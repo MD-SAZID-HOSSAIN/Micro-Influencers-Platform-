@@ -28,6 +28,16 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
 ]
 
+TEMPLATES = [
+    {
+        # Needed for Swagger UI and plain-text email templates.
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {"context_processors": []},
+    }
+]
+
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
@@ -58,6 +68,16 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Micro-Influencers' Platform API",
+    "DESCRIPTION": "REST API for the creator / brand marketplace.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",
 }
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
