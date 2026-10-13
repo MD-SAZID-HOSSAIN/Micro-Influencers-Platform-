@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from urllib.parse import urlencode
 
+import re
+from urllib.parse import parse_qs, urlparse
+
 import requests
 from django.conf import settings
 
@@ -50,6 +53,45 @@ class ChannelSnapshot:
     subscribers: int
     engagement_rate: Decimal
     recent_content: list[dict] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class VideoStats:
+    """Public counters for one video. ``None`` means the owner hides that counter."""
+
+    views: int | None
+    likes: int | None
+    comments: int | None
+
+
+_VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_PATH_ID = re.compile(r"^/(?:shorts|embed|live|v)/([^/?#]+)")
+
+
+def youtube_video_id(url: str) -> str | None:
+    """The video id in a YouTube link (watch, youtu.be, shorts, embed, live), or None."""
+    try:
+        parsed = urlparse(url or "")
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    for prefix in ("www.", "m."):
+        host = host.removeprefix(prefix)
+    if host == "youtu.be":
+        candidate = parsed.path.lstrip("/").split("/")[0]
+    elif host in ("youtube.com", "music.youtube.com"):
+        if parsed.path == "/watch":
+            candidate = parse_qs(parsed.query).get("v", [""])[0]
+        else:
+            match = _PATH_ID.match(parsed.path)
+            candidate = match.group(1) if match else ""
+    else:
+        return None
+    return candidate if _VIDEO_ID.match(candidate) else None
+
+
+def _count(value) -> int | None:
+    return int(value) if value is not None else None
 
 
 def _error_reasons(response: requests.Response) -> set[str]:
@@ -129,6 +171,29 @@ class YouTubeClient:
                 for v in videos
             ],
         )
+
+    def fetch_video_stats(self, video_ids: list[str], api_key: str) -> dict[str, VideoStats]:
+        """Public statistics for up to 50 videos, using the server's API key (no creator login needed).
+
+        Videos Google does not return (deleted, private) are simply absent from the result.
+        """
+        if not video_ids:
+            return {}
+        response = self._send(
+            "GET",
+            f"{API_URL}/videos",
+            params={"part": "statistics", "id": ",".join(video_ids), "key": api_key},
+        )
+        self._raise_for_status(response)
+        found = {}
+        for item in response.json().get("items", []):
+            stats = item.get("statistics", {})
+            found[item["id"]] = VideoStats(
+                views=_count(stats.get("viewCount")),
+                likes=_count(stats.get("likeCount")),
+                comments=_count(stats.get("commentCount")),
+            )
+        return found
 
     # -- internals ----------------------------------------------------------------------
 

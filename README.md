@@ -116,6 +116,7 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
 | `GOOGLE_REDIRECT_URI` | The callback URL registered with Google. |
+| `YOUTUBE_API_KEY` | Optional server key for public video statistics (brand analytics). Without it, content performance shows `not_available`. |
 | `EMAIL_BACKEND` | Django email backend; console in development, SMTP in production. |
 | `EMAIL_HOST` | SMTP host. |
 | `EMAIL_PORT` | SMTP port. |

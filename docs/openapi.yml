@@ -594,6 +594,54 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/brand/campaigns/{id}/analytics/:
+    get:
+      operationId: brand_campaigns_analytics_retrieve
+      description: Proposal metrics for one of the brand's campaigns (another brand's
+        campaign is a 404).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Campaigns
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignMetrics'
+          description: ''
+  /api/v1/brand/campaigns/{id}/analytics/content/:
+    get:
+      operationId: brand_campaigns_analytics_content_list
+      description: |-
+        Views, likes, comments and engagement per delivered post, from the daily snapshot.
+
+        Opening this never calls YouTube. Figures the platform does not provide are "not_available".
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Campaigns
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContentPerformanceRow'
+          description: ''
   /api/v1/brand/campaigns/{id}/close/:
     post:
       operationId: brand_campaigns_close_create
@@ -1811,6 +1859,16 @@ paths:
           description: No response body
 components:
   schemas:
+    AcceptedVsNeeded:
+      type: object
+      properties:
+        accepted:
+          type: integer
+        needed:
+          type: integer
+      required:
+      - accepted
+      - needed
     AdminActionLog:
       type: object
       properties:
@@ -2318,6 +2376,38 @@ components:
       - platform
       - status
       - title
+    CampaignMetrics:
+      type: object
+      properties:
+        views:
+          type: integer
+          description: Times creators opened this campaign.
+        funnel:
+          $ref: '#/components/schemas/Funnel'
+        accepted_vs_needed:
+          $ref: '#/components/schemas/AcceptedVsNeeded'
+        avg_proposed_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        budget_per_creator:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        acceptance_rate:
+          type: number
+          format: double
+          nullable: true
+          description: Currently accepted / received, from 0 to 1. Null until a proposal
+            arrives.
+      required:
+      - acceptance_rate
+      - accepted_vs_needed
+      - avg_proposed_rate
+      - budget_per_creator
+      - funnel
+      - views
     CampaignStatusEnum:
       enum:
       - draft
@@ -2342,6 +2432,69 @@ components:
       - completed_at
       - id
       - status
+    ContentPerformanceRow:
+      type: object
+      description: Views, likes, comments and engagement of one delivered post, from
+        the last daily sync.
+      properties:
+        deliverable_id:
+          type: integer
+        proposal_id:
+          type: integer
+        creator:
+          $ref: '#/components/schemas/DeliverableCreator'
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        post_url:
+          type: string
+          format: uri
+        views:
+          oneOf:
+          - type: integer
+          - type: string
+            enum:
+            - not_available
+          description: A number, or the text 'not_available' when the platform does
+            not provide it.
+        likes:
+          oneOf:
+          - type: integer
+          - type: string
+            enum:
+            - not_available
+          description: A number, or the text 'not_available' when the platform does
+            not provide it.
+        comments:
+          oneOf:
+          - type: integer
+          - type: string
+            enum:
+            - not_available
+          description: A number, or the text 'not_available' when the platform does
+            not provide it.
+        engagement_rate:
+          oneOf:
+          - type: string
+            example: '3.33'
+          - type: string
+            enum:
+            - not_available
+          description: A percentage with two decimals, or 'not_available'.
+        synced_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - comments
+      - creator
+      - deliverable_id
+      - engagement_rate
+      - likes
+      - platform
+      - post_url
+      - proposal_id
+      - synced_at
+      - views
     CreatorCard:
       type: object
       description: A directory result. Expects a profile annotated by ``annotate_primary_stats``.
@@ -2707,6 +2860,26 @@ components:
           pattern: ^\d{6}$
       required:
       - code
+    Funnel:
+      type: object
+      properties:
+        received:
+          type: integer
+          description: Every proposal received, withdrawn ones included.
+        shortlisted:
+          type: integer
+        accepted:
+          type: integer
+        rejected:
+          type: integer
+        withdrawn:
+          type: integer
+      required:
+      - accepted
+      - received
+      - rejected
+      - shortlisted
+      - withdrawn
     KindEnum:
       enum:
       - proposal_shortlisted

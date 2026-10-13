@@ -58,6 +58,11 @@ class Deliverable(models.Model):
     post_url = models.URLField(max_length=500)
     platform = models.CharField(max_length=20, choices=Platform.choices)
     note = models.CharField(max_length=500, blank=True, default="")
+    # Snapshot of the video's public counters, refreshed daily by a background job (null = unknown).
+    views_count = models.PositiveBigIntegerField(null=True, blank=True)
+    likes_count = models.PositiveBigIntegerField(null=True, blank=True)
+    comments_count = models.PositiveBigIntegerField(null=True, blank=True)
+    stats_synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

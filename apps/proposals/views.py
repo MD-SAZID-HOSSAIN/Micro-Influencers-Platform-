@@ -11,6 +11,7 @@ from apps.core.permissions import IsBrand, IsCreator
 from apps.social.queries import annotate_primary_stats
 
 from .apply_state import accepted_count
+from .deliverable_stats import content_performance
 from .deliverables import (
     complete_proposal,
     delete_deliverable,
@@ -23,6 +24,7 @@ from .serializers import (
     BrandProposalSerializer,
     CampaignDeliverablesRowSerializer,
     CompletionResultSerializer,
+    ContentPerformanceRowSerializer,
     DeliverableSerializer,
     MyProposalSerializer,
     ProposalActionResultSerializer,
@@ -273,3 +275,17 @@ class CompleteProposalView(APIView):
         return Response(
             {"id": proposal.id, "status": proposal.status, "completed_at": proposal.completed_at}
         )
+
+
+class CampaignContentPerformanceView(APIView):
+    """Views, likes, comments and engagement per delivered post, from the daily snapshot.
+
+    Opening this never calls YouTube. Figures the platform does not provide are "not_available".
+    """
+
+    permission_classes = [IsBrand]
+
+    @extend_schema(tags=["Campaigns"], responses={200: ContentPerformanceRowSerializer(many=True)})
+    def get(self, request, pk):
+        campaign = get_object_or_404(Campaign, pk=pk, brand=request.user)
+        return Response(ContentPerformanceRowSerializer(content_performance(campaign), many=True).data)

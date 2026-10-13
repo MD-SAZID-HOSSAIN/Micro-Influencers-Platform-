@@ -40,6 +40,10 @@ class FakeYouTubeClient:
         self.fetch_calls: list[str] = []
         self.refresh_calls: list[str] = []
         self.exchange_calls: list[str] = []
+        # video statistics (FR-23 content performance): id -> VideoStats, or an exception per batch
+        self.video_results: dict[str, object] = {}
+        self.video_batch_errors: list[Exception | None] = []  # consumed one per call, in order
+        self.video_calls: list[tuple[list[str], str]] = []
 
     def build_auth_url(self, state):
         return f"https://accounts.google.com/o/oauth2/v2/auth?state={state}"
@@ -55,6 +59,14 @@ class FakeYouTubeClient:
     def fetch_channel(self, access_token):
         self.fetch_calls.append(access_token)
         return self._result(self.fetch_results.get(access_token, self.default_snapshot))
+
+    def fetch_video_stats(self, video_ids, api_key):
+        self.video_calls.append((list(video_ids), api_key))
+        if self.video_batch_errors:
+            error = self.video_batch_errors.pop(0)
+            if error is not None:
+                raise error
+        return {vid: self.video_results[vid] for vid in video_ids if vid in self.video_results}
 
     @staticmethod
     def _result(value):

@@ -14,6 +14,7 @@ OAUTH_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789a="
 GOOGLE_CLIENT_ID = "test-client-id"
 GOOGLE_CLIENT_SECRET = "test-client-secret"
 GOOGLE_REDIRECT_URI = "http://testserver/api/v1/social/youtube/callback/"
+YOUTUBE_API_KEY = "test-youtube-api-key"
 FRONTEND_URL = "http://frontend.test"
 CORS_ALLOWED_ORIGINS = ["http://frontend.test"]
 

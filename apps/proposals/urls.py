@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AcceptProposalView,
     BrandProposalListView,
+    CampaignContentPerformanceView,
     CampaignDeliverablesView,
     CompleteProposalView,
     DeliverableDetailView,
@@ -15,6 +16,11 @@ from .views import (
 )
 
 urlpatterns = [
+    path(
+        "brand/campaigns/<int:pk>/analytics/content/",
+        CampaignContentPerformanceView.as_view(),
+        name="campaign-content-performance",
+    ),
     path(
         "creators/me/proposals/<int:pk>/deliverables/",
         DeliverableListCreateView.as_view(),

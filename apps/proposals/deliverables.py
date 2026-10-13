@@ -61,6 +61,9 @@ def update_deliverable(*, creator: User, proposal_id: int, deliverable_id: int, 
         if deliverable is None:
             raise NotFound("Deliverable not found.")
         _ensure_editable(proposal)
+        if "post_url" in changes and changes["post_url"] != deliverable.post_url:
+            deliverable.views_count = deliverable.likes_count = deliverable.comments_count = None
+            deliverable.stats_synced_at = None  # the numbers belonged to the old video
         for field, value in changes.items():
             setattr(deliverable, field, value)
         deliverable.save()

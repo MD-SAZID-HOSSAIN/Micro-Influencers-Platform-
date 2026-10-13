@@ -163,6 +163,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.social.tasks.sync_all_youtube",
         "schedule": crontab(hour=3, minute=0),
     },
+    "sync-deliverable-stats": {
+        "task": "apps.proposals.tasks.sync_deliverable_stats",
+        "schedule": crontab(hour=4, minute=0),
+    },
     "close-expired-campaigns": {
         "task": "apps.campaigns.tasks.close_expired_campaigns",
         "schedule": crontab(minute="*/5"),
@@ -185,3 +189,5 @@ OAUTH_ENCRYPTION_KEY = env("OAUTH_ENCRYPTION_KEY", default="")
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
 GOOGLE_REDIRECT_URI = env("GOOGLE_REDIRECT_URI", default="")
+# Server-side key for public YouTube video statistics (content performance); optional.
+YOUTUBE_API_KEY = env("YOUTUBE_API_KEY", default="")

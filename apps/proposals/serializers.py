@@ -213,3 +213,41 @@ class CampaignDeliverablesRowSerializer(serializers.Serializer):
     @extend_schema_field(DeliverableCreatorSerializer)
     def get_creator(self, proposal) -> dict:
         return {"id": proposal.creator_id, "name": proposal.creator.full_name}
+
+
+_NUMBER_OR_NOT_AVAILABLE = {
+    "oneOf": [{"type": "integer"}, {"type": "string", "enum": ["not_available"]}],
+    "description": "A number, or the text 'not_available' when the platform does not provide it.",
+}
+_DECIMAL_OR_NOT_AVAILABLE = {
+    "oneOf": [{"type": "string", "example": "3.33"}, {"type": "string", "enum": ["not_available"]}],
+    "description": "A percentage with two decimals, or 'not_available'.",
+}
+
+
+@extend_schema_field(_NUMBER_OR_NOT_AVAILABLE)
+class MetricField(serializers.JSONField):
+    """An integer counter, or the text 'not_available'."""
+
+
+@extend_schema_field(_DECIMAL_OR_NOT_AVAILABLE)
+class RateField(serializers.JSONField):
+    """A percentage as a two-decimal string, or the text 'not_available'."""
+
+    def to_representation(self, value):
+        return str(value) if isinstance(value, Decimal) else value
+
+
+class ContentPerformanceRowSerializer(serializers.Serializer):
+    """Views, likes, comments and engagement of one delivered post, from the last daily sync."""
+
+    deliverable_id = serializers.IntegerField()
+    proposal_id = serializers.IntegerField()
+    creator = DeliverableCreatorSerializer()
+    platform = serializers.ChoiceField(choices=Platform.choices)
+    post_url = serializers.URLField()
+    views = MetricField()
+    likes = MetricField()
+    comments = MetricField()
+    engagement_rate = RateField()
+    synced_at = serializers.DateTimeField(allow_null=True)
