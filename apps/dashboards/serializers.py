@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
+from apps.campaigns.models import Campaign
 from apps.campaigns.serializers import CampaignCardSerializer
 from apps.proposals.serializers import MyProposalSerializer
 from apps.social.models import YouTubeConnection
@@ -28,3 +30,36 @@ class CreatorDashboardSerializer(serializers.Serializer):
     applications = MyProposalSerializer(many=True)
     accepted_campaigns = MyProposalSerializer(many=True)
     performance = PerformanceSerializer()
+
+
+class BrandDashboardCampaignSerializer(serializers.ModelSerializer):
+    """One quick-link row. Expects ``proposal_count`` / ``accepted_count`` annotations."""
+
+    proposals_url = serializers.SerializerMethodField()
+    proposal_count = serializers.IntegerField(help_text="All proposals received, withdrawn included.")
+    accepted_count = serializers.IntegerField(help_text="Proposals currently Accepted.")
+
+    class Meta:
+        model = Campaign
+        fields = [
+            "id",
+            "title",
+            "status",
+            "proposals_url",
+            "proposal_count",
+            "accepted_count",
+            "creators_needed",
+        ]
+        read_only_fields = fields
+
+    def get_proposals_url(self, campaign) -> str:
+        return reverse("brand-campaign-proposals", kwargs={"pk": campaign.pk})
+
+
+class BrandDashboardSerializer(serializers.Serializer):
+    total_campaigns = serializers.IntegerField()
+    active_campaigns = serializers.IntegerField(help_text="Campaigns currently Published.")
+    total_proposals = serializers.IntegerField(help_text="Across all campaigns, withdrawn included.")
+    shortlisted_count = serializers.IntegerField(help_text="Proposals currently Shortlisted.")
+    accepted_count = serializers.IntegerField(help_text="Proposals currently Accepted.")
+    campaigns = BrandDashboardCampaignSerializer(many=True, help_text="The 50 newest campaigns.")

@@ -3,6 +3,7 @@ from django.db.models import Count, Q
 
 from apps.accounts.models import User
 from apps.campaigns.discovery import discovery_queryset
+from apps.campaigns.models import Campaign
 from apps.profiles.services import completion_percent, get_or_create_profile
 from apps.proposals.models import Proposal
 from apps.social.services import connection_status
@@ -10,6 +11,7 @@ from apps.social.services import connection_status
 AVAILABLE_CAMPAIGNS_LIMIT = 5
 APPLICATIONS_LIMIT = 10
 ACCEPTED_LIMIT = 20
+BRAND_CAMPAIGN_ROWS_LIMIT = 50
 
 
 def creator_dashboard(user: User) -> dict:
@@ -41,4 +43,35 @@ def creator_dashboard(user: User) -> dict:
             "accepted": accepted,
             "acceptance_rate": round(accepted / sent, 4) if sent else None,
         },
+    }
+
+
+def brand_dashboard(user: User) -> dict:
+    """A brand's home: headline counts over everything, plus rows for its newest campaigns.
+
+    The counts come from two aggregate queries and the rows from one annotated query,
+    so the cost does not grow with the number of campaigns or proposals.
+    """
+    campaigns = Campaign.objects.filter(brand=user)
+    campaign_totals = campaigns.aggregate(
+        total=Count("id"),
+        active=Count("id", filter=Q(status=Campaign.Status.PUBLISHED)),
+    )
+    proposal_totals = Proposal.objects.filter(campaign__brand=user).aggregate(
+        total=Count("id"),  # withdrawn proposals included
+        shortlisted=Count("id", filter=Q(status=Proposal.Status.SHORTLISTED)),
+        accepted=Count("id", filter=Q(status=Proposal.Status.ACCEPTED)),  # only currently Accepted
+    )
+    rows = campaigns.annotate(
+        proposal_count=Count("proposals"),
+        accepted_count=Count("proposals", filter=Q(proposals__status=Proposal.Status.ACCEPTED)),
+    ).order_by("-created_at", "-id")[:BRAND_CAMPAIGN_ROWS_LIMIT]
+
+    return {
+        "total_campaigns": campaign_totals["total"],
+        "active_campaigns": campaign_totals["active"],
+        "total_proposals": proposal_totals["total"],
+        "shortlisted_count": proposal_totals["shortlisted"],
+        "accepted_count": proposal_totals["accepted"],
+        "campaigns": list(rows),
     }
