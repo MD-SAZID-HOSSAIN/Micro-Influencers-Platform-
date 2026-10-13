@@ -4,10 +4,14 @@ from .views import (
     BrandCampaignDetailView,
     BrandCampaignListCreateView,
     CloseCampaignView,
+    CreatorCampaignDetailView,
+    CreatorCampaignListView,
     PublishCampaignView,
 )
 
 urlpatterns = [
+    path("campaigns/", CreatorCampaignListView.as_view(), name="campaigns"),
+    path("campaigns/<int:pk>/", CreatorCampaignDetailView.as_view(), name="campaign-detail"),
     path("brand/campaigns/", BrandCampaignListCreateView.as_view(), name="brand-campaigns"),
     path("brand/campaigns/<int:pk>/", BrandCampaignDetailView.as_view(), name="brand-campaign"),
     path(

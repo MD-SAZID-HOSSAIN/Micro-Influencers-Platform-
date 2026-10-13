@@ -5,10 +5,18 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.permissions import IsBrand
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 
+from apps.core.permissions import IsBrand, IsCreator
+
+from .discovery import CampaignFilterSerializer, discovery_queryset, followers_by_platform
 from .models import Campaign
-from .serializers import BrandCampaignListFilterSerializer, CampaignSerializer
+from .serializers import (
+    BrandCampaignListFilterSerializer,
+    CampaignCardSerializer,
+    CampaignDetailSerializer,
+    CampaignSerializer,
+)
 from .services import (
     CampaignNotEditable,
     close_campaign,
@@ -92,3 +100,36 @@ class CloseCampaignView(_TransitionView):
 
     def transition(self, campaign):
         return close_campaign(campaign)
+
+
+class _CreatorCampaignMixin:
+    permission_classes = [IsCreator]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["followers_by_platform"] = followers_by_platform(self.request.user)
+        return context
+
+
+@extend_schema(tags=["Discovery"], parameters=[CampaignFilterSerializer])
+class CreatorCampaignListView(_CreatorCampaignMixin, ListAPIView):
+    """Open (published, not past deadline) campaigns for logged-in creators."""
+
+    serializer_class = CampaignCardSerializer
+
+    def get_queryset(self):
+        params = CampaignFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        return discovery_queryset(params.validated_data)
+
+
+@extend_schema(tags=["Discovery"])
+class CreatorCampaignDetailView(_CreatorCampaignMixin, RetrieveAPIView):
+    """Full details of a published or closed campaign. Drafts are never visible."""
+
+    serializer_class = CampaignDetailSerializer
+
+    def get_queryset(self):
+        return Campaign.objects.filter(
+            status__in=[Campaign.Status.PUBLISHED, Campaign.Status.CLOSED]
+        ).select_related("brand__brand_profile")

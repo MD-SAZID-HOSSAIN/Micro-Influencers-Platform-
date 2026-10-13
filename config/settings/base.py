@@ -101,6 +101,8 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "PlatformEnum": "apps.core.choices.Platform",
         "NicheEnum": "apps.core.choices.Niche",
+        "CampaignStatusEnum": "apps.campaigns.models.Campaign.Status",
+        "YouTubeConnectionStatusEnum": "apps.social.models.YouTubeConnection.Status",
     },
 }
 
