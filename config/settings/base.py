@@ -20,7 +20,10 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     "apps.core",
+    "apps.accounts",
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -70,6 +73,9 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
+    "DEFAULT_THROTTLE_RATES": {
+        "register": "5/min",
+    },
 }
 
 SPECTACULAR_SETTINGS = {
