@@ -155,3 +155,28 @@ class CampaignDetailSerializer(CampaignCardSerializer):
 
 class BrandCampaignListFilterSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Campaign.Status.choices, required=False)
+
+
+class FunnelSerializer(serializers.Serializer):
+    received = serializers.IntegerField(help_text="Every proposal received, withdrawn ones included.")
+    shortlisted = serializers.IntegerField()
+    accepted = serializers.IntegerField()
+    rejected = serializers.IntegerField()
+    withdrawn = serializers.IntegerField()
+
+
+class AcceptedVsNeededSerializer(serializers.Serializer):
+    accepted = serializers.IntegerField()
+    needed = serializers.IntegerField()
+
+
+class CampaignMetricsSerializer(serializers.Serializer):
+    views = serializers.IntegerField(help_text="Times creators opened this campaign.")
+    funnel = FunnelSerializer()
+    accepted_vs_needed = AcceptedVsNeededSerializer()
+    avg_proposed_rate = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
+    budget_per_creator = serializers.DecimalField(max_digits=10, decimal_places=2)
+    acceptance_rate = serializers.FloatField(
+        allow_null=True,
+        help_text="Currently accepted / received, from 0 to 1. Null until a proposal arrives.",
+    )

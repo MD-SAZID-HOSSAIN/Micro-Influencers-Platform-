@@ -49,3 +49,19 @@ class Campaign(models.Model):
 
     def __str__(self):
         return f"Campaign({self.pk}, {self.title!r}, {self.status})"
+
+
+class CampaignView(models.Model):
+    """How often one creator has opened a campaign. One row per creator, so the table stays small."""
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="views")
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="campaign_views"
+    )
+    view_count = models.PositiveIntegerField(default=0)
+    last_viewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["campaign", "creator"], name="uniq_view_per_creator_campaign")
+        ]

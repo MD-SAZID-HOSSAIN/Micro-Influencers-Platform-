@@ -9,11 +9,13 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 
 from apps.core.permissions import IsBrand, IsCreator
 
+from .analytics import campaign_metrics, record_campaign_view
 from .discovery import CampaignFilterSerializer, discovery_queryset, followers_by_platform
 from .models import Campaign
 from .serializers import (
     BrandCampaignListFilterSerializer,
     CampaignCardSerializer,
+    CampaignMetricsSerializer,
     CampaignDetailSerializer,
     CampaignSerializer,
 )
@@ -133,3 +135,19 @@ class CreatorCampaignDetailView(_CreatorCampaignMixin, RetrieveAPIView):
         return Campaign.objects.filter(
             status__in=[Campaign.Status.PUBLISHED, Campaign.Status.CLOSED]
         ).select_related("brand__brand_profile")
+
+    def retrieve(self, request, *args, **kwargs):
+        campaign = self.get_object()
+        record_campaign_view(campaign, request.user)  # feeds the brand's analytics
+        return Response(self.get_serializer(campaign).data)
+
+
+class CampaignAnalyticsView(APIView):
+    """Proposal metrics for one of the brand's campaigns (another brand's campaign is a 404)."""
+
+    permission_classes = [IsBrand]
+
+    @extend_schema(tags=["Campaigns"], responses={200: CampaignMetricsSerializer})
+    def get(self, request, pk):
+        campaign = get_object_or_404(Campaign, pk=pk, brand=request.user)
+        return Response(CampaignMetricsSerializer(campaign_metrics(campaign)).data)
