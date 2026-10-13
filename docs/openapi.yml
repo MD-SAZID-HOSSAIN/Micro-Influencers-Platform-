@@ -355,6 +355,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/Campaign'
           description: ''
+  /api/v1/brand/campaigns/{id}/deliverables/:
+    get:
+      operationId: brand_campaigns_deliverables_list
+      description: What each accepted creator has delivered, for the owner of the
+        campaign.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CampaignDeliverablesRow'
+          description: ''
   /api/v1/brand/campaigns/{id}/proposals/:
     get:
       operationId: brand_campaigns_proposals_list
@@ -448,6 +472,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProposalActionResult'
+          description: ''
+  /api/v1/brand/proposals/{id}/complete/:
+    post:
+      operationId: brand_proposals_complete_create
+      description: Mark an accepted collaboration Completed. Final; unlocks the review.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionResult'
           description: ''
   /api/v1/brand/proposals/{id}/reject/:
     post:
@@ -1025,6 +1070,123 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMyProposalList'
           description: ''
+  /api/v1/creators/me/proposals/{id}/deliverables/:
+    get:
+      operationId: creators_me_proposals_deliverables_list
+      description: The content an accepted creator delivered for a proposal. New ones
+        are accepted until completion.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deliverable'
+          description: ''
+    post:
+      operationId: creators_me_proposals_deliverables_create
+      description: The content an accepted creator delivered for a proposal. New ones
+        are accepted until completion.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Deliverable'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Deliverable'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Deliverable'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deliverable'
+          description: ''
+  /api/v1/creators/me/proposals/{id}/deliverables/{deliverable_id}/:
+    patch:
+      operationId: creators_me_proposals_deliverables_partial_update
+      description: Update or remove one deliverable, until the brand marks the collaboration
+        Completed.
+      parameters:
+      - in: path
+        name: deliverable_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDeliverable'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDeliverable'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDeliverable'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deliverable'
+          description: ''
+    delete:
+      operationId: creators_me_proposals_deliverables_destroy
+      description: Update or remove one deliverable, until the brand marks the collaboration
+        Completed.
+      parameters:
+      - in: path
+        name: deliverable_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Proposals
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/creators/me/proposals/{id}/withdraw/:
     post:
       operationId: creators_me_proposals_withdraw_create
@@ -1457,11 +1619,17 @@ components:
         profile_url:
           type: string
           readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
           readOnly: true
       required:
+      - completed_at
       - cover_message
       - created_at
       - creator
@@ -1604,6 +1772,29 @@ components:
       - niche
       - platform
       - title
+    CampaignDeliverablesRow:
+      type: object
+      description: One accepted creator and everything they have delivered for a campaign.
+      properties:
+        proposal_id:
+          type: integer
+        creator:
+          allOf:
+          - $ref: '#/components/schemas/DeliverableCreator'
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        deliverables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deliverable'
+      required:
+      - completed_at
+      - creator
+      - deliverables
+      - proposal_id
     CampaignDetail:
       type: object
       description: Full details plus the viewing creator's apply state (needs ``request``
@@ -1698,6 +1889,20 @@ components:
         * `draft` - Draft
         * `published` - Published
         * `closed` - Closed
+    CompletionResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ProposalStatusEnum'
+        completed_at:
+          type: string
+          format: date-time
+      required:
+      - completed_at
+      - id
+      - status
     CreatorCard:
       type: object
       description: A directory result. Expects a profile annotated by ``annotate_primary_stats``.
@@ -1968,6 +2173,46 @@ components:
       - last_synced_at
       - needs_reconnect
       - status
+    Deliverable:
+      type: object
+      description: A link to published content. Used for create (all fields) and for
+        partial update.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        post_url:
+          type: string
+          maxLength: 500
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        note:
+          type: string
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - platform
+      - post_url
+      - updated_at
+    DeliverableCreator:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
     Detail:
       type: object
       properties:
@@ -2051,6 +2296,11 @@ components:
           type: string
           format: date-time
           readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         withdrawal_reason:
           type: string
           nullable: true
@@ -2061,6 +2311,7 @@ components:
           readOnly: true
       required:
       - campaign
+      - completed_at
       - created_at
       - id
       - proposed_rate
@@ -2465,6 +2716,30 @@ components:
           items:
             $ref: '#/components/schemas/PlatformStats'
           readOnly: true
+    PatchedDeliverable:
+      type: object
+      description: A link to published content. Used for create (all fields) and for
+        partial update.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        post_url:
+          type: string
+          maxLength: 500
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        note:
+          type: string
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedNotificationSettings:
       type: object
       properties:
@@ -2590,12 +2865,18 @@ components:
         withdrawal_reason:
           type: string
           readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
           readOnly: true
       required:
       - campaign_id
+      - completed_at
       - cover_message
       - created_at
       - experience_note

@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
-from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, ListCreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,9 +11,19 @@ from apps.core.permissions import IsBrand, IsCreator
 from apps.social.queries import annotate_primary_stats
 
 from .apply_state import accepted_count
+from .deliverables import (
+    complete_proposal,
+    delete_deliverable,
+    list_deliverables,
+    submit_deliverable,
+    update_deliverable,
+)
 from .models import Proposal
 from .serializers import (
     BrandProposalSerializer,
+    CampaignDeliverablesRowSerializer,
+    CompletionResultSerializer,
+    DeliverableSerializer,
     MyProposalSerializer,
     ProposalActionResultSerializer,
     ProposalSerializer,
@@ -186,3 +196,80 @@ class MyProposalListView(ListAPIView):
         if wanted := params.validated_data.get("status"):
             proposals = proposals.filter(status=wanted)
         return proposals
+
+
+@extend_schema(tags=["Proposals"])
+class DeliverableListCreateView(ListCreateAPIView):
+    """The content an accepted creator delivered for a proposal. New ones are accepted until completion."""
+
+    permission_classes = [IsCreator]
+    serializer_class = DeliverableSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        return list_deliverables(creator=self.request.user, proposal_id=self.kwargs["pk"])
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        deliverable = submit_deliverable(
+            creator=request.user, proposal_id=kwargs["pk"], **serializer.validated_data
+        )
+        return Response(self.get_serializer(deliverable).data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(tags=["Proposals"])
+class DeliverableDetailView(GenericAPIView):
+    """Update or remove one deliverable, until the brand marks the collaboration Completed."""
+
+    permission_classes = [IsCreator]
+    serializer_class = DeliverableSerializer
+    http_method_names = ["patch", "delete", "options"]
+
+    def patch(self, request, pk, deliverable_id):
+        serializer = self.get_serializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        deliverable = update_deliverable(
+            creator=request.user,
+            proposal_id=pk,
+            deliverable_id=deliverable_id,
+            changes=serializer.validated_data,
+        )
+        return Response(self.get_serializer(deliverable).data)
+
+    @extend_schema(responses={204: None})
+    def delete(self, request, pk, deliverable_id):
+        delete_deliverable(creator=request.user, proposal_id=pk, deliverable_id=deliverable_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=["Proposals"], responses={200: CampaignDeliverablesRowSerializer(many=True)})
+class CampaignDeliverablesView(ListAPIView):
+    """What each accepted creator has delivered, for the owner of the campaign."""
+
+    permission_classes = [IsBrand]
+    serializer_class = CampaignDeliverablesRowSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        campaign = get_object_or_404(Campaign, pk=self.kwargs["pk"], brand=self.request.user)
+        return (
+            Proposal.objects.filter(campaign=campaign, status=Proposal.Status.ACCEPTED)
+            .select_related("creator")
+            .prefetch_related("deliverables")
+            .order_by("created_at", "id")
+        )
+
+
+class CompleteProposalView(APIView):
+    """Mark an accepted collaboration Completed. Final; unlocks the review."""
+
+    permission_classes = [IsBrand]
+    http_method_names = ["post", "options"]
+
+    @extend_schema(tags=["Proposals"], request=None, responses={200: CompletionResultSerializer})
+    def post(self, request, pk):
+        proposal = complete_proposal(brand=request.user, proposal_id=pk)
+        return Response(
+            {"id": proposal.id, "status": proposal.status, "completed_at": proposal.completed_at}
+        )

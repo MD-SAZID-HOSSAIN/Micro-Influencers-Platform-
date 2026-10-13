@@ -7,10 +7,11 @@ from rest_framework.reverse import reverse
 
 from apps.campaigns.models import Campaign
 from apps.campaigns.serializers import brand_summary
+from apps.core.choices import Platform
 from apps.core.fields import SafeCharField
 from apps.core.validators import validate_safe_url
 
-from .models import Proposal
+from .models import Deliverable, Proposal
 
 MAX_PORTFOLIO_LINKS = 3
 MAX_WITHDRAWAL_REASON = 300
@@ -66,6 +67,7 @@ class BrandProposalSerializer(serializers.ModelSerializer):
             "status",
             "withdrawal_reason",
             "profile_url",
+            "completed_at",
             "created_at",
         ]
         read_only_fields = fields
@@ -109,6 +111,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             "portfolio_links",
             "experience_note",
             "withdrawal_reason",
+            "completed_at",
             "created_at",
         ]
         read_only_fields = fields
@@ -143,7 +146,15 @@ class MyProposalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Proposal
-        fields = ["id", "status", "proposed_rate", "created_at", "withdrawal_reason", "campaign"]
+        fields = [
+            "id",
+            "status",
+            "proposed_rate",
+            "created_at",
+            "completed_at",
+            "withdrawal_reason",
+            "campaign",
+        ]
         read_only_fields = fields
 
     @extend_schema_field(MyProposalCampaignSerializer)
@@ -159,3 +170,40 @@ class MyProposalSerializer(serializers.ModelSerializer):
 
     def get_withdrawal_reason(self, proposal) -> str | None:
         return proposal.withdrawal_reason or None
+
+
+class DeliverableSerializer(serializers.ModelSerializer):
+    """A link to published content. Used for create (all fields) and for partial update."""
+
+    post_url = serializers.CharField(max_length=500, validators=[validate_safe_url])
+    platform = serializers.ChoiceField(choices=Platform.choices)
+    note = SafeCharField(max_length=500, allow_blank=True, required=False)
+
+    class Meta:
+        model = Deliverable
+        fields = ["id", "post_url", "platform", "note", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class CompletionResultSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=Proposal.Status.choices)
+    completed_at = serializers.DateTimeField()
+
+
+class DeliverableCreatorSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class CampaignDeliverablesRowSerializer(serializers.Serializer):
+    """One accepted creator and everything they have delivered for a campaign."""
+
+    proposal_id = serializers.IntegerField(source="id")
+    creator = serializers.SerializerMethodField()
+    completed_at = serializers.DateTimeField(allow_null=True)
+    deliverables = DeliverableSerializer(many=True)
+
+    @extend_schema_field(DeliverableCreatorSerializer)
+    def get_creator(self, proposal) -> dict:
+        return {"id": proposal.creator_id, "name": proposal.creator.full_name}

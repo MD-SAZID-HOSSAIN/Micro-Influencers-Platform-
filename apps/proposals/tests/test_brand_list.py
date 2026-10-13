@@ -166,6 +166,7 @@ def test_item_shows_everything_the_brand_needs_to_decide(brand, campaign, auth_c
         "status": "pending",
         "withdrawal_reason": None,
         "profile_url": f"/api/v1/creators/{creator.id}/",
+        "completed_at": None,
         "created_at": item["created_at"],
     }
 

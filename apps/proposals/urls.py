@@ -3,6 +3,10 @@ from django.urls import path
 from .views import (
     AcceptProposalView,
     BrandProposalListView,
+    CampaignDeliverablesView,
+    CompleteProposalView,
+    DeliverableDetailView,
+    DeliverableListCreateView,
     MyProposalListView,
     RejectProposalView,
     ShortlistProposalView,
@@ -11,6 +15,22 @@ from .views import (
 )
 
 urlpatterns = [
+    path(
+        "creators/me/proposals/<int:pk>/deliverables/",
+        DeliverableListCreateView.as_view(),
+        name="deliverables",
+    ),
+    path(
+        "creators/me/proposals/<int:pk>/deliverables/<int:deliverable_id>/",
+        DeliverableDetailView.as_view(),
+        name="deliverable",
+    ),
+    path("brand/proposals/<int:pk>/complete/", CompleteProposalView.as_view(), name="proposal-complete"),
+    path(
+        "brand/campaigns/<int:pk>/deliverables/",
+        CampaignDeliverablesView.as_view(),
+        name="campaign-deliverables",
+    ),
     path("creators/me/proposals/", MyProposalListView.as_view(), name="my-proposals"),
     path("brand/proposals/<int:pk>/shortlist/", ShortlistProposalView.as_view(), name="proposal-shortlist"),
     path("brand/proposals/<int:pk>/accept/", AcceptProposalView.as_view(), name="proposal-accept"),

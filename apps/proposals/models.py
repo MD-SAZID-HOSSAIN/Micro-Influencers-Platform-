@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
+from apps.core.choices import Platform
+
 
 class Proposal(models.Model):
     """A creator's application to a campaign. Lightweight: status updates only, no messaging."""
@@ -25,6 +27,8 @@ class Proposal(models.Model):
     portfolio_links = models.JSONField(default=list, blank=True)  # up to 3 URLs
     experience_note = models.TextField(blank=True, default="")
     withdrawal_reason = models.CharField(max_length=300, blank=True, default="")
+    # Set when the brand marks the collaboration Completed: final, and unlocks the review.
+    completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -45,6 +49,23 @@ class Proposal(models.Model):
 
     def __str__(self):
         return f"Proposal({self.pk}, campaign={self.campaign_id}, {self.status})"
+
+
+class Deliverable(models.Model):
+    """A link to published content that an accepted creator delivered for a campaign."""
+
+    proposal = models.ForeignKey(Proposal, on_delete=models.CASCADE, related_name="deliverables")
+    post_url = models.URLField(max_length=500)
+    platform = models.CharField(max_length=20, choices=Platform.choices)
+    note = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"Deliverable({self.pk}, proposal={self.proposal_id})"
 
 
 ACTIVE_STATUSES = (

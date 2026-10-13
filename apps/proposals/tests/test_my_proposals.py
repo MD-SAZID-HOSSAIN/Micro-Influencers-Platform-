@@ -94,6 +94,7 @@ def test_item_shape_is_status_only(creator, auth_client):
         "status": "withdrawn",
         "proposed_rate": "275.50",
         "created_at": item["created_at"],
+        "completed_at": None,
         "withdrawal_reason": "Family emergency",
         "campaign": {
             "id": campaign.id,

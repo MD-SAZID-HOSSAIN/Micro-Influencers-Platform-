@@ -33,6 +33,11 @@ class InvalidTransition(Conflict):
     default_detail = "This change is not allowed for the proposal's current status."
 
 
+class AlreadyCompleted(Conflict):
+    default_code = "already_completed"
+    default_detail = "This collaboration is completed and can no longer be withdrawn."
+
+
 def submit_proposal(
     *,
     creator: User,
@@ -105,6 +110,8 @@ def withdraw_proposal(*, creator: User, proposal_id: int, reason: str | None) ->
     with transaction.atomic():
         campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
         proposal = Proposal.objects.select_for_update().get(pk=proposal_id)
+        if proposal.completed_at is not None:
+            raise AlreadyCompleted()  # completion is final
         if proposal.status not in ACTIVE_STATUSES:
             raise InvalidTransition()
 
