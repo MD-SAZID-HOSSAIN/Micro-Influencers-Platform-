@@ -44,6 +44,39 @@ class CodeLocked(DomainError):
     default_detail = "Too many incorrect attempts. Request a new code."
 
 
+class VerificationCodeInvalid(CodeInvalid):
+    default_code = "invalid_verification_code"
+
+
+class VerificationCodeExpired(CodeExpired):
+    default_code = "verification_code_expired"
+
+
+class VerificationCodeUsed(CodeUsed):
+    default_code = "verification_code_used"
+
+
+class VerificationCodeLocked(CodeLocked):
+    default_code = "verification_code_locked"
+
+
+# Error classes per purpose, so each flow reports codes that make sense to its own screen.
+_ERRORS = {
+    "password_reset": {
+        "invalid": CodeInvalid,
+        "used": CodeUsed,
+        "locked": CodeLocked,
+        "expired": CodeExpired,
+    },
+    "email_verification": {
+        "invalid": VerificationCodeInvalid,
+        "used": VerificationCodeUsed,
+        "locked": VerificationCodeLocked,
+        "expired": VerificationCodeExpired,
+    },
+}
+
+
 def _hash(user_id: int, purpose: str, code: str) -> str:
     message = f"{purpose}:{user_id}:{code}".encode()
     return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
@@ -73,6 +106,7 @@ def verify_code(user: User, purpose: str, code: str) -> None:
     hold under concurrency; the exception is raised afterwards so the attempt counter
     is committed rather than rolled back.
     """
+    errors = _ERRORS[purpose]
     failure: type[DomainError] | None = None
     with transaction.atomic():
         current = (
@@ -82,19 +116,19 @@ def verify_code(user: User, purpose: str, code: str) -> None:
             .first()
         )
         if current is None:
-            failure = CodeInvalid
+            failure = errors["invalid"]
         elif current.used_at is not None:
-            failure = CodeUsed
+            failure = errors["used"]
         elif current.attempts >= MAX_ATTEMPTS:
-            failure = CodeLocked
+            failure = errors["locked"]
         elif timezone.now() > current.expires_at:
-            failure = CodeExpired
+            failure = errors["expired"]
         elif hmac.compare_digest(current.code_hash, _hash(user.pk, purpose, code)):
             current.used_at = timezone.now()
             current.save(update_fields=["used_at"])
         else:
             current.attempts += 1
             current.save(update_fields=["attempts"])
-            failure = CodeInvalid
+            failure = errors["invalid"]
     if failure is not None:
         raise failure()

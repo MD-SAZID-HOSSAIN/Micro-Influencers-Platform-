@@ -41,6 +41,9 @@ PUBLIC_ROUTES = {
 ANY_AUTHENTICATED_ROUTES = {
     "/api/v1/auth/logout/",
     "/api/v1/auth/me/",
+    "/api/v1/auth/email/verify/",
+    "/api/v1/auth/email/resend/",
+    "/api/v1/settings/notifications/",
     "/api/v1/notifications/",
     "/api/v1/notifications/read-all/",
     "/api/v1/notifications/1/read/",
@@ -257,6 +260,8 @@ def test_no_secret_fields_or_values_appear_in_any_response(db):
         ("/api/v1/auth/register/", "register"),
         ("/api/v1/auth/password-reset/request/", "password_reset"),
         ("/api/v1/auth/password-reset/confirm/", "password_reset_confirm"),
+        ("/api/v1/auth/email/verify/", "email_verify"),
+        ("/api/v1/auth/email/resend/", "email_resend"),
     ],
 )
 def test_abuse_prone_endpoints_are_throttled(settings, path, scope):

@@ -1,0 +1,7 @@
+{% autoescape off %}{{ sentence }}
+
+Open it here: {{ url }}
+
+You are receiving this because notification emails are on for your account.
+Change that any time: {{ settings_url }}
+{% endautoescape %}

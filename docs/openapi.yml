@@ -14,6 +14,48 @@ info:
     ## Pagination
     List endpoints return `count`, `next`, `previous` and `results`. Use `page` and `page_size` (default 20, maximum 50).
 paths:
+  /api/v1/auth/email/resend/:
+    post:
+      operationId: auth_email_resend_create
+      description: Send a new verification code (at most one per minute).
+      tags:
+      - Auth
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: ''
+  /api/v1/auth/email/verify/:
+    post:
+      operationId: auth_email_verify_create
+      description: Confirm the 6-digit code that was emailed after registration.
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerify'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailVerify'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailVerify'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
   /api/v1/auth/login/:
     post:
       operationId: auth_login_create
@@ -1142,6 +1184,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarkAllReadResponse'
           description: ''
+  /api/v1/settings/notifications/:
+    get:
+      operationId: settings_notifications_retrieve
+      description: Turn notification emails on or off. Reset and verification codes
+        are always sent.
+      tags:
+      - Notifications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+          description: ''
+    patch:
+      operationId: settings_notifications_partial_update
+      description: Turn notification emails on or off. Reset and verification codes
+        are always sent.
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationSettings'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationSettings'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+          description: ''
   /api/v1/social/youtube/:
     get:
       operationId: social_youtube_retrieve
@@ -1891,6 +1975,14 @@ components:
           type: string
       required:
       - detail
+    EmailVerify:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: ^\d{6}$
+      required:
+      - code
     KindEnum:
       enum:
       - proposal_shortlisted
@@ -2045,6 +2137,17 @@ components:
       - kind
       - message
       - payload
+    NotificationSettings:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        email_verified:
+          type: boolean
+          readOnly: true
+      required:
+      - email_enabled
+      - email_verified
     NullEnum:
       enum:
       - null
@@ -2362,6 +2465,14 @@ components:
           items:
             $ref: '#/components/schemas/PlatformStats'
           readOnly: true
+    PatchedNotificationSettings:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        email_verified:
+          type: boolean
+          readOnly: true
     Performance:
       type: object
       properties:
@@ -2637,8 +2748,12 @@ components:
         mobile_number:
           type: string
           readOnly: true
+        email_verified:
+          type: boolean
+          readOnly: true
       required:
       - email
+      - email_verified
       - full_name
       - id
       - mobile_number

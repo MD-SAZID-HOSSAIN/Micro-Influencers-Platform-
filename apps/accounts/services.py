@@ -1,19 +1,36 @@
+from datetime import timedelta
+
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.core.emailing import queue_email
 from apps.core.exceptions import Conflict, DomainError
 
 from .codes import CODE_TTL, CodeInvalid, issue_code, verify_code
-from .models import CodePurpose, Role, User
+from .models import CodePurpose, OneTimeCode, Role, User
 
 
 class RoleNotAllowed(DomainError):
     status_code = 400
     default_code = "role_not_allowed"
     default_detail = "This role cannot be chosen at registration."
+
+
+class AlreadyVerified(Conflict):
+    default_code = "already_verified"
+    default_detail = "Your email address is already verified."
+
+
+class ResendCooldown(DomainError):
+    status_code = 429
+    default_code = "resend_cooldown"
+    default_detail = "A code was sent a moment ago. Please wait a minute before asking for another."
+
+
+RESEND_COOLDOWN = timedelta(seconds=60)
 
 
 class InvalidCredentials(DomainError):
@@ -34,7 +51,7 @@ def register_user(
     if role not in (Role.CREATOR, Role.BRAND):
         raise RoleNotAllowed()
     try:
-        return User.objects.create_user(
+        user = User.objects.create_user(
             username=username,
             email=email.strip().lower(),
             password=password,
@@ -45,6 +62,8 @@ def register_user(
     except IntegrityError:
         # Lost a race against a concurrent registration of the same email/username.
         raise Conflict("Email or username is already in use.")
+    request_email_verification(user)
+    return user
 
 
 def authenticate_login(identifier: str, password: str) -> User:
@@ -94,6 +113,41 @@ def request_password_reset(email: str) -> None:
             {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
         )
     )
+
+
+def request_email_verification(user: User) -> None:
+    """Email a fresh 6-digit verification code. Always sent, whatever the notification toggle says."""
+    code = issue_code(user, CodePurpose.EMAIL_VERIFICATION)
+    transaction.on_commit(
+        lambda: queue_email(
+            user.email,
+            "Verify your email address",
+            "verify_email",
+            {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
+        )
+    )
+
+
+def resend_email_verification(user: User) -> None:
+    """Send a new verification code, at most one per minute."""
+    if user.email_verified:
+        raise AlreadyVerified()
+    latest = (
+        OneTimeCode.objects.filter(user=user, purpose=CodePurpose.EMAIL_VERIFICATION)
+        .order_by("-created_at")
+        .first()
+    )
+    if latest is not None and timezone.now() - latest.created_at < RESEND_COOLDOWN:
+        raise ResendCooldown()
+    request_email_verification(user)
+
+
+def verify_email(user: User, code: str) -> User:
+    """Mark the address verified if ``code`` is the user's current valid verification code."""
+    verify_code(user, CodePurpose.EMAIL_VERIFICATION, code)
+    User.objects.filter(pk=user.pk).update(email_verified=True)
+    user.email_verified = True
+    return user
 
 
 def confirm_password_reset(email: str, code: str, new_password: str) -> None:

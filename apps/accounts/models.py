@@ -16,6 +16,9 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role.choices)
     # Bumped on logout and password reset; JWTs carrying an older value are rejected.
     token_version = models.PositiveIntegerField(default=0)
+    # Logging in never requires a verified email; only notification emails do.
+    email_verified = models.BooleanField(default=False)
+    email_notifications_enabled = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

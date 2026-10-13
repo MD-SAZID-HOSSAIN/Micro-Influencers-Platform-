@@ -14,7 +14,15 @@ _MOBILE_RE = re.compile(r"^\+?[0-9]{7,15}$")
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "full_name", "email", "username", "role", "mobile_number"]
+        fields = [
+            "id",
+            "full_name",
+            "email",
+            "username",
+            "role",
+            "mobile_number",
+            "email_verified",
+        ]
         read_only_fields = fields
 
 
@@ -40,6 +48,21 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(
         write_only=True, min_length=8, max_length=128, trim_whitespace=False
     )
+
+
+class EmailVerifySerializer(serializers.Serializer):
+    code = serializers.RegexField(
+        r"^\d{6}$", error_messages={"invalid": "Enter the 6-digit code."}
+    )
+
+
+class NotificationSettingsSerializer(serializers.ModelSerializer):
+    email_enabled = serializers.BooleanField(source="email_notifications_enabled")
+    email_verified = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["email_enabled", "email_verified"]
 
 
 class DetailSerializer(serializers.Serializer):
