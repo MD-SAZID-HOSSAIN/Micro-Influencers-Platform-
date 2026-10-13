@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.core.choices import Niche, Platform
 from apps.core.fields import OptionalUrlField, SafeCharField
+from apps.social.serializers import PlatformStatsSerializer
 
 from .models import BrandProfile, CreatorProfile
 from .services import completion_percent
@@ -29,6 +30,7 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
     rate_story = _rate()
     rate_video = _rate()
     completion_percent = serializers.SerializerMethodField()
+    stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
 
     class Meta:
         model = CreatorProfile
@@ -46,6 +48,7 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
             "rate_story",
             "rate_video",
             "completion_percent",
+            "stats",
         ]
 
     def get_completion_percent(self, profile) -> int:

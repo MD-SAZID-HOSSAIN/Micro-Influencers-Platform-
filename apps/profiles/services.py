@@ -1,6 +1,7 @@
 from typing import Callable
 
 from apps.accounts.models import Role, User
+from apps.social.models import PlatformStats
 
 from .models import BrandProfile, CreatorProfile
 
@@ -15,6 +16,8 @@ COMPLETION_CHECKS: dict[str, Callable[[CreatorProfile], bool]] = {
     "primary_platform": lambda p: bool(p.primary_platform),
     "location": lambda p: bool(p.city and p.country),
     "rate": lambda p: any(r is not None for r in (p.rate_post, p.rate_story, p.rate_video)),
+    "primary_platform_stats": lambda p: bool(p.primary_platform)
+    and PlatformStats.objects.filter(creator_id=p.user_id, platform=p.primary_platform).exists(),
 }
 
 

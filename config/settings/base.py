@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.profiles",
+    "apps.social",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -94,6 +95,10 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "ENUM_NAME_OVERRIDES": {
+        "PlatformEnum": "apps.core.choices.Platform",
+        "NicheEnum": "apps.core.choices.Niche",
+    },
 }
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
