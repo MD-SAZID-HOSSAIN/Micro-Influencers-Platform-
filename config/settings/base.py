@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.profiles",
     "apps.social",
+    "apps.notifications",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
