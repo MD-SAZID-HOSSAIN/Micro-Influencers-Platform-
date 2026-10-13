@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "apps.social",
     "apps.notifications",
     "apps.campaigns",
+    "apps.proposals",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -103,6 +104,7 @@ SPECTACULAR_SETTINGS = {
         "NicheEnum": "apps.core.choices.Niche",
         "CampaignStatusEnum": "apps.campaigns.models.Campaign.Status",
         "YouTubeConnectionStatusEnum": "apps.social.models.YouTubeConnection.Status",
+        "ProposalStatusEnum": "apps.proposals.models.Proposal.Status",
     },
 }
 

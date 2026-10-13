@@ -101,14 +101,56 @@ class CampaignCardSerializer(serializers.ModelSerializer):
 
 
 class CampaignDetailSerializer(CampaignCardSerializer):
+    """Full details plus the viewing creator's apply state (needs ``request`` in the context)."""
+
+    accepted_count = serializers.SerializerMethodField()
+    all_creators_selected = serializers.SerializerMethodField()
+    can_apply = serializers.SerializerMethodField()
+    apply_blocked_reason = serializers.SerializerMethodField()
+
     class Meta(CampaignCardSerializer.Meta):
         fields = CampaignCardSerializer.Meta.fields + [
             "description",
             "deliverables",
             "min_followers",
             "status",
+            "accepted_count",
+            "all_creators_selected",
+            "can_apply",
+            "apply_blocked_reason",
         ]
         read_only_fields = fields
+
+    def _state(self, campaign) -> dict:
+        # Imported here: the proposals app depends on this one, so a top-level import would be circular.
+        from apps.proposals.apply_state import accepted_count, apply_state
+
+        cache = self.__dict__.setdefault("_state_cache", {})
+        if campaign.pk not in cache:
+            can_apply, reason = apply_state(campaign, self.context["request"].user)
+            accepted = accepted_count(campaign)
+            cache[campaign.pk] = {
+                "accepted_count": accepted,
+                "all_creators_selected": accepted >= campaign.creators_needed,
+                "can_apply": can_apply,
+                "apply_blocked_reason": reason,
+            }
+        return cache[campaign.pk]
+
+    def get_accepted_count(self, campaign) -> int:
+        return self._state(campaign)["accepted_count"]
+
+    def get_all_creators_selected(self, campaign) -> bool:
+        return self._state(campaign)["all_creators_selected"]
+
+    def get_can_apply(self, campaign) -> bool:
+        return self._state(campaign)["can_apply"]
+
+    @extend_schema_field(
+        {"type": "string", "nullable": True, "enum": ["active_proposal", "proposal_rejected", "campaign_closed"]}
+    )
+    def get_apply_blocked_reason(self, campaign):
+        return self._state(campaign)["apply_blocked_reason"]
 
 
 class BrandCampaignListFilterSerializer(serializers.Serializer):
