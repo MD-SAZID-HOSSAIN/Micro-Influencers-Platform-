@@ -5,6 +5,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
+from apps.campaigns.models import Campaign
+from apps.campaigns.serializers import brand_summary
 from apps.core.fields import SafeCharField
 from apps.core.validators import validate_safe_url
 
@@ -119,3 +121,41 @@ class ProposalActionResultSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Proposal.Status.choices)
     accepted_count = serializers.IntegerField()
     creators_needed = serializers.IntegerField()
+
+
+class MyProposalBrandSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class MyProposalCampaignSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    status = serializers.ChoiceField(choices=Campaign.Status.choices)
+    brand = MyProposalBrandSerializer()
+
+
+class MyProposalSerializer(serializers.ModelSerializer):
+    """One row of a creator's application list: status only, no messaging or negotiation."""
+
+    campaign = serializers.SerializerMethodField()
+    withdrawal_reason = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Proposal
+        fields = ["id", "status", "proposed_rate", "created_at", "withdrawal_reason", "campaign"]
+        read_only_fields = fields
+
+    @extend_schema_field(MyProposalCampaignSerializer)
+    def get_campaign(self, proposal) -> dict:
+        campaign = proposal.campaign
+        brand = brand_summary(campaign.brand)
+        return {
+            "id": campaign.id,
+            "title": campaign.title,
+            "status": campaign.status,
+            "brand": {"id": brand["id"], "name": brand["name"]},
+        }
+
+    def get_withdrawal_reason(self, proposal) -> str | None:
+        return proposal.withdrawal_reason or None

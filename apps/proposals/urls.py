@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AcceptProposalView,
     BrandProposalListView,
+    MyProposalListView,
     RejectProposalView,
     ShortlistProposalView,
     SubmitProposalView,
@@ -10,6 +11,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("creators/me/proposals/", MyProposalListView.as_view(), name="my-proposals"),
     path("brand/proposals/<int:pk>/shortlist/", ShortlistProposalView.as_view(), name="proposal-shortlist"),
     path("brand/proposals/<int:pk>/accept/", AcceptProposalView.as_view(), name="proposal-accept"),
     path("brand/proposals/<int:pk>/reject/", RejectProposalView.as_view(), name="proposal-reject"),

@@ -14,6 +14,7 @@ from .apply_state import accepted_count
 from .models import Proposal
 from .serializers import (
     BrandProposalSerializer,
+    MyProposalSerializer,
     ProposalActionResultSerializer,
     ProposalSerializer,
     ProposalSubmitSerializer,
@@ -62,7 +63,7 @@ class WithdrawProposalView(GenericAPIView):
         return Response(ProposalSerializer(proposal).data)
 
 
-class BrandProposalFilterSerializer(serializers.Serializer):
+class ProposalStatusFilterSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Proposal.Status.choices, required=False)
 
 
@@ -88,7 +89,7 @@ class BrandProposalPagination(StandardPagination):
         return schema
 
 
-@extend_schema(tags=["Proposals"], parameters=[BrandProposalFilterSerializer])
+@extend_schema(tags=["Proposals"], parameters=[ProposalStatusFilterSerializer])
 class BrandProposalListView(ListAPIView):
     """Proposals received for one of the brand's campaigns, newest first.
 
@@ -105,7 +106,7 @@ class BrandProposalListView(ListAPIView):
         self.campaign = get_object_or_404(Campaign, pk=kwargs["pk"], brand=request.user)
 
     def get_queryset(self):
-        params = BrandProposalFilterSerializer(data=self.request.query_params)
+        params = ProposalStatusFilterSerializer(data=self.request.query_params)
         params.is_valid(raise_exception=True)
         proposals = Proposal.objects.filter(campaign=self.campaign).select_related(
             "creator", "creator__creator_profile"
@@ -163,3 +164,25 @@ class RejectProposalView(_ProposalActionView):
     @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
     def post(self, request, pk):
         return super().post(request, pk)
+
+
+@extend_schema(tags=["Proposals"], parameters=[ProposalStatusFilterSerializer])
+class MyProposalListView(ListAPIView):
+    """Every campaign the creator applied to, with the status of each proposal (newest first).
+
+    Withdrawn proposals stay as history, and a resubmission is a separate entry.
+    """
+
+    permission_classes = [IsCreator]
+    serializer_class = MyProposalSerializer
+    http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self):
+        params = ProposalStatusFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        proposals = Proposal.objects.filter(creator=self.request.user).select_related(
+            "campaign__brand__brand_profile"
+        )
+        if wanted := params.validated_data.get("status"):
+            proposals = proposals.filter(status=wanted)
+        return proposals
