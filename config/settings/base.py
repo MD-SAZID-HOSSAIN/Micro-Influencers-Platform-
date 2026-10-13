@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "apps.core",
     "apps.accounts",
+    "apps.profiles",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

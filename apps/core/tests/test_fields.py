@@ -1,7 +1,22 @@
 import pytest
 from rest_framework import serializers
 
-from apps.core.fields import SafeCharField
+from apps.core.fields import OptionalUrlField, SafeCharField
+
+
+def test_optional_url_field_turns_blank_and_null_into_none():
+    field = OptionalUrlField()
+
+    assert field.run_validation("") is None
+    assert field.run_validation(None) is None
+
+
+def test_optional_url_field_accepts_https_and_rejects_script_urls():
+    field = OptionalUrlField()
+
+    assert field.run_validation(" https://example.com/a.png ") == "https://example.com/a.png"
+    with pytest.raises(serializers.ValidationError):
+        field.run_validation("javascript:alert(1)")
 
 
 def test_safe_char_field_strips_tags():

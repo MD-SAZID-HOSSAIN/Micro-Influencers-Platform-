@@ -12,6 +12,21 @@ def _clear_cache():
 
 
 @pytest.fixture
+def auth_client():
+    """Return a factory: ``auth_client(user)`` -> APIClient logged in as that user."""
+    from rest_framework.test import APIClient
+
+    from apps.accounts.services import issue_access_token
+
+    def _make(user):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {issue_access_token(user)}")
+        return client
+
+    return _make
+
+
+@pytest.fixture
 def run_on_commit(django_capture_on_commit_callbacks):
     """Execute transaction.on_commit callbacks inside a test (they are deferred otherwise).
 
