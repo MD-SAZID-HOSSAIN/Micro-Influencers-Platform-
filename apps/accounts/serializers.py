@@ -28,6 +28,24 @@ class LoginResponseSerializer(serializers.Serializer):
     user = UserSerializer()
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.RegexField(
+        r"^\d{6}$", error_messages={"invalid": "Enter the 6-digit code."}
+    )
+    new_password = serializers.CharField(
+        write_only=True, min_length=8, max_length=128, trim_whitespace=False
+    )
+
+
+class DetailSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
 class RegisterSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=[Role.CREATOR, Role.BRAND])
     full_name = SafeCharField(max_length=150)

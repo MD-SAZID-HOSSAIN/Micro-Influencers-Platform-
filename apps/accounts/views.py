@@ -7,12 +7,22 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .serializers import (
+    DetailSerializer,
     LoginResponseSerializer,
     LoginSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RegisterSerializer,
     UserSerializer,
 )
-from .services import authenticate_login, bump_token_version, issue_access_token
+from .services import (
+    GENERIC_RESET_MESSAGE,
+    authenticate_login,
+    bump_token_version,
+    confirm_password_reset,
+    issue_access_token,
+    request_password_reset,
+)
 
 
 class RegisterView(GenericAPIView):
@@ -60,3 +70,33 @@ class MeView(APIView):
     @extend_schema(tags=["Auth"], responses={200: UserSerializer})
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class PasswordResetRequestView(GenericAPIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
+    serializer_class = PasswordResetRequestSerializer
+
+    @extend_schema(tags=["Auth"], responses={200: DetailSerializer})
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_password_reset(serializer.validated_data["email"])
+        return Response({"detail": GENERIC_RESET_MESSAGE})
+
+
+class PasswordResetConfirmView(GenericAPIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset_confirm"
+    serializer_class = PasswordResetConfirmSerializer
+
+    @extend_schema(tags=["Auth"], responses={200: DetailSerializer})
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        confirm_password_reset(**serializer.validated_data)
+        return Response({"detail": "Your password has been reset. Please log in."})

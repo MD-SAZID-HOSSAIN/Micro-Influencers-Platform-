@@ -77,6 +77,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "register": "5/min",
         "login": "10/min",
+        "password_reset": "5/hour",
+        "password_reset_confirm": "10/hour",
     },
 }
 

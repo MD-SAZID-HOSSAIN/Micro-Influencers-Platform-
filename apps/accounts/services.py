@@ -1,11 +1,13 @@
 from django.contrib.auth.hashers import make_password
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from rest_framework_simplejwt.tokens import AccessToken
 
+from apps.core.emailing import queue_email
 from apps.core.exceptions import Conflict, DomainError
 
-from .models import Role, User
+from .codes import CODE_TTL, CodeInvalid, issue_code, verify_code
+from .models import CodePurpose, Role, User
 
 
 class RoleNotAllowed(DomainError):
@@ -69,3 +71,38 @@ def issue_access_token(user: User) -> str:
 def bump_token_version(user: User) -> None:
     """Invalidate every token issued so far for this user."""
     User.objects.filter(pk=user.pk).update(token_version=F("token_version") + 1)
+
+
+GENERIC_RESET_MESSAGE = "If this email is registered, a code has been sent."
+
+
+def _find_active_user_by_email(email: str) -> User | None:
+    return User.objects.filter(email__iexact=(email or "").strip(), is_active=True).first()
+
+
+def request_password_reset(email: str) -> None:
+    """Email a reset code if the address belongs to an active user; otherwise do nothing."""
+    user = _find_active_user_by_email(email)
+    if user is None:
+        return
+    code = issue_code(user, CodePurpose.PASSWORD_RESET)
+    transaction.on_commit(
+        lambda: queue_email(
+            user.email,
+            "Your password reset code",
+            "password_reset",
+            {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
+        )
+    )
+
+
+def confirm_password_reset(email: str, code: str, new_password: str) -> None:
+    """Set a new password if ``code`` is valid, and sign the user out everywhere."""
+    user = _find_active_user_by_email(email)
+    if user is None:
+        raise CodeInvalid()
+    verify_code(user, CodePurpose.PASSWORD_RESET, code)
+    with transaction.atomic():
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+        bump_token_version(user)
