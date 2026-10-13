@@ -1,8 +1,18 @@
 from django.urls import path
 
-from .views import BrandProposalListView, SubmitProposalView, WithdrawProposalView
+from .views import (
+    AcceptProposalView,
+    BrandProposalListView,
+    RejectProposalView,
+    ShortlistProposalView,
+    SubmitProposalView,
+    WithdrawProposalView,
+)
 
 urlpatterns = [
+    path("brand/proposals/<int:pk>/shortlist/", ShortlistProposalView.as_view(), name="proposal-shortlist"),
+    path("brand/proposals/<int:pk>/accept/", AcceptProposalView.as_view(), name="proposal-accept"),
+    path("brand/proposals/<int:pk>/reject/", RejectProposalView.as_view(), name="proposal-reject"),
     path(
         "brand/campaigns/<int:pk>/proposals/",
         BrandProposalListView.as_view(),

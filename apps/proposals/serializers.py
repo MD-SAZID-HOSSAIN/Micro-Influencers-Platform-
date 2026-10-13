@@ -110,3 +110,12 @@ class ProposalSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class ProposalActionResultSerializer(serializers.Serializer):
+    """What a brand needs after shortlisting/accepting/rejecting: the new status and the counter."""
+
+    id = serializers.IntegerField()
+    status = serializers.ChoiceField(choices=Proposal.Status.choices)
+    accepted_count = serializers.IntegerField()
+    creators_needed = serializers.IntegerField()

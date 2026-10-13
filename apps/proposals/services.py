@@ -129,3 +129,95 @@ def withdraw_proposal(*, creator: User, proposal_id: int, reason: str | None) ->
             slot_opened=was_accepted,
         )
     return proposal
+
+
+class CampaignFull(Conflict):
+    default_code = "campaign_full"
+    default_detail = "All creators for this campaign have already been selected."
+
+
+def _lock_for_brand(brand: User, proposal_id: int) -> tuple[Campaign, Proposal]:
+    """Lock the campaign, then the proposal (the same order withdrawals use), for the owning brand.
+
+    Anyone else's proposal is a 404. Must be called inside ``transaction.atomic()``.
+    """
+    campaign_id = (
+        Proposal.objects.filter(pk=proposal_id, campaign__brand=brand)
+        .values_list("campaign_id", flat=True)
+        .first()
+    )
+    if campaign_id is None:
+        raise NotFound("Proposal not found.")
+    campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
+    proposal = Proposal.objects.select_for_update().select_related("creator").get(pk=proposal_id)
+    return campaign, proposal
+
+
+def _transition(
+    *,
+    brand: User,
+    proposal_id: int,
+    allowed_from: tuple[str, ...],
+    to: str,
+    kind: str,
+    message: str,
+    check_capacity: bool = False,
+) -> Proposal:
+    with transaction.atomic():
+        campaign, proposal = _lock_for_brand(brand, proposal_id)
+        if proposal.status == to == Proposal.Status.ACCEPTED:
+            return proposal  # accepting twice (a double click) changes nothing and is not an error
+        if proposal.status not in allowed_from:
+            raise InvalidTransition()
+        if check_capacity:
+            taken = Proposal.objects.filter(campaign=campaign, status=Proposal.Status.ACCEPTED).count()
+            if taken >= campaign.creators_needed:
+                raise CampaignFull()
+        proposal.status = to
+        proposal.save(update_fields=["status", "updated_at"])
+        notify(
+            proposal.creator,
+            kind,
+            message.format(title=campaign.title),
+            campaign_id=campaign.id,
+            proposal_id=proposal.id,
+        )
+    return proposal
+
+
+def shortlist_proposal(*, brand: User, proposal_id: int) -> Proposal:
+    return _transition(
+        brand=brand,
+        proposal_id=proposal_id,
+        allowed_from=(Proposal.Status.PENDING,),
+        to=Proposal.Status.SHORTLISTED,
+        kind=Kind.PROPOSAL_SHORTLISTED,
+        message='You were shortlisted for "{title}".',
+    )
+
+
+def accept_proposal(*, brand: User, proposal_id: int) -> Proposal:
+    """Accept a Pending or Shortlisted proposal, never beyond the campaign's Creators Needed.
+
+    The campaign row is locked first, so simultaneous accepts are counted one at a time.
+    """
+    return _transition(
+        brand=brand,
+        proposal_id=proposal_id,
+        allowed_from=(Proposal.Status.PENDING, Proposal.Status.SHORTLISTED),
+        to=Proposal.Status.ACCEPTED,
+        kind=Kind.PROPOSAL_ACCEPTED,
+        message='Congratulations! You were accepted for "{title}".',
+        check_capacity=True,
+    )
+
+
+def reject_proposal(*, brand: User, proposal_id: int) -> Proposal:
+    return _transition(
+        brand=brand,
+        proposal_id=proposal_id,
+        allowed_from=(Proposal.Status.PENDING, Proposal.Status.SHORTLISTED),
+        to=Proposal.Status.REJECTED,
+        kind=Kind.PROPOSAL_REJECTED,
+        message='Your proposal for "{title}" was not selected.',
+    )

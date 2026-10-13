@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.campaigns.models import Campaign
 from apps.core.pagination import StandardPagination
@@ -13,11 +14,18 @@ from .apply_state import accepted_count
 from .models import Proposal
 from .serializers import (
     BrandProposalSerializer,
+    ProposalActionResultSerializer,
     ProposalSerializer,
     ProposalSubmitSerializer,
     WithdrawSerializer,
 )
-from .services import submit_proposal, withdraw_proposal
+from .services import (
+    accept_proposal,
+    reject_proposal,
+    shortlist_proposal,
+    submit_proposal,
+    withdraw_proposal,
+)
 
 
 class SubmitProposalView(GenericAPIView):
@@ -111,3 +119,47 @@ class BrandProposalListView(ListAPIView):
             creator_field="creator_id",
             platform_field="creator__creator_profile__primary_platform",
         )
+
+
+class _ProposalActionView(APIView):
+    """Base for the brand's shortlist / accept / reject buttons."""
+
+    permission_classes = [IsBrand]
+    http_method_names = ["post", "options"]
+    action = None  # a service function: (brand, proposal_id) -> Proposal
+
+    def post(self, request, pk):
+        proposal = type(self).action(brand=request.user, proposal_id=pk)
+        campaign = proposal.campaign
+        return Response(
+            {
+                "id": proposal.id,
+                "status": proposal.status,
+                "accepted_count": accepted_count(campaign),
+                "creators_needed": campaign.creators_needed,
+            }
+        )
+
+
+class ShortlistProposalView(_ProposalActionView):
+    action = staticmethod(shortlist_proposal)
+
+    @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
+    def post(self, request, pk):
+        return super().post(request, pk)
+
+
+class AcceptProposalView(_ProposalActionView):
+    action = staticmethod(accept_proposal)
+
+    @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
+    def post(self, request, pk):
+        return super().post(request, pk)
+
+
+class RejectProposalView(_ProposalActionView):
+    action = staticmethod(reject_proposal)
+
+    @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
+    def post(self, request, pk):
+        return super().post(request, pk)
