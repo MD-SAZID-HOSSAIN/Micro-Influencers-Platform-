@@ -29,3 +29,26 @@ class PlatformStats(models.Model):
 
     def __str__(self):
         return f"PlatformStats({self.creator_id}, {self.platform})"
+
+
+class YouTubeConnection(models.Model):
+    """OAuth link to a creator's YouTube channel. Tokens are stored encrypted, never exposed."""
+
+    class Status(models.TextChoices):
+        CONNECTED = "connected", "Connected"
+        NEEDS_RECONNECT = "needs_reconnect", "Needs reconnect"
+
+    creator = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="youtube_connection"
+    )
+    access_token_enc = models.TextField()
+    refresh_token_enc = models.TextField()
+    access_expires_at = models.DateTimeField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.CONNECTED)
+    recent_content = models.JSONField(default=list, blank=True)
+    last_manual_refresh_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=100, blank=True, default="")
+    connected_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"YouTubeConnection({self.creator_id}, {self.status})"

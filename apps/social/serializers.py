@@ -2,7 +2,16 @@ from rest_framework import serializers
 
 from apps.core.fields import OptionalUrlField
 
-from .models import PlatformStats
+from .models import PlatformStats, YouTubeConnection
+
+
+class YouTubeConnectionSerializer(serializers.ModelSerializer):
+    """Connection state only: token fields are deliberately never listed."""
+
+    class Meta:
+        model = YouTubeConnection
+        fields = ["status", "connected_at"]
+        read_only_fields = fields
 
 
 class PlatformStatsSerializer(serializers.ModelSerializer):
