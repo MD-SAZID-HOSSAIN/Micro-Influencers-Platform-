@@ -65,6 +65,19 @@ celery -A config beat -l info                 # the scheduler; run exactly ONE i
 Scheduled jobs: every creator's YouTube stats are refreshed daily at 03:00 UTC, and campaigns whose
 application deadline has passed are closed every 5 minutes.
 
+## Admin accounts
+
+Admins cannot register through the API. Create one on the server:
+
+```bash
+python manage.py create_admin --email you@example.com --username you
+```
+
+The password is prompted for (twice) and is never accepted as an argument. Admins sign in at
+`POST /api/v1/admin/auth/login/`; the public login rejects admin accounts, and ordinary accounts
+cannot use the admin login. Every admin action (suspend, reactivate, delete, close a campaign,
+remove a review) needs a written reason and is recorded in `GET /api/v1/admin/actions/`.
+
 ## Connecting YouTube (Google OAuth)
 
 Only YouTube is connected through OAuth; Instagram, TikTok and Facebook use manual entry and are labelled

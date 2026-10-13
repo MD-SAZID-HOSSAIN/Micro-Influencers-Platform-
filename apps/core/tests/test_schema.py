@@ -21,6 +21,7 @@ EXPECTED_TAGS = {
     "Reviews",
     "Notifications",
     "Dashboards",
+    "Admin",
 }
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 

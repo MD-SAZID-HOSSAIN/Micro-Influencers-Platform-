@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from .models import Role
 from .serializers import (
     DetailSerializer,
     EmailVerifySerializer,
@@ -19,6 +20,7 @@ from .serializers import (
 )
 from .services import (
     GENERIC_RESET_MESSAGE,
+    InvalidCredentials,
     authenticate_login,
     bump_token_version,
     confirm_password_reset,
@@ -56,6 +58,8 @@ class LoginView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = authenticate_login(**serializer.validated_data)
+        if user.role == Role.ADMIN:
+            raise InvalidCredentials()  # admins use the admin panel login
         return Response(
             {"access": issue_access_token(user), "user": UserSerializer(user).data}
         )

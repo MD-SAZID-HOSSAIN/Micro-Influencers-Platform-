@@ -30,6 +30,7 @@ PUBLIC_ROUTES = {
     "/api/v1/health/",
     "/api/v1/auth/register/",
     "/api/v1/auth/login/",
+    "/api/v1/admin/auth/login/",  # admin accounts only; ordinary accounts get invalid_credentials
     "/api/v1/auth/password-reset/request/",
     "/api/v1/auth/password-reset/confirm/",
     "/api/v1/social/youtube/callback/",  # a browser redirect from Google; protected by a signed state
@@ -257,6 +258,7 @@ def test_no_secret_fields_or_values_appear_in_any_response(db):
     "path, scope",
     [
         ("/api/v1/auth/login/", "login"),
+        ("/api/v1/admin/auth/login/", "admin_login"),
         ("/api/v1/auth/register/", "register"),
         ("/api/v1/auth/password-reset/request/", "password_reset"),
         ("/api/v1/auth/password-reset/confirm/", "password_reset_confirm"),

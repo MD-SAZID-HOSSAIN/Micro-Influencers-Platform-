@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/v1/", include("apps.proposals.urls")),
     path("api/v1/", include("apps.dashboards.urls")),
     path("api/v1/", include("apps.reviews.urls")),
+    path("api/v1/", include("apps.adminpanel.urls")),
 ]
 
 # JSON versions of Django's HTML 404/500 pages, so every error uses the same envelope.

@@ -37,6 +37,12 @@ docker compose run --rm web python manage.py migrate       # apply database migr
 docker compose up -d                                       # db, redis, web, worker, beat
 ```
 
+Create the first admin account (there is no sign-up for admins):
+
+```bash
+docker compose run --rm web python manage.py create_admin --email you@example.com --username you
+```
+
 For a first look without a real domain, set `DJANGO_SETTINGS_MODULE=config.settings.dev` in `.env`
 instead of using the production settings.
 

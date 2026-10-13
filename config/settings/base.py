@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.proposals",
     "apps.dashboards",
     "apps.reviews",
+    "apps.adminpanel",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -99,6 +100,7 @@ REST_FRAMEWORK = {
         "password_reset_confirm": "10/hour",
         "email_verify": "20/hour",
         "email_resend": "5/hour",
+        "admin_login": "5/min",
     },
 }
 
@@ -138,6 +140,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Reviews", "description": "Ratings and reviews of creators after completed collaborations."},
         {"name": "Notifications", "description": "In-app notifications."},
         {"name": "Dashboards", "description": "The creator and brand home screens."},
+        {"name": "Admin", "description": "The admin panel: user management, moderation and platform overview."},
     ],
     "ENUM_NAME_OVERRIDES": {
         "PlatformEnum": "apps.core.choices.Platform",
