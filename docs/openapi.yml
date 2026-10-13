@@ -14,6 +14,265 @@ info:
     ## Pagination
     List endpoints return `count`, `next`, `previous` and `results`. Use `page` and `page_size` (default 20, maximum 50).
 paths:
+  /api/v1/admin/actions/:
+    get:
+      operationId: admin_actions_list
+      description: The audit trail of everything admins have done, newest first.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminActionLogList'
+          description: ''
+  /api/v1/admin/auth/login/:
+    post:
+      operationId: admin_auth_login_create
+      description: Log in to the admin panel. Only admin accounts are accepted here
+        (and only here).
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Login'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+          description: ''
+  /api/v1/admin/campaigns/{id}/close/:
+    post:
+      operationId: admin_campaigns_close_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reason'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCampaign'
+          description: ''
+  /api/v1/admin/overview/:
+    get:
+      operationId: admin_overview_retrieve
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Overview'
+          description: ''
+  /api/v1/admin/reviews/{id}/:
+    delete:
+      operationId: admin_reviews_destroy
+      description: DELETE removes an inappropriate review and recalculates the creator's
+        rating.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/admin/users/:
+    get:
+      operationId: admin_users_list
+      description: Search and filter every account.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 100
+      - in: query
+        name: role
+        schema:
+          enum:
+          - creator
+          - brand
+          - admin
+          type: string
+          minLength: 1
+        description: |-
+          * `creator` - Creator
+          * `brand` - Brand
+          * `admin` - Admin
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - suspended
+          type: string
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `suspended` - suspended
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminUserList'
+          description: ''
+  /api/v1/admin/users/{id}/:
+    delete:
+      operationId: admin_users_destroy
+      description: DELETE removes the account and its data. The JSON body must contain
+        a ``reason``.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/admin/users/{id}/reactivate/:
+    post:
+      operationId: admin_users_reactivate_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reason'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
+  /api/v1/admin/users/{id}/suspend/:
+    post:
+      operationId: admin_users_suspend_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reason'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+          description: ''
   /api/v1/auth/email/resend/:
     post:
       operationId: auth_email_resend_create
@@ -1552,6 +1811,108 @@ paths:
           description: No response body
 components:
   schemas:
+    AdminActionLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        admin:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        action:
+          type: string
+          readOnly: true
+        target_type:
+          type: string
+          readOnly: true
+        target_id:
+          type: integer
+          readOnly: true
+        target_label:
+          type: string
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - admin
+      - created_at
+      - id
+      - reason
+      - target_id
+      - target_label
+      - target_type
+    AdminCampaign:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CampaignStatusEnum'
+          readOnly: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - closed_at
+      - id
+      - status
+      - title
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        email_verified:
+          type: boolean
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - date_joined
+      - email
+      - email_verified
+      - full_name
+      - id
+      - role
+      - status
+      - username
     ApplyBlockedReasonEnum:
       type: string
       enum:
@@ -2520,6 +2881,98 @@ components:
     NullEnum:
       enum:
       - null
+    Overview:
+      type: object
+      properties:
+        users:
+          $ref: '#/components/schemas/OverviewUsers'
+        signups:
+          type: array
+          items:
+            $ref: '#/components/schemas/OverviewSignup'
+        campaigns_by_status:
+          type: object
+          additionalProperties:
+            type: integer
+        total_proposals:
+          type: integer
+      required:
+      - campaigns_by_status
+      - signups
+      - total_proposals
+      - users
+    OverviewSignup:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+      required:
+      - count
+      - date
+    OverviewUsers:
+      type: object
+      properties:
+        total:
+          type: integer
+        suspended:
+          type: integer
+        by_role:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+      - by_role
+      - suspended
+      - total
+    PaginatedAdminActionLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminActionLog'
+    PaginatedAdminUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
     PaginatedBrandProposalList:
       type: object
       required:
@@ -3090,6 +3543,15 @@ components:
       required:
       - cover_message
       - proposed_rate
+    Reason:
+      type: object
+      description: Every admin action records why it was taken.
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+      required:
+      - reason
     RecentVideo:
       type: object
       properties:
@@ -3190,6 +3652,16 @@ components:
           maxLength: 500
       required:
       - rating
+    RoleEnum:
+      enum:
+      - creator
+      - brand
+      - admin
+      type: string
+      description: |-
+        * `creator` - Creator
+        * `brand` - Brand
+        * `admin` - Admin
     SourceEnum:
       enum:
       - manual
@@ -3218,7 +3690,7 @@ components:
             only.
         role:
           allOf:
-          - $ref: '#/components/schemas/UserRoleEnum'
+          - $ref: '#/components/schemas/RoleEnum'
           readOnly: true
         mobile_number:
           type: string
@@ -3234,16 +3706,6 @@ components:
       - mobile_number
       - role
       - username
-    UserRoleEnum:
-      enum:
-      - creator
-      - brand
-      - admin
-      type: string
-      description: |-
-        * `creator` - Creator
-        * `brand` - Brand
-        * `admin` - Admin
     Withdraw:
       type: object
       properties:
@@ -3317,3 +3779,5 @@ tags:
   description: In-app notifications.
 - name: Dashboards
   description: The creator and brand home screens.
+- name: Admin
+  description: 'The admin panel: user management, moderation and platform overview.'

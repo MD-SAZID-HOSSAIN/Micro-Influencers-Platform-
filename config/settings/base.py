@@ -148,6 +148,7 @@ SPECTACULAR_SETTINGS = {
         "CampaignStatusEnum": "apps.campaigns.models.Campaign.Status",
         "YouTubeConnectionStatusEnum": "apps.social.models.YouTubeConnection.Status",
         "ProposalStatusEnum": "apps.proposals.models.Proposal.Status",
+        "RoleEnum": "apps.accounts.models.Role",
     },
 }
 
