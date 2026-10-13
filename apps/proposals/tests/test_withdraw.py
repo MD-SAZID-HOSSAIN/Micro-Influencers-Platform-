@@ -141,7 +141,6 @@ def test_unknown_proposal_is_404(creator, auth_client):
 def test_brands_cannot_withdraw_and_logged_out_gets_401(creator):
     proposal = ProposalFactory(creator=creator)
     brand = proposal.campaign.brand
-    from rest_framework_simplejwt.tokens import AccessToken  # noqa: F401  (token built below)
     from apps.accounts.services import issue_access_token
 
     client = APIClient()

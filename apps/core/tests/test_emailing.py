@@ -2,6 +2,8 @@ import logging
 from smtplib import SMTPException
 from unittest import mock
 
+import pytest
+
 from django.core import mail
 
 from apps.core.emailing import queue_email
@@ -64,6 +66,34 @@ def test_unknown_template_is_logged_not_raised(caplog):
 
     assert mail.outbox == []
     assert "Failed to queue email" in caplog.text
+
+
+def test_retry_delays_grow_exponentially_and_are_capped():
+    from apps.core.tasks import retry_delay
+
+    for retries in range(6):
+        base = 30 * 2**retries
+        assert 0.75 * base <= retry_delay(retries) <= base  # jitter spreads retries out a little
+    assert retry_delay(20) <= 3600  # never longer than an hour
+
+
+def test_a_failed_send_schedules_its_retry_with_the_backoff_delay():
+    """Celery only applies retry_backoff to autoretry; a manual retry needs an explicit countdown."""
+    from celery.exceptions import Retry
+
+    from apps.core.tasks import deliver_email
+
+    deliver_email.push_request(retries=3)
+    try:
+        with mock.patch("apps.core.tasks.send_mail", side_effect=SMTPException("down")):
+            with mock.patch.object(deliver_email, "retry", side_effect=Retry()) as retry:
+                with pytest.raises(Retry):
+                    deliver_email.run("a@example.com", "Hi", "Body")
+    finally:
+        deliver_email.pop_request()
+
+    countdown = retry.call_args.kwargs["countdown"]
+    assert 0.75 * 240 <= countdown <= 240  # the fourth attempt waits about 4 minutes, not a fixed 3
 
 
 def test_deliver_email_task_is_registered_with_celery():
