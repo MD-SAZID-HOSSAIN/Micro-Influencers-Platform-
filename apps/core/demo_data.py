@@ -1,0 +1,224 @@
+"""Deterministic demo data for local development and frontend integration. Never used in production.
+
+Every demo account is derived from its own index, so ``demo_creator_003`` is the same person
+whether 10 or 1000 creators are seeded, and running the seeder again only tops up what is missing.
+"""
+import random
+import zlib
+from datetime import timedelta
+from decimal import Decimal
+
+from django.contrib.auth.hashers import make_password
+from django.utils import timezone
+
+from apps.accounts.models import Role, User
+from apps.campaigns.models import Campaign
+from apps.core.choices import Niche, Platform
+from apps.profiles.models import BrandProfile, CreatorProfile, PortfolioItem
+from apps.proposals.models import Proposal
+from apps.social.models import PlatformStats
+
+DEMO_PASSWORD = "DemoPass123!"
+CREATOR_PREFIX = "demo_creator_"
+BRAND_PREFIX = "demo_brand_"
+
+FIRST_NAMES = ["Amina", "Rafi", "Nadia", "Tanvir", "Sara", "Imran", "Lina", "Farhan", "Maya", "Omar", "Priya", "Zane"]
+LAST_NAMES = ["Rahman", "Khan", "Ahmed", "Hossain", "Chowdhury", "Islam", "Sharma", "Patel", "Ali", "Begum"]
+PLACES = [
+    ("Dhaka", "Bangladesh"),
+    ("Chattogram", "Bangladesh"),
+    ("Mumbai", "India"),
+    ("Karachi", "Pakistan"),
+    ("London", "United Kingdom"),
+    ("Toronto", "Canada"),
+]
+COMPANIES = ["Acme Foods", "Bright Fit", "Nova Tech", "Glow Beauty", "Wander Co", "Spice Route", "Pixel Gear", "Green Fork"]
+BIOS = [
+    "Sharing honest reviews and everyday tips with my community.",
+    "Creating short, practical content for people who like to try new things.",
+    "Full-time creator. Collaborations welcome.",
+]
+DELIVERABLES = ["2 posts, 1 reel", "1 video review", "3 stories and 1 post", "1 dedicated video"]
+COVER_MESSAGES = [
+    "I think my audience is a great fit for this campaign.",
+    "I have worked with similar brands and would love to collaborate.",
+    "My followers engage a lot with this kind of content.",
+]
+
+
+def _rng(label: str) -> random.Random:
+    return random.Random(label)
+
+
+def _bulk_users(usernames, role, hashed_password, full_names):
+    users = [
+        User(
+            username=username,
+            email=f"{username}@demo.test",
+            full_name=full_name,
+            # crc32, not hash(): str hashes change between Python runs and the data must be stable.
+            mobile_number="+8801" + str(zlib.crc32(username.encode()) % 10**9).zfill(9),
+            role=role,
+            password=hashed_password,
+        )
+        for username, full_name in zip(usernames, full_names)
+    ]
+    return User.objects.bulk_create(users)
+
+
+def _seed_creators(target: int, hashed: str) -> int:
+    existing = User.objects.filter(username__startswith=CREATOR_PREFIX).count()
+    indexes = range(existing + 1, target + 1)
+    if not indexes:
+        return 0
+    rngs = {i: _rng(f"creator-{i}") for i in indexes}
+    names = [f"{rngs[i].choice(FIRST_NAMES)} {rngs[i].choice(LAST_NAMES)}" for i in indexes]
+    users = _bulk_users([f"{CREATOR_PREFIX}{i:03d}" for i in indexes], Role.CREATOR, hashed, names)
+
+    profiles, stats, portfolio = [], [], []
+    now = timezone.now()
+    for i, user in zip(indexes, users):
+        rng = rngs[i]
+        platform = rng.choice(Platform.values)
+        city, country = rng.choice(PLACES)
+        profiles.append(
+            CreatorProfile(
+                user=user,
+                bio=rng.choice(BIOS),
+                niche=rng.choice(Niche.values),
+                primary_platform=platform,
+                city=city,
+                country=country,
+                rate_post=Decimal(rng.randint(20, 400)) if rng.random() < 0.9 else None,
+                rate_story=Decimal(rng.randint(10, 200)) if rng.random() < 0.6 else None,
+                rate_video=Decimal(rng.randint(50, 800)) if rng.random() < 0.7 else None,
+            )
+        )
+        # YouTube is the only platform that can be Verified; everything else is manual (Unverified).
+        verified = platform == Platform.YOUTUBE and rng.random() < 0.8
+        stats.append(
+            PlatformStats(
+                creator=user,
+                platform=platform,
+                followers=rng.randint(1_000, 100_000),
+                engagement_rate=Decimal(rng.randint(80, 900)) / 100,
+                is_verified=verified,
+                last_synced_at=now - timedelta(hours=rng.randint(1, 48)),
+            )
+        )
+        for n in range(rng.randint(0, 3)):
+            portfolio.append(
+                PortfolioItem(creator=user, url=f"https://example.com/{user.username}/work-{n + 1}", caption=f"Past work {n + 1}")
+            )
+    CreatorProfile.objects.bulk_create(profiles)
+    PlatformStats.objects.bulk_create(stats)
+    PortfolioItem.objects.bulk_create(portfolio)
+    return len(indexes)
+
+
+def _seed_brands(target: int, hashed: str) -> int:
+    existing = User.objects.filter(username__startswith=BRAND_PREFIX).count()
+    indexes = range(existing + 1, target + 1)
+    if not indexes:
+        return 0
+    users = _bulk_users(
+        [f"{BRAND_PREFIX}{i:02d}" for i in indexes],
+        Role.BRAND,
+        hashed,
+        [f"Brand Owner {i}" for i in indexes],
+    )
+    BrandProfile.objects.bulk_create(
+        [
+            BrandProfile(
+                user=user,
+                company_name=f"{COMPANIES[i % len(COMPANIES)]} {i}",
+                industry=_rng(f"brand-{i}").choice(["Food", "Fitness", "Tech", "Beauty", "Travel"]),
+                website=f"https://brand{i}.example.com",
+                about="A demo brand for local development.",
+            )
+            for i, user in zip(indexes, users)
+        ]
+    )
+    return len(indexes)
+
+
+def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
+    brands = list(User.objects.filter(username__startswith=BRAND_PREFIX).order_by("username"))
+    creators = list(User.objects.filter(username__startswith=CREATOR_PREFIX).values_list("id", flat=True))
+    existing = Campaign.objects.filter(brand__username__startswith=BRAND_PREFIX).count()
+    indexes = range(existing, target)
+    if not brands or not indexes:
+        return 0, 0
+
+    now = timezone.now()
+    campaigns = []
+    for i in indexes:
+        rng = _rng(f"campaign-{i}")
+        roll = rng.random()
+        status = (
+            Campaign.Status.DRAFT if roll < 0.15 else Campaign.Status.CLOSED if roll < 0.40 else Campaign.Status.PUBLISHED
+        )
+        deadline = now - timedelta(days=rng.randint(1, 30)) if status == Campaign.Status.CLOSED else now + timedelta(days=rng.randint(2, 30))
+        campaigns.append(
+            Campaign(
+                brand=brands[i % len(brands)],
+                title=f"Demo campaign {i + 1}",
+                description="Tell your audience about our product in your own voice.",
+                niche=rng.choice(Niche.values),
+                platform=rng.choice(Platform.values),
+                budget=Decimal(rng.randint(50, 1500)),
+                deadline=deadline,
+                deliverables=rng.choice(DELIVERABLES),
+                creators_needed=rng.randint(1, 5),
+                min_followers=rng.choice([None, 1_000, 5_000, 20_000]),
+                status=status,
+                published_at=None if status == Campaign.Status.DRAFT else now - timedelta(days=rng.randint(1, 20)),
+                closed_at=deadline if status == Campaign.Status.CLOSED else None,
+            )
+        )
+    created = Campaign.objects.bulk_create(campaigns)
+
+    proposals = []
+    for i, campaign in zip(indexes, created):
+        if campaign.status == Campaign.Status.DRAFT or not creators:
+            continue
+        rng = _rng(f"proposals-{i}")
+        accepted = 0
+        for creator_id in rng.sample(creators, min(len(creators), rng.randint(3, 12))):  # one per creator
+            status = rng.choices(
+                [Proposal.Status.PENDING, Proposal.Status.SHORTLISTED, Proposal.Status.ACCEPTED, Proposal.Status.REJECTED, Proposal.Status.WITHDRAWN],
+                weights=[40, 20, 15, 15, 10],
+            )[0]
+            if status == Proposal.Status.ACCEPTED:
+                if accepted >= campaign.creators_needed:
+                    status = Proposal.Status.SHORTLISTED
+                else:
+                    accepted += 1
+            proposals.append(
+                Proposal(
+                    campaign=campaign,
+                    creator_id=creator_id,
+                    status=status,
+                    cover_message=rng.choice(COVER_MESSAGES),
+                    proposed_rate=campaign.budget * Decimal(rng.randint(70, 130)) / 100,
+                    portfolio_links=[],
+                    experience_note="",
+                    withdrawal_reason="Schedule conflict" if status == Proposal.Status.WITHDRAWN and rng.random() < 0.5 else "",
+                )
+            )
+    Proposal.objects.bulk_create(proposals)
+    return len(created), len(proposals)
+
+
+def seed(*, creators: int = 200, brands: int = 20, campaigns: int = 100) -> dict[str, int]:
+    """Top the demo data up to the requested sizes. Returns how many of each were created."""
+    hashed = make_password(DEMO_PASSWORD)
+    new_creators = _seed_creators(creators, hashed)
+    new_brands = _seed_brands(brands, hashed)
+    new_campaigns, new_proposals = _seed_campaigns_and_proposals(campaigns)
+    return {
+        "creators": new_creators,
+        "brands": new_brands,
+        "campaigns": new_campaigns,
+        "proposals": new_proposals,
+    }
