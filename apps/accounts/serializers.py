@@ -18,6 +18,16 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class LoginSerializer(serializers.Serializer):
+    identifier = serializers.CharField(help_text="Email or username")
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    user = UserSerializer()
+
+
 class RegisterSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=[Role.CREATOR, Role.BRAND])
     full_name = SafeCharField(max_length=150)
