@@ -126,10 +126,10 @@ class _ProposalActionView(APIView):
 
     permission_classes = [IsBrand]
     http_method_names = ["post", "options"]
-    action = None  # a service function: (brand, proposal_id) -> Proposal
+    service = None  # a service function: (brand, proposal_id) -> Proposal
 
     def post(self, request, pk):
-        proposal = type(self).action(brand=request.user, proposal_id=pk)
+        proposal = type(self).service(brand=request.user, proposal_id=pk)
         campaign = proposal.campaign
         return Response(
             {
@@ -142,7 +142,7 @@ class _ProposalActionView(APIView):
 
 
 class ShortlistProposalView(_ProposalActionView):
-    action = staticmethod(shortlist_proposal)
+    service = staticmethod(shortlist_proposal)
 
     @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
     def post(self, request, pk):
@@ -150,7 +150,7 @@ class ShortlistProposalView(_ProposalActionView):
 
 
 class AcceptProposalView(_ProposalActionView):
-    action = staticmethod(accept_proposal)
+    service = staticmethod(accept_proposal)
 
     @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
     def post(self, request, pk):
@@ -158,7 +158,7 @@ class AcceptProposalView(_ProposalActionView):
 
 
 class RejectProposalView(_ProposalActionView):
-    action = staticmethod(reject_proposal)
+    service = staticmethod(reject_proposal)
 
     @extend_schema(tags=["Proposals"], request=None, responses={200: ProposalActionResultSerializer})
     def post(self, request, pk):
