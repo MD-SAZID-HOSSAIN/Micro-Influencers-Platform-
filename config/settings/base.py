@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.profiles",
     "apps.social",
     "apps.notifications",
+    "apps.campaigns",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -113,6 +114,10 @@ CELERY_BEAT_SCHEDULE = {
     "sync-all-youtube": {
         "task": "apps.social.tasks.sync_all_youtube",
         "schedule": crontab(hour=3, minute=0),
+    },
+    "close-expired-campaigns": {
+        "task": "apps.campaigns.tasks.close_expired_campaigns",
+        "schedule": crontab(minute="*/5"),
     },
 }
 
