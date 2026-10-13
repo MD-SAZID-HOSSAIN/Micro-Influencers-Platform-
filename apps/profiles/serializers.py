@@ -85,6 +85,21 @@ class BrandProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+class CreatorCardSerializer(serializers.Serializer):
+    """A directory result. Expects a profile annotated by ``annotate_primary_stats``."""
+
+    id = serializers.IntegerField(source="user_id")
+    name = serializers.CharField(source="user.full_name")
+    photo_url = serializers.CharField(allow_null=True)
+    niche = serializers.ChoiceField(choices=Niche.choices, allow_null=True)
+    primary_platform = serializers.ChoiceField(choices=Platform.choices, allow_null=True)
+    followers = serializers.IntegerField(source="primary_followers", allow_null=True)
+    engagement_rate = serializers.DecimalField(
+        source="primary_engagement", max_digits=5, decimal_places=2, allow_null=True
+    )
+    is_verified = serializers.BooleanField(source="primary_verified")
+
+
 class PortfolioItemSerializer(serializers.ModelSerializer):
     url = serializers.CharField(max_length=500, validators=[validate_safe_url])
     caption = SafeCharField(max_length=200, allow_blank=True, required=False)
@@ -94,3 +109,33 @@ class PortfolioItemSerializer(serializers.ModelSerializer):
         model = PortfolioItem
         fields = ["id", "url", "caption", "source", "created_at"]
         read_only_fields = ["id", "created_at"]
+
+
+class CreatorDetailSerializer(serializers.ModelSerializer):
+    """The brand-facing view of a creator. Private account data (email, phone) is excluded."""
+
+    id = serializers.IntegerField(source="user_id", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
+    portfolio = PortfolioItemSerializer(source="user.portfolio_items", many=True, read_only=True)
+
+    class Meta:
+        model = CreatorProfile
+        fields = [
+            "id",
+            "username",
+            "full_name",
+            "photo_url",
+            "bio",
+            "niche",
+            "primary_platform",
+            "city",
+            "country",
+            "rate_post",
+            "rate_story",
+            "rate_video",
+            "stats",
+            "portfolio",
+        ]
+        read_only_fields = fields
