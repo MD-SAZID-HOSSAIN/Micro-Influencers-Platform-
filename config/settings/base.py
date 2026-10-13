@@ -37,6 +37,10 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # Inert for bearer-token API views (DRF exempts them from CSRF); kept so the standard
+    # deployment checks pass without silencing anything.
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 TEMPLATES = [
@@ -72,6 +76,11 @@ CACHES = {
     }
 }
 
+# How many reverse proxies sit in front of the app. Throttling identifies clients by IP, and
+# with this unset DRF would trust the whole X-Forwarded-For header, which any client can fake.
+# 0 = no proxy, use the connecting address; production defaults to 1 (see prod.py).
+NUM_PROXIES = env.int("NUM_PROXIES", default=0)
+
 REST_FRAMEWORK = {
     # Deny by default: a new view is protected unless it explicitly opts out.
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -81,6 +90,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
+    "NUM_PROXIES": NUM_PROXIES,
     "DEFAULT_THROTTLE_RATES": {
         "register": "5/min",
         "login": "10/min",

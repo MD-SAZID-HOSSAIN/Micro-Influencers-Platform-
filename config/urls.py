@@ -17,3 +17,7 @@ urlpatterns = [
     path("api/v1/", include("apps.proposals.urls")),
     path("api/v1/", include("apps.dashboards.urls")),
 ]
+
+# JSON versions of Django's HTML 404/500 pages, so every error uses the same envelope.
+handler404 = "apps.core.views.not_found"
+handler500 = "apps.core.views.server_error"

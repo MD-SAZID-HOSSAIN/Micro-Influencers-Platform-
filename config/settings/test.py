@@ -15,6 +15,7 @@ GOOGLE_CLIENT_ID = "test-client-id"
 GOOGLE_CLIENT_SECRET = "test-client-secret"
 GOOGLE_REDIRECT_URI = "http://testserver/api/v1/social/youtube/callback/"
 FRONTEND_URL = "http://frontend.test"
+CORS_ALLOWED_ORIGINS = ["http://frontend.test"]
 
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
