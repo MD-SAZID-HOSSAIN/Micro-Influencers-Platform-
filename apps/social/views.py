@@ -1,6 +1,7 @@
 from django.http import Http404
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import ListAPIView
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,7 +10,7 @@ from apps.core.permissions import IsCreator
 
 from .models import PlatformStats
 from .serializers import PlatformStatsSerializer
-from .services import set_manual_stats
+from .services import request_manual_refresh, set_manual_stats
 
 
 @extend_schema(tags=["Social"])
@@ -37,3 +38,14 @@ class ManualStatsView(APIView):
         serializer.is_valid(raise_exception=True)
         stats = set_manual_stats(creator=request.user, platform=platform, **serializer.validated_data)
         return Response(PlatformStatsSerializer(stats).data)
+
+
+class YouTubeRefreshView(APIView):
+    """Ask for an immediate stats refresh (rate limited by a cooldown)."""
+
+    permission_classes = [IsCreator]
+
+    @extend_schema(tags=["Social"], request=None, responses={202: None})
+    def post(self, request):
+        request_manual_refresh(request.user)
+        return Response({"detail": "Refresh scheduled."}, status=status.HTTP_202_ACCEPTED)

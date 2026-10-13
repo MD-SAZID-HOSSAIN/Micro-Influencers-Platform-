@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -108,6 +109,14 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULE = {
+    "sync-all-youtube": {
+        "task": "apps.social.tasks.sync_all_youtube",
+        "schedule": crontab(hour=3, minute=0),
+    },
+}
+
+YOUTUBE_REFRESH_COOLDOWN_SECONDS = 900
 
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"
