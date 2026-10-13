@@ -37,6 +37,25 @@ class CreatorProfile(models.Model):
         return f"CreatorProfile({self.user_id})"
 
 
+class PortfolioItem(models.Model):
+    """A link to previous work (external URL only; no uploads)."""
+
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        YOUTUBE = "youtube", "YouTube"
+
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="portfolio_items"
+    )
+    url = models.URLField(max_length=500)
+    caption = models.CharField(max_length=200, blank=True, default="")
+    source = models.CharField(max_length=10, choices=Source.choices, default=Source.MANUAL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+
 class BrandProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="brand_profile"

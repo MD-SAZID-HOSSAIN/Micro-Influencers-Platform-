@@ -2,9 +2,10 @@ from rest_framework import serializers
 
 from apps.core.choices import Niche, Platform
 from apps.core.fields import OptionalUrlField, SafeCharField
+from apps.core.validators import validate_safe_url
 from apps.social.serializers import PlatformStatsSerializer
 
-from .models import BrandProfile, CreatorProfile
+from .models import BrandProfile, CreatorProfile, PortfolioItem
 from .services import completion_percent
 
 
@@ -82,3 +83,14 @@ class BrandProfileSerializer(serializers.ModelSerializer):
             "logo_url",
             "about",
         ]
+
+
+class PortfolioItemSerializer(serializers.ModelSerializer):
+    url = serializers.CharField(max_length=500, validators=[validate_safe_url])
+    caption = SafeCharField(max_length=200, allow_blank=True, required=False)
+    source = serializers.ChoiceField(choices=PortfolioItem.Source.choices, required=False)
+
+    class Meta:
+        model = PortfolioItem
+        fields = ["id", "url", "caption", "source", "created_at"]
+        read_only_fields = ["id", "created_at"]

@@ -1,13 +1,16 @@
 from typing import Callable
 
+from django.db import transaction
+
 from apps.accounts.models import Role, User
+from apps.core.exceptions import Conflict
 from apps.social.models import PlatformStats
 
-from .models import BrandProfile, CreatorProfile
+from .models import BrandProfile, CreatorProfile, PortfolioItem
 
-# The completion indicator is fixed at 8 items. Checks for the two items that depend on
-# other features (stats on the primary platform, portfolio) are added with those features.
+# The completion indicator is fixed at 8 equally weighted items.
 COMPLETION_ITEMS = 8
+PORTFOLIO_MAX_ITEMS = 10
 
 COMPLETION_CHECKS: dict[str, Callable[[CreatorProfile], bool]] = {
     "photo": lambda p: bool(p.photo_url),
@@ -18,6 +21,7 @@ COMPLETION_CHECKS: dict[str, Callable[[CreatorProfile], bool]] = {
     "rate": lambda p: any(r is not None for r in (p.rate_post, p.rate_story, p.rate_video)),
     "primary_platform_stats": lambda p: bool(p.primary_platform)
     and PlatformStats.objects.filter(creator_id=p.user_id, platform=p.primary_platform).exists(),
+    "portfolio": lambda p: PortfolioItem.objects.filter(creator_id=p.user_id).exists(),
 }
 
 
@@ -34,3 +38,21 @@ def get_or_create_profile(user: User) -> CreatorProfile | BrandProfile:
     if user.role == Role.BRAND:
         return BrandProfile.objects.select_related("user").get_or_create(user=user)[0]
     raise ValueError(f"Role {user.role!r} has no profile.")
+
+
+class PortfolioFull(Conflict):
+    default_code = "portfolio_full"
+    default_detail = f"A portfolio can hold at most {PORTFOLIO_MAX_ITEMS} items. Remove one first."
+
+
+def add_portfolio_item(
+    *, creator: User, url: str, caption: str = "", source: str = PortfolioItem.Source.MANUAL
+) -> PortfolioItem:
+    """Add a portfolio link, enforcing the 10-item cap even under concurrent requests."""
+    with transaction.atomic():
+        # Lock the creator's profile row so concurrent adds are counted one at a time.
+        get_or_create_profile(creator)
+        CreatorProfile.objects.select_for_update().get(user=creator)
+        if PortfolioItem.objects.filter(creator=creator).count() >= PORTFOLIO_MAX_ITEMS:
+            raise PortfolioFull()
+        return PortfolioItem.objects.create(creator=creator, url=url, caption=caption, source=source)
