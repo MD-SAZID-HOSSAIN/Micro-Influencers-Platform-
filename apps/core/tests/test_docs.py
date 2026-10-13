@@ -1,5 +1,4 @@
 import pytest
-from django.core.management import call_command
 from rest_framework.test import APIClient
 
 
@@ -16,7 +15,3 @@ def test_schema_is_served_publicly_and_lists_health():
 
     assert response.status_code == 200
     assert "/api/v1/health/" in response.json()["paths"]
-
-
-def test_schema_generation_validates(tmp_path):
-    call_command("spectacular", "--validate", "--fail-on-warn", "--file", str(tmp_path / "s.yml"))

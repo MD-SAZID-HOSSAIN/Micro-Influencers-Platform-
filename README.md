@@ -1,57 +1,150 @@
 # Micro-Influencers' Platform: Backend
 
-Django REST API for a two-sided creator / brand marketplace. The product spec is
-[`PRD_Micro-Influencers_Platform.md`](PRD_Micro-Influencers_Platform.md); the build plan is
-[`plan.md`](plan.md).
+Django REST API for a two-sided marketplace that connects micro-influencers (creators) with brands.
+Creators build profiles with audience stats and rates and apply to campaigns; brands discover creators,
+post campaigns and manage the proposals they receive.
+
+- Product spec: [`PRD_Micro-Influencers_Platform.md`](PRD_Micro-Influencers_Platform.md)
+- Build plan: [`plan.md`](plan.md)
+- API reference: Swagger UI at **`/api/docs/`** while the server runs, or import
+  [`docs/openapi.yml`](docs/openapi.yml) into Postman / Insomnia.
+- Deployment: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 
 ## Requirements
 
 - Python 3.12 or newer
-- Docker (PostgreSQL 16 and Redis 7), or your own PostgreSQL and Redis
+- PostgreSQL 16 and Redis 7 (Docker is the easiest way to get both)
 
-Tests need a real PostgreSQL: the race-safe "accept" rule relies on row locks that SQLite does not provide.
+The test suite needs a real PostgreSQL: the "accept never exceeds Creators Needed" guarantee relies on
+row locks that SQLite does not provide.
 
-## Setup
+## Quick start
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements/dev.txt
-cp .env.example .env               # then edit values
-docker compose up -d db redis
+cp .env.example .env                   # then edit the values you need
+docker compose up -d db redis         # PostgreSQL + Redis
 python manage.py migrate
+python manage.py seed_demo             # optional demo data (see below)
 python manage.py runserver
 ```
 
-Check it works: `GET http://localhost:8000/api/v1/health/` returns `{"status": "ok", "database": "ok"}`.
+Check it works: `GET http://localhost:8000/api/v1/health/` returns `{"status": "ok", "database": "ok"}`,
+and `http://localhost:8000/api/docs/` shows the API reference.
+
+### Demo data
+
+`python manage.py seed_demo` creates 200 creators, 20 brands, 100 campaigns and their proposals so the
+frontend has something to show. It only runs when `DEBUG` is on, is safe to repeat (it tops up what is
+missing) and produces the same data every time. Options: `--creators`, `--brands`, `--campaigns`.
+
+Log in as `demo_creator_001` or `demo_brand_01` with password **`DemoPass123!`**.
 
 ## Tests
 
 ```bash
-pytest
+pytest                       # whole suite
+pytest apps/proposals -v     # one app
 ```
 
-Settings for tests are `config.settings.test` (set in `pytest.ini`). They read `DATABASE_URL`, so
-point it at any PostgreSQL the test user may create databases on.
+Tests use `config.settings.test` (set in `pytest.ini`) and read `DATABASE_URL`: point it at any
+PostgreSQL the user may create databases on. Email is captured in memory and background tasks run
+immediately, so no Redis or SMTP server is needed.
 
 ## Background workers
 
-Email, YouTube syncs and campaign auto-closing run in Celery.
+Email, YouTube stat syncs and campaign auto-closing run in Celery.
 
 ```bash
-celery -A config worker --pool=solo -l info    # --pool=solo is required on Windows
-celery -A config beat -l info                  # scheduled jobs
+celery -A config worker -l info --pool=solo   # --pool=solo is required on Windows
+celery -A config beat -l info                 # the scheduler; run exactly ONE instance
 ```
 
-## Environment variables
+Scheduled jobs: every creator's YouTube stats are refreshed daily at 03:00 UTC, and campaigns whose
+application deadline has passed are closed every 5 minutes.
 
-All configuration comes from the environment; see [`.env.example`](.env.example). No secrets are
-stored in the repository.
+## Connecting YouTube (Google OAuth)
 
-## Settings modules
+Only YouTube is connected through OAuth; Instagram, TikTok and Facebook use manual entry and are labelled
+Unverified (see the PRD for why).
 
-| Module | Use |
+1. In the [Google Cloud console](https://console.cloud.google.com/) create a project and enable the
+   **YouTube Data API v3**.
+2. Configure the **OAuth consent screen** in **Testing** mode and add your test users' Google accounts.
+   The only scope used is `https://www.googleapis.com/auth/youtube.readonly`.
+3. Create an **OAuth client ID** of type *Web application* and add the redirect URI
+   `<backend-url>/api/v1/social/youtube/callback/`.
+4. Put the client ID, secret and redirect URI in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   `GOOGLE_REDIRECT_URI`), and generate `OAUTH_ENCRYPTION_KEY` as shown in `.env.example`.
+
+**While the app is in Testing mode, Google expires refresh tokens after 7 days**, so creators may need to
+reconnect about once a week. The platform handles this: the creator gets a "reconnect" notification and
+their last known stats stay visible, marked as outdated. Publishing the app (Google verification) removes
+the limit.
+
+## Configuration
+
+All configuration comes from environment variables; nothing secret is stored in the repository. Copy
+`.env.example` to `.env` for local development.
+
+| Variable | Purpose |
 |---|---|
-| `config.settings.dev` | local development (default for `manage.py`) |
-| `config.settings.test` | pytest |
-| `config.settings.prod` | deployment; `SECRET_KEY` must be set |
+| `SECRET_KEY` | Signs tokens and hashes reset codes. Long and random in production. |
+| `ALLOWED_HOSTS` | Comma-separated host names the API answers to. |
+| `DATABASE_URL` | PostgreSQL connection URL. |
+| `REDIS_URL` | Redis for Celery and the shared cache (rate limiting). |
+| `FRONTEND_URL` | Where the OAuth callback redirects, and the base of links in emails. |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins allowed to call the API (https in production). |
+| `NUM_PROXIES` | Reverse proxies in front of the app, so rate limiting sees the real client IP. `0` in development, `1` in production by default. |
+| `SECURE_SSL_REDIRECT` | Production only: redirect HTTP to HTTPS. Set `false` only for a plain-HTTP smoke test. |
+| `OAUTH_ENCRYPTION_KEY` | Fernet key that encrypts stored YouTube tokens. Required in production. |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID. |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
+| `GOOGLE_REDIRECT_URI` | The callback URL registered with Google. |
+| `EMAIL_BACKEND` | Django email backend; console in development, SMTP in production. |
+| `EMAIL_HOST` | SMTP host. |
+| `EMAIL_PORT` | SMTP port. |
+| `EMAIL_HOST_USER` | SMTP user. |
+| `EMAIL_HOST_PASSWORD` | SMTP password. |
+| `EMAIL_USE_TLS` | Use TLS for SMTP. |
+| `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
+
+Settings modules: `config.settings.dev` (default for `manage.py`), `config.settings.test` (pytest) and
+`config.settings.prod` (deployment; refuses to start with an unsafe configuration).
+
+## How the API behaves
+
+- **Auth:** `POST /api/v1/auth/login/`, then send `Authorization: Bearer <token>`. Tokens last 24 hours.
+  Logging out or resetting a password signs the user out everywhere.
+- **Errors:** always `{"error": {"code", "message", "details"}}`. Branch on `code`.
+- **Lists:** `count`, `next`, `previous`, `results`; `?page=` and `?page_size=` (max 50).
+- **Roles:** creators and brands see different endpoints; the wrong role gets 403 and another account's
+  data is 404.
+
+## Project layout
+
+```
+config/            settings (base / dev / test / prod), URLs, Celery
+apps/core/         shared plumbing: error format, pagination, permissions, email, demo data
+apps/accounts/     users, registration, login, password reset
+apps/profiles/     creator and brand profiles, portfolio, creator directory
+apps/social/       platform stats, YouTube OAuth and sync
+apps/campaigns/    campaigns and their lifecycle, creator-facing discovery
+apps/proposals/    applying, withdrawing, shortlist / accept / reject
+apps/notifications/ in-app notifications
+apps/dashboards/   the creator and brand home screens
+docs/              OpenAPI file and the deployment guide
+```
+
+Business rules live in each app's `services.py`; views stay thin.
+
+## Working on this repository
+
+Work on a feature branch and open a pull request into `main`. When you change an endpoint, regenerate the
+API file (a test fails if it is stale):
+
+```bash
+python manage.py spectacular --file docs/openapi.yml
+```

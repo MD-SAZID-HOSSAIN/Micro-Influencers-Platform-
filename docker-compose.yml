@@ -1,3 +1,5 @@
+# `docker compose up -d db redis`  -> just the backing services (for local development).
+# `docker compose up -d`           -> the whole stack, built from the Dockerfile (see docs/DEPLOYMENT.md).
 services:
   db:
     image: postgres:16
@@ -9,11 +11,50 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d microinfluencers"]
+      interval: 5s
+      retries: 10
 
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+
+  web:
+    build: .
+    env_file: .env
+    environment: &app-env
+      DATABASE_URL: postgres://postgres:postgres@db:5432/microinfluencers
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: .
+    env_file: .env
+    environment: *app-env
+    command: ["celery", "-A", "config", "worker", "-l", "info"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Run exactly ONE beat instance: two would queue every scheduled job twice.
+  beat:
+    build: .
+    env_file: .env
+    environment: *app-env
+    command: ["celery", "-A", "config", "beat", "-l", "info"]
+    depends_on:
+      redis:
+        condition: service_started
 
 volumes:
   pgdata:

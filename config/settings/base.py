@@ -106,10 +106,35 @@ SIMPLE_JWT = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Micro-Influencers' Platform API",
-    "DESCRIPTION": "REST API for the creator / brand marketplace.",
+    "DESCRIPTION": (
+        "REST API for the two-sided creator / brand marketplace.\n\n"
+        "## Authentication\n"
+        "Log in with `POST /auth/login/` and send the returned token on every other request as "
+        "`Authorization: Bearer <token>`. Tokens last 24 hours. Only the endpoints without a "
+        "padlock in this document are public.\n\n"
+        "## Errors\n"
+        "Every error has the same shape: "
+        '`{"error": {"code": "...", "message": "...", "details": ...}}`. `code` is stable and '
+        "meant for the frontend to branch on; `details` holds per-field messages for validation "
+        "errors (HTTP 400) and is `null` otherwise.\n\n"
+        "## Pagination\n"
+        "List endpoints return `count`, `next`, `previous` and `results`. Use `page` and "
+        "`page_size` (default 20, maximum 50)."
+    ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
+    "TAGS": [
+        {"name": "Health", "description": "Liveness probe used by deployments."},
+        {"name": "Auth", "description": "Registration, login, logout and password reset."},
+        {"name": "Profiles", "description": "Creator and brand profiles, and the creator's portfolio."},
+        {"name": "Social", "description": "Platform stats, YouTube connection (OAuth) and manual stats entry."},
+        {"name": "Discovery", "description": "Brand-facing creator directory and creator-facing campaign directory."},
+        {"name": "Campaigns", "description": "A brand's campaigns: create, edit, publish and close."},
+        {"name": "Proposals", "description": "Applying to campaigns and managing the proposals received."},
+        {"name": "Notifications", "description": "In-app notifications."},
+        {"name": "Dashboards", "description": "The creator and brand home screens."},
+    ],
     "ENUM_NAME_OVERRIDES": {
         "PlatformEnum": "apps.core.choices.Platform",
         "NicheEnum": "apps.core.choices.Niche",
