@@ -256,6 +256,8 @@ def test_card_fields(brand, auth_client):
         "followers": 4200,
         "engagement_rate": "5.25",
         "is_verified": True,
+        "rating_avg": None,
+        "rating_count": 0,
     }
 
 

@@ -30,6 +30,8 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
     rate_post = _rate()
     rate_story = _rate()
     rate_video = _rate()
+    rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True, read_only=True)
+    rating_count = serializers.IntegerField(read_only=True)
     completion_percent = serializers.SerializerMethodField()
     stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
 
@@ -48,6 +50,8 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
             "rate_post",
             "rate_story",
             "rate_video",
+            "rating_avg",
+            "rating_count",
             "completion_percent",
             "stats",
         ]
@@ -98,6 +102,8 @@ class CreatorCardSerializer(serializers.Serializer):
         source="primary_engagement", max_digits=5, decimal_places=2, allow_null=True
     )
     is_verified = serializers.BooleanField(source="primary_verified")
+    rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True)
+    rating_count = serializers.IntegerField()
 
 
 class PortfolioItemSerializer(serializers.ModelSerializer):
@@ -119,6 +125,8 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source="user.full_name", read_only=True)
     stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
     portfolio = PortfolioItemSerializer(source="user.portfolio_items", many=True, read_only=True)
+    rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True, read_only=True)
+    rating_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = CreatorProfile
@@ -137,5 +145,7 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
             "rate_video",
             "stats",
             "portfolio",
+            "rating_avg",
+            "rating_count",
         ]
         read_only_fields = fields

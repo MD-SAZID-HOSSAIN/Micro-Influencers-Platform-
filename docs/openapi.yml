@@ -515,6 +515,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProposalActionResult'
           description: ''
+  /api/v1/brand/proposals/{id}/review/:
+    post:
+      operationId: brand_proposals_review_create
+      description: Rate a creator after a Completed collaboration. One review per
+        collaboration; no edits.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Reviews
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+          description: ''
   /api/v1/brand/proposals/{id}/shortlist/:
     post:
       operationId: brand_proposals_shortlist_create
@@ -802,6 +836,12 @@ paths:
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
       - in: query
+        name: min_rating
+        schema:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+      - in: query
         name: niche
         schema:
           enum:
@@ -830,6 +870,8 @@ paths:
           - -engagement
           - rate
           - -rate
+          - rating
+          - -rating
           type: string
           minLength: 1
         description: |-
@@ -839,6 +881,8 @@ paths:
           * `-engagement` - -engagement
           * `rate` - rate
           * `-rate` - -rate
+          * `rating` - rating
+          * `-rating` - -rating
       - name: page
         required: false
         in: query
@@ -906,6 +950,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreatorDetail'
+          description: ''
+  /api/v1/creators/{user_id}/reviews/:
+    get:
+      operationId: creators_reviews_list
+      description: The reviews a creator has received, newest first (for logged-in
+        brands).
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Reviews
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReviewList'
           description: ''
   /api/v1/creators/me/:
     get:
@@ -1934,6 +2012,13 @@ components:
           nullable: true
         is_verified:
           type: boolean
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          nullable: true
+        rating_count:
+          type: integer
       required:
       - engagement_rate
       - followers
@@ -1943,6 +2028,8 @@ components:
       - niche
       - photo_url
       - primary_platform
+      - rating_avg
+      - rating_count
     CreatorDashboard:
       type: object
       properties:
@@ -2039,6 +2126,15 @@ components:
           items:
             $ref: '#/components/schemas/PortfolioItem'
           readOnly: true
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        rating_count:
+          type: integer
+          readOnly: true
       required:
       - bio
       - city
@@ -2052,6 +2148,8 @@ components:
       - rate_post
       - rate_story
       - rate_video
+      - rating_avg
+      - rating_count
       - stats
       - username
     CreatorProfile:
@@ -2104,6 +2202,15 @@ components:
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           nullable: true
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        rating_count:
+          type: integer
+          readOnly: true
         completion_percent:
           type: integer
           readOnly: true
@@ -2116,6 +2223,8 @@ components:
       - completion_percent
       - full_name
       - id
+      - rating_avg
+      - rating_count
       - stats
       - username
     CreatorSummary:
@@ -2141,6 +2250,13 @@ components:
           nullable: true
         is_verified:
           type: boolean
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          nullable: true
+        rating_count:
+          type: integer
       required:
       - engagement_rate
       - followers
@@ -2149,6 +2265,8 @@ components:
       - name
       - niche
       - platform
+      - rating_avg
+      - rating_count
     DashboardYouTube:
       type: object
       properties:
@@ -2552,6 +2670,29 @@ components:
         unread_count:
           type: integer
           example: 3
+    PaginatedReviewList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
     PasswordResetConfirm:
       type: object
       properties:
@@ -2708,6 +2849,15 @@ components:
           format: decimal
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           nullable: true
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        rating_count:
+          type: integer
+          readOnly: true
         completion_percent:
           type: integer
           readOnly: true
@@ -2996,6 +3146,50 @@ components:
       description: |-
         * `creator` - creator
         * `brand` - brand
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        rating:
+          type: integer
+          readOnly: true
+        text:
+          type: string
+          readOnly: true
+        brand:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        campaign:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - brand
+      - campaign
+      - created_at
+      - id
+      - rating
+      - text
+    ReviewCreate:
+      type: object
+      properties:
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        text:
+          type: string
+          default: ''
+          maxLength: 500
+      required:
+      - rating
     SourceEnum:
       enum:
       - manual
@@ -3117,6 +3311,8 @@ tags:
   description: 'A brand''s campaigns: create, edit, publish and close.'
 - name: Proposals
   description: Applying to campaigns and managing the proposals received.
+- name: Reviews
+  description: Ratings and reviews of creators after completed collaborations.
 - name: Notifications
   description: In-app notifications.
 - name: Dashboards

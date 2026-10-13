@@ -30,6 +30,9 @@ class CreatorProfile(models.Model):
     rate_post = _rate_field()
     rate_story = _rate_field()
     rate_video = _rate_field()
+    # Kept up to date by reviews.services.recalculate_rating (null until the first review).
+    rating_avg = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True)
+    rating_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

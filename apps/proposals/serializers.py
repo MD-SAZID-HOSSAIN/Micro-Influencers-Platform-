@@ -43,6 +43,8 @@ class CreatorSummarySerializer(serializers.Serializer):
     followers = serializers.IntegerField(allow_null=True)
     engagement_rate = serializers.DecimalField(max_digits=5, decimal_places=2, allow_null=True)
     is_verified = serializers.BooleanField()
+    rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True)
+    rating_count = serializers.IntegerField()
 
 
 class BrandProposalSerializer(serializers.ModelSerializer):
@@ -77,8 +79,10 @@ class BrandProposalSerializer(serializers.ModelSerializer):
         try:
             profile = proposal.creator.creator_profile
             niche, platform = profile.niche, profile.primary_platform
+            rating_avg, rating_count = profile.rating_avg, profile.rating_count
         except ObjectDoesNotExist:
-            niche = platform = None
+            niche = platform = rating_avg = None
+            rating_count = 0
         summary = {
             "id": proposal.creator_id,
             "name": proposal.creator.full_name,
@@ -87,6 +91,8 @@ class BrandProposalSerializer(serializers.ModelSerializer):
             "followers": proposal.primary_followers,
             "engagement_rate": proposal.primary_engagement,
             "is_verified": proposal.primary_verified,
+            "rating_avg": rating_avg,
+            "rating_count": rating_count,
         }
         return CreatorSummarySerializer(summary).data  # formats decimals like every other endpoint
 

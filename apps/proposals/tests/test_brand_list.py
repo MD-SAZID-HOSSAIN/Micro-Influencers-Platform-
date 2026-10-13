@@ -158,6 +158,8 @@ def test_item_shows_everything_the_brand_needs_to_decide(brand, campaign, auth_c
             "followers": 4200,
             "engagement_rate": "5.25",
             "is_verified": True,
+            "rating_avg": None,
+            "rating_count": 0,
         },
         "proposed_rate": "275.50",
         "cover_message": "I would be a great fit.",

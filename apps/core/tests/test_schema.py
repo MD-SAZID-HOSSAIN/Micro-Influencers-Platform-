@@ -18,6 +18,7 @@ EXPECTED_TAGS = {
     "Discovery",
     "Campaigns",
     "Proposals",
+    "Reviews",
     "Notifications",
     "Dashboards",
 }

@@ -8,12 +8,22 @@ from apps.social.queries import annotate_primary_stats
 
 from .models import CreatorProfile
 
-ORDERINGS = ["followers", "-followers", "engagement", "-engagement", "rate", "-rate"]
+ORDERINGS = [
+    "followers",
+    "-followers",
+    "engagement",
+    "-engagement",
+    "rate",
+    "-rate",
+    "rating",
+    "-rating",
+]
 DEFAULT_ORDERING = "-followers"
 _ORDER_FIELDS = {
     "followers": "primary_followers",
     "engagement": "primary_engagement",
     "rate": "cheapest_rate",
+    "rating": "rating_avg",
 }
 _RATE_FIELDS = ("rate_post", "rate_story", "rate_video")
 
@@ -40,6 +50,9 @@ class DirectoryFilterSerializer(serializers.Serializer):
     min_rate = _decimal()
     max_rate = _decimal()
     verified_only = serializers.BooleanField(required=False)
+    min_rating = serializers.DecimalField(
+        max_digits=3, decimal_places=2, min_value=0, max_value=5, required=False
+    )
     ordering = serializers.ChoiceField(choices=ORDERINGS, required=False)
 
 
@@ -91,5 +104,7 @@ def directory_queryset(params: dict) -> QuerySet:
         profiles = profiles.filter(_rate_in_range(min_rate, max_rate))
     if params.get("verified_only"):
         profiles = profiles.filter(primary_verified=True)
+    if (value := params.get("min_rating")) is not None:
+        profiles = profiles.filter(rating_avg__gte=value)
 
     return _ordered(profiles, params.get("ordering") or DEFAULT_ORDERING)

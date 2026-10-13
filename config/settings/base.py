@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.campaigns",
     "apps.proposals",
     "apps.dashboards",
+    "apps.reviews",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -134,6 +135,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Discovery", "description": "Brand-facing creator directory and creator-facing campaign directory."},
         {"name": "Campaigns", "description": "A brand's campaigns: create, edit, publish and close."},
         {"name": "Proposals", "description": "Applying to campaigns and managing the proposals received."},
+        {"name": "Reviews", "description": "Ratings and reviews of creators after completed collaborations."},
         {"name": "Notifications", "description": "In-app notifications."},
         {"name": "Dashboards", "description": "The creator and brand home screens."},
     ],
