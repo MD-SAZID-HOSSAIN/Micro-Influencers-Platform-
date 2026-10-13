@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.campaigns",
     "apps.proposals",
+    "apps.dashboards",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
