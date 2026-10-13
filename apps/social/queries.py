@@ -4,16 +4,25 @@ from django.db.models.functions import Coalesce
 from .models import PlatformStats
 
 
-def annotate_primary_stats(profiles: QuerySet) -> QuerySet:
-    """Annotate CreatorProfile rows with the numbers for their own primary platform.
+def annotate_primary_stats(
+    rows: QuerySet,
+    *,
+    creator_field: str = "user_id",
+    platform_field: str = "primary_platform",
+) -> QuerySet:
+    """Annotate rows with the numbers for their creator's own primary platform.
 
-    Adds ``primary_followers``, ``primary_engagement`` (both None when the creator has
-    no stats there) and ``primary_verified`` (False when there are none).
+    By default ``rows`` are CreatorProfile objects. For other models, say where the creator's
+    id and primary platform live, e.g. ``creator_field="creator_id"`` and
+    ``platform_field="creator__creator_profile__primary_platform"`` for proposals.
+
+    Adds ``primary_followers``, ``primary_engagement`` (both None when the creator has no
+    stats there) and ``primary_verified`` (False when there are none).
     """
     stats = PlatformStats.objects.filter(
-        creator_id=OuterRef("user_id"), platform=OuterRef("primary_platform")
+        creator_id=OuterRef(creator_field), platform=OuterRef(platform_field)
     )
-    return profiles.annotate(
+    return rows.annotate(
         primary_followers=Subquery(stats.values("followers")[:1]),
         primary_engagement=Subquery(stats.values("engagement_rate")[:1]),
         primary_verified=Coalesce(
