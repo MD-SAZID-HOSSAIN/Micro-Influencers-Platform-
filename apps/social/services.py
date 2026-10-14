@@ -11,7 +11,9 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
 from apps.accounts.models import User
-from apps.core.exceptions import Conflict, DomainError
+from apps.core.exceptions import Conflict, DomainError, ServiceUnavailable
+from apps.core.queueing import enqueue
+from apps.core.throttling import CACHE_ERRORS
 from apps.notifications.models import Kind
 from apps.notifications.services import notify
 
@@ -178,7 +180,7 @@ def request_manual_refresh(user: User) -> None:
         connection.last_manual_refresh_at = now
         connection.save(update_fields=["last_manual_refresh_at"])
         connection_id = connection.id
-        transaction.on_commit(lambda: tasks.sync_connection_task.delay(connection_id))
+        transaction.on_commit(lambda: enqueue(tasks.sync_connection_task, connection_id))
 
 
 _CONNECT_MESSAGES = {
@@ -203,7 +205,11 @@ class ConnectError(DomainError):
 def start_connect(user: User) -> str:
     """Return the Google consent URL carrying a signed, single-use ``state`` (CSRF defence)."""
     nonce = secrets.token_urlsafe(16)
-    cache.set(OAUTH_NONCE_KEY.format(nonce), True, OAUTH_STATE_MAX_AGE)
+    try:
+        cache.set(OAUTH_NONCE_KEY.format(nonce), True, OAUTH_STATE_MAX_AGE)
+    except CACHE_ERRORS:
+        # The one-time nonce lives in the shared cache; without it the flow cannot be made safe.
+        raise ServiceUnavailable()
     state = signing.dumps({"uid": user.id, "nonce": nonce}, salt=OAUTH_STATE_SALT)
     return get_youtube_client().build_auth_url(state)
 
@@ -231,7 +237,11 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
     if payload["uid"] != user.id:
         raise ConnectError("invalid_state")  # checked before the nonce is claimed: a wrong person cannot burn it
     # cache.delete is the atomic "claim": only the first completion finds the nonce.
-    if not cache.delete(OAUTH_NONCE_KEY.format(payload["nonce"])):
+    try:
+        claimed = cache.delete(OAUTH_NONCE_KEY.format(payload["nonce"]))
+    except CACHE_ERRORS:
+        raise ServiceUnavailable()  # nothing was used up: Google's code is untouched, so the user can retry
+    if not claimed:
         raise ConnectError("invalid_state")
 
     try:
@@ -257,7 +267,8 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
             "last_error": "",
         },
     )
-    transaction.on_commit(lambda: tasks.sync_connection_task.delay(connection.id))
+    # The link is already saved. If the queue is down, the first sync simply waits for the next daily run.
+    transaction.on_commit(lambda: enqueue(tasks.sync_connection_task, connection.id))
     return connection
 
 

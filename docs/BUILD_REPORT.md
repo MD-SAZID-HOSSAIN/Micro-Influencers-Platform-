@@ -259,8 +259,8 @@ I want to be open about these:
 
 ## 8. The independent code review (what it found)
 
-At your request I reviewed the whole repo and reported **10 findings**. **Findings 1 to 5 have since been
-fixed (each with a test that failed first); 6 to 10 are still open.** What each fix did is in the
+At your request I reviewed the whole repo and reported **10 findings**. **All 10 have since been
+fixed (each with a test that failed first).** What each fix did is in the
 "Review fixes" part right after this list.
 The most important:
 
@@ -278,7 +278,7 @@ The most important:
 8–10. Smaller clean-ups (a private helper used across apps, an inefficient view counter, and the daily
    YouTube sync starting everyone at the same second).
 
-**Review fixes (findings 1 to 5, now done)**
+**Review fixes (findings 1 to 10, all done)**
 
 1. `manage.py`, wsgi and Celery now start in **production** mode unless told otherwise (one shared
    helper, `config/bootstrap.py`). Local development opts in with `DJANGO_SETTINGS_MODULE=config.settings.dev`
@@ -290,6 +290,21 @@ The most important:
    someone else is refused. I proved the test catches the attack by removing the check: the test failed.
 5. Building a notification email can no longer raise after the data was saved: problems are logged, the
    link falls back to the app's home page, and the in-app notification is unaffected.
+6. A **Redis outage** no longer breaks login, sign-up, password reset or email verification. The rate
+   limiter now lets requests through (and logs a warning) when Redis can't be reached, and Redis calls give
+   up after 2 seconds. While Redis is down the rate limits are **not enforced**. The YouTube connect step
+   answers `503` (try again), and background jobs that can't be queued are logged instead of failing a
+   request whose data was already saved. I broke the new code on purpose: 6 outage tests failed.
+7. **HSTS** is now opt-in: only the one-year header is on by default. Subdomain locking and preload are
+   switched on with `SECURE_HSTS_INCLUDE_SUBDOMAINS` and `SECURE_HSTS_PRELOAD` (preload without subdomains
+   is refused at start-up).
+8. The proposal-locking helper is now a public function in `apps/proposals/locks.py`, shared by proposals,
+   deliverables and reviews (lock order: campaign, then proposal). A test forbids importing another app's
+   private names.
+9. The campaign view counter is one database statement (`INSERT ... ON CONFLICT`) instead of 2-3 queries,
+   and has no race.
+10. The daily YouTube sync is spread evenly over 30 minutes (`YOUTUBE_SYNC_SPREAD_SECONDS`) instead of
+    starting every creator at once.
 
 Other known gaps (not bugs): suspended users' campaigns/proposals stay visible; old codes and
 notifications are never deleted; there is no token-refresh address (tickets last 24 hours); the email
@@ -482,7 +497,7 @@ me if you want any changed (each one is a small change). The full list of all 49
 | A completed collaboration **cannot be withdrawn** | "Completion is final" | Say if creators may still withdraw |
 | Admin login is **separate**; normal login refuses admins | Safer, and the PRD says "separate panel" | Tell me if admins should use the normal login |
 | Suspended users keep their campaigns/proposals visible | PRD only says "cannot log in" | Say if their content should be hidden |
-| Strict HTTPS "preload" is on in production | Passes Django's deployment check | Tell me to make it optional (finding 7) |
+| Strict HTTPS (HSTS) is on in production for one year; subdomains and preload are **off** | Those two are very hard to undo | Set `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` when ready |
 
 ### F. What the frontend must know
 

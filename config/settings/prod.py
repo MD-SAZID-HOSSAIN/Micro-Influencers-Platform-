@@ -32,8 +32,23 @@ REST_FRAMEWORK = {**REST_FRAMEWORK, "NUM_PROXIES": NUM_PROXIES}
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$"]  # so a plain-HTTP health probe is not redirected
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# HSTS makes browsers use HTTPS only for this host. The two extra switches are hard to undo, so they are
+# opt-in per deployment: `includeSubDomains` also locks every subdomain to HTTPS, and `preload` is a promise
+# that can end up in browsers' built-in lists. Lower SECURE_HSTS_SECONDS (e.g. 300) for a first rollout.
+SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=False)
+if SECURE_HSTS_PRELOAD and not SECURE_HSTS_INCLUDE_SUBDOMAINS:
+    raise ImproperlyConfigured(
+        "SECURE_HSTS_PRELOAD requires SECURE_HSTS_INCLUDE_SUBDOMAINS=true: browsers reject a preload header without it."
+    )
+
+# Django's deployment check nags us to switch the two options above on. Leaving them off is a deliberate
+# choice (see the comment above), so say so instead of turning irreversible options on to quiet a warning.
+SILENCED_SYSTEM_CHECKS = []
+if not SECURE_HSTS_INCLUDE_SUBDOMAINS:
+    SILENCED_SYSTEM_CHECKS.append("security.W005")
+if not SECURE_HSTS_PRELOAD:
+    SILENCED_SYSTEM_CHECKS.append("security.W021")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

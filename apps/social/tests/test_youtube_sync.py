@@ -324,3 +324,74 @@ def test_manual_refresh_is_creator_only(db, auth_client):
 
     assert auth_client(brand).post(REFRESH).status_code == 403
     assert APIClient().post(REFRESH).status_code == 401
+
+
+# ---- the daily batch is spread out, not fired all at once ----------------------------------------------
+
+
+def _capture_starts(monkeypatch):
+    """Record (connection id, countdown seconds) for every sync the daily job schedules."""
+    starts = []
+    monkeypatch.setattr(
+        sync_connection_task,
+        "apply_async",
+        lambda args=None, countdown=0, **kwargs: starts.append((args[0], countdown)),
+    )
+    return starts
+
+
+def test_the_daily_job_spreads_the_syncs_evenly_over_the_window(db, settings, monkeypatch):
+    settings.YOUTUBE_SYNC_SPREAD_SECONDS = 1800
+    connections = [make_connection(UserFactory(role=Role.CREATOR), with_stats=False) for _ in range(40)]
+    starts = _capture_starts(monkeypatch)
+
+    enqueued = sync_all_youtube()
+
+    countdowns = [countdown for _, countdown in starts]
+    assert enqueued == 40
+    assert [cid for cid, _ in starts] == sorted(c.id for c in connections)
+    assert countdowns[0] == 0  # the first creator starts straight away
+    assert countdowns == sorted(countdowns) and len(set(countdowns)) == 40  # one start every 45 seconds
+    assert countdowns[-1] < 1800  # and everything starts inside the window
+
+
+def test_a_single_connection_starts_immediately(db, settings, monkeypatch):
+    settings.YOUTUBE_SYNC_SPREAD_SECONDS = 1800
+    make_connection(UserFactory(role=Role.CREATOR), with_stats=False)
+    starts = _capture_starts(monkeypatch)
+
+    sync_all_youtube()
+
+    assert [countdown for _, countdown in starts] == [0]
+
+
+def test_a_spread_of_zero_switches_spreading_off(db, settings, monkeypatch):
+    settings.YOUTUBE_SYNC_SPREAD_SECONDS = 0
+    for _ in range(5):
+        make_connection(UserFactory(role=Role.CREATOR), with_stats=False)
+    starts = _capture_starts(monkeypatch)
+
+    sync_all_youtube()
+
+    assert {countdown for _, countdown in starts} == {0}
+
+
+def test_the_default_window_is_half_an_hour(settings):
+    assert settings.YOUTUBE_SYNC_SPREAD_SECONDS == 1800
+
+
+def test_a_background_queue_outage_does_not_fail_a_manual_refresh(creator, fake_youtube, auth_client, run_on_commit, caplog):
+    import logging
+    from unittest import mock
+
+    from kombu.exceptions import OperationalError
+
+    make_connection(creator)
+
+    with mock.patch("apps.social.tasks.sync_connection_task.delay", side_effect=OperationalError("broker down")):
+        with caplog.at_level(logging.ERROR):
+            with run_on_commit():
+                response = auth_client(creator).post(REFRESH)
+
+    assert response.status_code == 202
+    assert "Could not queue" in caplog.text

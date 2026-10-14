@@ -37,3 +37,18 @@ def run_on_commit(django_capture_on_commit_callbacks):
         return django_capture_on_commit_callbacks(execute=True)
 
     return _run
+
+
+@pytest.fixture
+def redis_down(settings):
+    """Make the shared cache (rate limiting, OAuth state) unreachable, like a Redis outage.
+
+    Port 1 refuses connections at once, so tests stay fast.
+    """
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://127.0.0.1:1",
+            "OPTIONS": {"socket_connect_timeout": 1, "socket_timeout": 1},
+        }
+    }

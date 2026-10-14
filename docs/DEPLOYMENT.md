@@ -87,8 +87,17 @@ health check to the web container only.
 - **Emails:** password reset codes are sent through the worker. If the provider is down the user still sees
   the same message and can request a new code later; check the worker log.
 - **Demo data** (`seed_demo`) refuses to run in production because it creates accounts with a public password.
-- **HSTS preload** is enabled in the production settings. Only serve the API over HTTPS on a domain you
-  intend to keep on HTTPS.
+- **HSTS:** production sends a one-year `Strict-Transport-Security` header (`SECURE_HSTS_SECONDS`; try `300`
+  for a first rollout). Subdomain locking (`SECURE_HSTS_INCLUDE_SUBDOMAINS`) and browser preload
+  (`SECURE_HSTS_PRELOAD`, which needs the subdomain option) are **off** by default because they are very hard
+  to undo. Turn them on only for a domain that will always use HTTPS.
+- **If Redis goes down:** the API keeps working. Login, sign-up, password reset and email verification are
+  still served, but **rate limits are not enforced** until Redis is back (a warning
+  "Rate limiting is unavailable" is logged for each request). The YouTube connect step answers `503
+  temporarily_unavailable` (the user can try again). Work that could not be queued is logged ("Could not
+  queue background task") and the daily YouTube sync picks it up. Cache calls give up after 2 seconds.
+- **Daily YouTube sync** is spread over `YOUTUBE_SYNC_SPREAD_SECONDS` (default 1800) after 03:00 UTC instead of
+  starting every creator at the same second.
 - **Backups:** back up PostgreSQL. Redis only holds queued jobs and counters and can be rebuilt.
 
 ## 7. Checklist before going live

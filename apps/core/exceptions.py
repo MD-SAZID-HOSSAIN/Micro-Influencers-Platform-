@@ -32,3 +32,11 @@ def api_exception_handler(exc, context):
 
     response.data = {"error": {"code": code, "message": message, "details": details}}
     return response
+
+
+class ServiceUnavailable(DomainError):
+    """A dependency (such as the shared cache) is down; the caller can simply try again shortly."""
+
+    status_code = 503
+    default_code = "temporarily_unavailable"
+    default_detail = "This feature is temporarily unavailable. Please try again in a moment."

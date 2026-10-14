@@ -88,6 +88,11 @@ line of code, and the tests that pin them sit next to the code.
 - finding 3 — network errors from Google now carry only the exception class name (raised 'from None' so the chained original with the URL is dropped), and urllib3 is pinned to WARNING in LOGGING; I did NOT move the API key to the X-Goog-Api-Key header because I cannot verify the YouTube Data API honours it without a real key — cost if wrong: the key still travels in the query string to Google (as before) but no longer reaches our logs.
 - finding 4 — YouTube connect now finishes in a separate authenticated step (POST /social/youtube/complete/ {state, code}) so the state must have been issued to the logged-in creator; the callback only validates the state signature and redirects to FRONTEND_URL/settings/connections?youtube=confirm&code=..&state=..; the uid check runs BEFORE the one-time nonce is claimed so a wrong person cannot burn another's state; this CHANGES the frontend contract (the old ?youtube=success redirect is gone) — cost if wrong: one extra frontend call; chosen over a cookie because the API and SPA may be on different sites.
 - finding 5 — notification emails are prepared inside a catch-all (never raises from on_commit) and a payload missing a link field falls back to the app home page with a warning — cost if wrong: a developer mistake produces a generic link instead of an error.
+- finding 6 — a Redis outage no longer takes login, sign-up, password reset or email verification down: throttled views use FailOpenScopedRateThrottle, which lets the request through (and logs a warning) when the cache is unreachable; real configuration mistakes are still errors; cache sockets time out after 2 seconds so a dead Redis cannot hang requests; the YouTube connect flow answers 503 temporarily_unavailable (its one-time nonce needs the cache); background jobs are queued through enqueue(), so a broker outage is logged instead of failing a request whose data was already saved — cost if wrong: while Redis is down rate limits are not enforced (the per-code attempt limit lives in the database and stays on).
+- finding 7 — HSTS is opt-in per deployment: SECURE_HSTS_SECONDS (default one year), SECURE_HSTS_INCLUDE_SUBDOMAINS and SECURE_HSTS_PRELOAD default off, and preload without include-subdomains is refused at start-up; the matching Django deployment-check warnings are silenced only while the option is off — cost if wrong: an operator who wants preload must set two variables.
+- finding 8 — lock_proposal_for_brand lives in apps/proposals/locks.py (campaign row first, then proposal row) and is imported by proposals, deliverables and reviews; an AST test forbids importing another app's underscore-prefixed names — cost if wrong: none.
+- finding 9 — the campaign view counter is one INSERT ... ON CONFLICT DO UPDATE statement (PostgreSQL), so there is one query and no race — cost if wrong: the counter now requires PostgreSQL (already required).
+- finding 10 — the daily YouTube sync spreads connections evenly over YOUTUBE_SYNC_SPREAD_SECONDS (default 1800) using task countdowns, ordered by id — cost if wrong: a creator's stats can refresh up to 30 minutes after 03:00 UTC.
 
 ## Known gaps and things deliberately left alone
 
@@ -106,11 +111,12 @@ line of code, and the tests that pin them sit next to the code.
   Dockerfile and compose services are covered by structural tests only. Build them once before relying on them.
 - **Local development used Python 3.13 and PostgreSQL 18**; the Dockerfile and compose file target
   Python 3.12 and PostgreSQL 16 as originally planned.
-- **HSTS preload is on** in the production settings, which commits a domain to HTTPS only once it is
-  submitted to the preload list; only deploy the API on a domain that will always serve HTTPS.
-- **Code-review findings 6 to 10 are still open** (Redis outage makes login fail; HSTS preload is forced on;
-  a private lock helper is imported across apps; the view counter costs 2-3 queries; the daily YouTube sync
-  starts every creator at once). Findings 1 to 5 were fixed; see the Review fixes section above.
+- **HSTS is opt-in.** By default production sends a one-year HSTS header only; subdomain locking and
+  preload are off and need `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` (preload is refused
+  without subdomains). Both are very hard to undo, so turn them on only for a domain that will always use HTTPS.
+- **While Redis is down, rate limits are not enforced** (login and password reset keep working; a warning is
+  logged). The YouTube connect step answers 503 until Redis is back. Findings 1 to 10 of the code review are
+  all fixed; see the Review fixes section of the build report.
 - **The independent whole-branch code review was not run.** The final pass was a self-review by the
   author (static checks, migration drift, a hunt for defects the tests cannot see). It found and fixed one
   defect: email retries did not actually back off. A fresh reviewer is still recommended before launch.

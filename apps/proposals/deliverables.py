@@ -7,7 +7,8 @@ from apps.accounts.models import User
 from apps.core.exceptions import Conflict
 
 from .models import Deliverable, Proposal
-from .services import InvalidTransition, _lock_for_brand
+from .locks import lock_proposal_for_brand
+from .services import InvalidTransition
 
 MAX_DELIVERABLES = 20
 
@@ -86,7 +87,7 @@ def complete_proposal(*, brand: User, proposal_id: int) -> Proposal:
     Uses the same lock order as accepting and withdrawing (campaign, then proposal).
     """
     with transaction.atomic():
-        _, proposal = _lock_for_brand(brand, proposal_id)
+        _, proposal = lock_proposal_for_brand(brand, proposal_id)
         if proposal.completed_at is not None:
             return proposal
         if proposal.status != Proposal.Status.ACCEPTED:

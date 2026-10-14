@@ -6,7 +6,7 @@ from django.db.models import Avg, Count
 from apps.accounts.models import User
 from apps.core.exceptions import Conflict
 from apps.profiles.models import CreatorProfile
-from apps.proposals.services import _lock_for_brand
+from apps.proposals.locks import lock_proposal_for_brand
 
 from .models import Review
 
@@ -46,7 +46,7 @@ def recalculate_rating(creator_id: int) -> None:
 def create_review(*, brand: User, proposal_id: int, rating: int, text: str = "") -> Review:
     """Rate the creator of a Completed collaboration. One review each; not editable afterwards."""
     with transaction.atomic():
-        _, proposal = _lock_for_brand(brand, proposal_id)  # another brand's proposal is a 404
+        _, proposal = lock_proposal_for_brand(brand, proposal_id)  # another brand's proposal is a 404
         if proposal.completed_at is None:
             raise NotCompleted()
         if Review.objects.filter(proposal=proposal).exists():

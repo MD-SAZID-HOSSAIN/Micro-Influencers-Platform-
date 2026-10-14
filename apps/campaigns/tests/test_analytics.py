@@ -214,3 +214,42 @@ def test_the_proposal_metrics_cost_a_constant_number_of_queries(campaign, auth_c
         response = client.get(analytics_url(campaign.pk))
 
     assert response.json()["funnel"]["received"] == 25
+
+
+# ---- the view counter is cheap ---------------------------------------------------------------------------
+# Every creator opening a campaign page bumps a counter, so this runs on a hot read path.
+
+
+def test_a_repeat_view_costs_a_single_query(campaign, django_assert_num_queries):
+    from apps.campaigns.analytics import record_campaign_view
+
+    creator = UserFactory(role=Role.CREATOR)
+    record_campaign_view(campaign, creator)  # the first view creates the row
+
+    with django_assert_num_queries(1):
+        record_campaign_view(campaign, creator)
+
+    assert CampaignView.objects.get(campaign=campaign, creator=creator).view_count == 2
+
+
+def test_the_first_view_also_costs_a_single_query(campaign, django_assert_num_queries):
+    from apps.campaigns.analytics import record_campaign_view
+
+    creator = UserFactory(role=Role.CREATOR)
+
+    with django_assert_num_queries(1):
+        record_campaign_view(campaign, creator)
+
+    assert CampaignView.objects.get(campaign=campaign, creator=creator).view_count == 1
+
+
+def test_each_view_updates_the_last_viewed_time(campaign):
+    from apps.campaigns.analytics import record_campaign_view
+
+    creator = UserFactory(role=Role.CREATOR)
+    record_campaign_view(campaign, creator)
+    first = CampaignView.objects.get(campaign=campaign, creator=creator).last_viewed_at
+
+    record_campaign_view(campaign, creator)
+
+    assert CampaignView.objects.get(campaign=campaign, creator=creator).last_viewed_at >= first
