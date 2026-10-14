@@ -430,3 +430,49 @@ def test_endpoints_are_creator_only(db, auth_client, path, method):
 
     assert getattr(auth_client(brand), method)(path).status_code == 403
     assert getattr(APIClient(), method)(path).status_code == 401
+
+
+# ---- when Redis is down ---------------------------------------------------------------------------------------
+# The OAuth state's one-time nonce lives in the shared cache. If it is unreachable the flow cannot be made
+# safe, so it must say so plainly (503) rather than crash, and must not half-complete.
+
+
+def test_connect_says_temporarily_unavailable_when_the_cache_is_down(creator, fake_youtube, auth_client, redis_down):
+    response = auth_client(creator).get(CONNECT)
+
+    assert response.status_code == 503
+    assert error_code(response) == "temporarily_unavailable"
+
+
+def test_completing_says_temporarily_unavailable_and_changes_nothing_when_the_cache_is_down(
+    creator, fake_youtube, auth_client, redis_down
+):
+    state = signing.dumps({"uid": creator.id, "nonce": "n1"}, salt="youtube-oauth")  # validly signed
+
+    response = complete(auth_client(creator), state)
+
+    assert response.status_code == 503
+    assert error_code(response) == "temporarily_unavailable"
+    assert fake_youtube.exchange_calls == []  # Google's code was not used up
+    assert not YouTubeConnection.objects.exists()
+
+
+def test_a_background_queue_outage_after_connecting_does_not_fail_the_request(
+    creator, fake_youtube, auth_client, run_on_commit, caplog
+):
+    import logging
+    from unittest import mock
+
+    from kombu.exceptions import OperationalError
+
+    client = auth_client(creator)
+    state = get_state(client)
+
+    with mock.patch("apps.social.tasks.sync_connection_task.delay", side_effect=OperationalError("broker down")):
+        with caplog.at_level(logging.ERROR):
+            with run_on_commit():
+                response = complete(client, state)
+
+    assert response.status_code == 200  # the link was saved; the first sync happens with the next daily run
+    assert YouTubeConnection.objects.filter(creator=creator).exists()
+    assert "Could not queue" in caplog.text

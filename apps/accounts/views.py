@@ -3,8 +3,9 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+
+from apps.core.throttling import FailOpenScopedRateThrottle
 
 from .models import Role
 from .serializers import (
@@ -34,7 +35,7 @@ from .services import (
 class RegisterView(GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "register"
     serializer_class = RegisterSerializer
 
@@ -49,7 +50,7 @@ class RegisterView(GenericAPIView):
 class LoginView(GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "login"
     serializer_class = LoginSerializer
 
@@ -83,7 +84,7 @@ class MeView(APIView):
 class PasswordResetRequestView(GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "password_reset"
     serializer_class = PasswordResetRequestSerializer
 
@@ -98,7 +99,7 @@ class PasswordResetRequestView(GenericAPIView):
 class PasswordResetConfirmView(GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "password_reset_confirm"
     serializer_class = PasswordResetConfirmSerializer
 
@@ -113,7 +114,7 @@ class PasswordResetConfirmView(GenericAPIView):
 class EmailVerifyView(GenericAPIView):
     """Confirm the 6-digit code that was emailed after registration."""
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "email_verify"
     serializer_class = EmailVerifySerializer
 
@@ -128,7 +129,7 @@ class EmailVerifyView(GenericAPIView):
 class EmailResendView(GenericAPIView):
     """Send a new verification code (at most one per minute)."""
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "email_resend"
     serializer_class = DetailSerializer
 

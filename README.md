@@ -126,6 +126,9 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins allowed to call the API (https in production). |
 | `NUM_PROXIES` | Reverse proxies in front of the app, so rate limiting sees the real client IP. `0` in development, `1` in production by default. |
 | `SECURE_SSL_REDIRECT` | Production only: redirect HTTP to HTTPS. Set `false` only for a plain-HTTP smoke test. |
+| `SECURE_HSTS_SECONDS` | Production only: how long browsers must keep using HTTPS for this site (default one year; try `300` for a first rollout). |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | Production only, default `false`: also lock every subdomain to HTTPS. Hard to undo. |
+| `SECURE_HSTS_PRELOAD` | Production only, default `false`: ask to be baked into browsers' HTTPS-only lists. Needs the option above; very hard to undo. |
 | `OAUTH_ENCRYPTION_KEY` | Fernet key that encrypts stored YouTube tokens. Required in production. |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |

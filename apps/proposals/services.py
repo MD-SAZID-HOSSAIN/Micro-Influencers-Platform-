@@ -10,6 +10,7 @@ from apps.core.exceptions import Conflict
 from apps.notifications.models import Kind
 from apps.notifications.services import notify
 
+from .locks import lock_proposal_for_brand
 from .models import ACTIVE_STATUSES, Proposal
 
 
@@ -143,23 +144,6 @@ class CampaignFull(Conflict):
     default_detail = "All creators for this campaign have already been selected."
 
 
-def _lock_for_brand(brand: User, proposal_id: int) -> tuple[Campaign, Proposal]:
-    """Lock the campaign, then the proposal (the same order withdrawals use), for the owning brand.
-
-    Anyone else's proposal is a 404. Must be called inside ``transaction.atomic()``.
-    """
-    campaign_id = (
-        Proposal.objects.filter(pk=proposal_id, campaign__brand=brand)
-        .values_list("campaign_id", flat=True)
-        .first()
-    )
-    if campaign_id is None:
-        raise NotFound("Proposal not found.")
-    campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
-    proposal = Proposal.objects.select_for_update().select_related("creator").get(pk=proposal_id)
-    return campaign, proposal
-
-
 def _transition(
     *,
     brand: User,
@@ -171,7 +155,7 @@ def _transition(
     check_capacity: bool = False,
 ) -> Proposal:
     with transaction.atomic():
-        campaign, proposal = _lock_for_brand(brand, proposal_id)
+        campaign, proposal = lock_proposal_for_brand(brand, proposal_id)
         if proposal.status == to == Proposal.Status.ACCEPTED:
             return proposal  # accepting twice (a double click) changes nothing and is not an error
         if proposal.status not in allowed_from:

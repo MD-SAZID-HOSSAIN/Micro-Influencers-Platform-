@@ -75,6 +75,8 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
+        # Without timeouts a Redis outage makes every throttled request wait for the OS to give up.
+        "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
     }
 }
 
@@ -185,6 +187,8 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 YOUTUBE_REFRESH_COOLDOWN_SECONDS = 900
+# The daily YouTube sync starts creators evenly over this many seconds (0 = all at once).
+YOUTUBE_SYNC_SPREAD_SECONDS = 1800
 
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"

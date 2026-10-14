@@ -7,10 +7,10 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.choices import Platform
+from apps.core.throttling import FailOpenScopedRateThrottle
 from apps.core.permissions import IsCreator
 
 from .models import PlatformStats, YouTubeConnection
@@ -139,7 +139,7 @@ class YouTubeCompleteView(GenericAPIView):
     """
 
     permission_classes = [IsCreator]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "youtube_complete"
     serializer_class = CompleteConnectSerializer
 

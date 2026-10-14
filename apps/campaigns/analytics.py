@@ -1,7 +1,8 @@
 """Per-campaign analytics for brands (FR-23): view counting and proposal metrics."""
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.db.models import Avg, Count, F, Q, Sum
+from django.db import connection
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -11,11 +12,21 @@ from .models import Campaign, CampaignView
 
 
 def record_campaign_view(campaign: Campaign, creator: User) -> None:
-    """Count one opening of the campaign by this creator (a counter on one row, safe under concurrency)."""
-    view, _ = CampaignView.objects.get_or_create(campaign=campaign, creator=creator)
-    CampaignView.objects.filter(pk=view.pk).update(
-        view_count=F("view_count") + 1, last_viewed_at=timezone.now()
-    )
+    """Count one opening of the campaign by this creator, in exactly one atomic statement.
+
+    This runs every time a creator opens a campaign page. A single PostgreSQL upsert creates the
+    creator's row on their first view and adds 1 to it afterwards, so there is no read-then-write
+    race and a first view costs the same as a repeat one.
+    """
+    table = connection.ops.quote_name(CampaignView._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"INSERT INTO {table} (campaign_id, creator_id, view_count, last_viewed_at) "
+            "VALUES (%s, %s, 1, %s) "
+            "ON CONFLICT (campaign_id, creator_id) DO UPDATE "
+            f"SET view_count = {table}.view_count + 1, last_viewed_at = EXCLUDED.last_viewed_at",
+            [campaign.pk, creator.pk, timezone.now()],
+        )
 
 
 def campaign_metrics(campaign: Campaign) -> dict:

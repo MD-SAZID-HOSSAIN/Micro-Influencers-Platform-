@@ -23,6 +23,7 @@ from apps.accounts.models import Role
 from apps.accounts.services import issue_access_token
 from apps.accounts.tests.factories import UserFactory
 from apps.core.permissions import IsAdminRole, IsBrand, IsCreator
+from apps.core.throttling import FailOpenScopedRateThrottle
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 
@@ -270,7 +271,7 @@ def test_no_secret_fields_or_values_appear_in_any_response(db):
 def test_abuse_prone_endpoints_are_throttled(settings, path, scope):
     view_class = next(v for p, v, _ in routes() if p == path)
 
-    assert ScopedRateThrottle in view_class.throttle_classes
+    assert FailOpenScopedRateThrottle in view_class.throttle_classes
     assert view_class.throttle_scope == scope
     assert scope in settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
 
@@ -407,3 +408,57 @@ def test_production_enforces_https_and_secure_cookies():
     result = _run(["-c", code], _prod_env())
 
     assert result.returncode == 0, result.stderr
+
+
+# ---- HSTS: opt-in for the irreversible parts ------------------------------------------------------------
+# `preload` and `includeSubDomains` tell browsers to use HTTPS-only for the domain (and every subdomain)
+# for a year, and a preload-list entry is very hard to undo. They must be a deliberate choice per deployment,
+# not something every staging or demo host inherits.
+
+_HSTS_CODE = (
+    "import config.settings.prod as s; "
+    "print(s.SECURE_HSTS_SECONDS, s.SECURE_HSTS_INCLUDE_SUBDOMAINS, s.SECURE_HSTS_PRELOAD)"
+)
+
+
+def test_hsts_preload_and_subdomains_are_off_by_default_but_https_is_still_enforced():
+    result = _run(["-c", _HSTS_CODE], _prod_env())
+
+    assert result.returncode == 0, result.stderr
+    seconds, subdomains, preload = result.stdout.split()
+    assert int(seconds) >= 31536000  # HSTS itself stays on for a year
+    assert (subdomains, preload) == ("False", "False")
+
+
+def test_hsts_preload_and_subdomains_can_be_switched_on_and_the_deploy_check_stays_clean():
+    env = _prod_env(SECURE_HSTS_INCLUDE_SUBDOMAINS="true", SECURE_HSTS_PRELOAD="true")
+
+    values = _run(["-c", _HSTS_CODE], env)
+    check = _run(["manage.py", "check", "--deploy", "--fail-level", "WARNING"], env)
+
+    assert values.stdout.split()[1:] == ["True", "True"]
+    assert check.returncode == 0, check.stdout + check.stderr
+
+
+def test_preload_without_subdomains_is_refused_because_browsers_would_reject_it():
+    result = _run(["-c", "import config.settings.prod"], _prod_env(SECURE_HSTS_PRELOAD="true"))
+
+    assert result.returncode != 0
+    assert "SECURE_HSTS_PRELOAD" in result.stderr
+
+
+def test_the_hsts_lifetime_can_be_shortened_for_a_first_rollout():
+    result = _run(["-c", _HSTS_CODE], _prod_env(SECURE_HSTS_SECONDS="300"))
+
+    assert result.stdout.split()[0] == "300"
+
+
+def test_no_view_uses_the_plain_scoped_throttle():
+    """The plain DRF class turns a Redis outage into HTTP 500s on login; ours lets requests through."""
+    offenders = [
+        path
+        for path, view_class, _ in routes()
+        if any(t is ScopedRateThrottle for t in getattr(view_class, "throttle_classes", []))
+    ]
+
+    assert offenders == []

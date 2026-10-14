@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.conf import settings
 
 from . import services
 from .models import YouTubeConnection
@@ -22,12 +23,18 @@ def sync_connection_task(connection_id: int) -> None:
 
 @shared_task
 def sync_all_youtube() -> int:
-    """Daily job: queue one sync per healthy connection, so one failure cannot stop the rest."""
+    """Daily job: queue one sync per healthy connection, so one failure cannot stop the rest.
+
+    The syncs are started evenly over ``YOUTUBE_SYNC_SPREAD_SECONDS`` instead of all at once, so
+    thousands of creators do not hit Google in the same few seconds (which would trigger rate limits
+    and make every retry land together too).
+    """
     ids = list(
-        YouTubeConnection.objects.filter(status=YouTubeConnection.Status.CONNECTED).values_list(
-            "id", flat=True
-        )
+        YouTubeConnection.objects.filter(status=YouTubeConnection.Status.CONNECTED)
+        .order_by("id")
+        .values_list("id", flat=True)
     )
-    for connection_id in ids:
-        sync_connection_task.delay(connection_id)
+    spread = settings.YOUTUBE_SYNC_SPREAD_SECONDS
+    for index, connection_id in enumerate(ids):
+        sync_connection_task.apply_async(args=[connection_id], countdown=index * spread // len(ids))
     return len(ids)

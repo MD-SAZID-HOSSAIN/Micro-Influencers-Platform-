@@ -4,12 +4,12 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import Role, User
 from apps.accounts.serializers import LoginResponseSerializer, LoginSerializer, UserSerializer
 from apps.accounts.services import InvalidCredentials, authenticate_login, issue_access_token
+from apps.core.throttling import FailOpenScopedRateThrottle
 from apps.core.permissions import IsAdminRole
 
 from .models import AdminActionLog
@@ -36,7 +36,7 @@ class AdminLoginView(GenericAPIView):
 
     permission_classes = [AllowAny]
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [FailOpenScopedRateThrottle]
     throttle_scope = "admin_login"
     serializer_class = LoginSerializer
 
