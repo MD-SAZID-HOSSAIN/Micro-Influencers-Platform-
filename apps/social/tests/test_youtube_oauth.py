@@ -1,3 +1,14 @@
+"""Connecting YouTube is a two-step flow so the link can only be finished by the person who started it.
+
+1. The creator (logged in) asks /connect/ for the Google URL. It carries a signed, single-use ``state``.
+2. Google sends the browser to /callback/ (no login possible there). The server only checks the state's
+   signature and redirects to the frontend with ``code`` and ``state``. It changes nothing.
+3. The frontend, logged in as the creator, POSTs both to /complete/. The server checks that the state
+   was issued to THAT creator, then exchanges the code and saves the tokens.
+
+Without step 3's identity check, a creator could send someone else a connect link and end up
+with that person's channel shown as Verified on their own profile (OAuth login CSRF).
+"""
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -17,12 +28,13 @@ from apps.social.youtube_client import TokenRevoked, TokenSet, TransientApiError
 BASE = "/api/v1/social/youtube/"
 CONNECT = BASE + "connect/"
 CALLBACK = BASE + "callback/"
+COMPLETE = BASE + "complete/"
 RECENT = BASE + "recent-content/"
-SUCCESS = "http://frontend.test/settings/connections?youtube=success"
+FRONTEND_PAGE = "http://frontend.test/settings/connections"
 
 
 def error_redirect(reason):
-    return f"http://frontend.test/settings/connections?youtube=error&reason={reason}"
+    return f"{FRONTEND_PAGE}?youtube=error&reason={reason}"
 
 
 @pytest.fixture
@@ -35,12 +47,20 @@ def get_state(client):
     return parse_qs(urlparse(url).query)["state"][0]
 
 
-def callback(state, code="auth-code", **extra):
-    params = {"state": state, "code": code, **extra}
-    return APIClient().get(CALLBACK, params)  # no Authorization header: it is a browser redirect
+def google_redirects_back(state, code="auth-code", **extra):
+    """What the browser does after Google's consent screen: a plain GET with no Authorization header."""
+    return APIClient().get(CALLBACK, {"state": state, "code": code, **extra})
 
 
-# ---- connect ------------------------------------------------------------------------------
+def complete(client, state, code="auth-code"):
+    return client.post(COMPLETE, {"state": state, "code": code}, format="json")
+
+
+def error_code(response):
+    return response.json()["error"]["code"]
+
+
+# ---- step 1: connect ------------------------------------------------------------------------------
 
 
 def test_connect_returns_google_url_with_a_signed_single_use_state(creator, fake_youtube, auth_client):
@@ -68,148 +88,67 @@ def test_only_creators_can_start_a_connection(db, fake_youtube, auth_client):
     assert APIClient().get(CONNECT).status_code == 401
 
 
-# ---- callback: success -----------------------------------------------------------------------
+# ---- step 2: Google's redirect (no login, no side effects) ------------------------------------------------
 
 
-def test_callback_with_valid_state_stores_encrypted_tokens_and_verified_stats(
-    creator, fake_youtube, auth_client, run_on_commit
-):
+def test_callback_only_redirects_to_the_frontend_carrying_the_code_and_state(creator, fake_youtube, auth_client):
     state = get_state(auth_client(creator))
 
-    with run_on_commit():
-        response = callback(state)
+    response = google_redirects_back(state, code="the-google-code")
 
     assert response.status_code == 302
-    assert response["Location"] == SUCCESS
-    connection = YouTubeConnection.objects.get(creator=creator)
-    assert connection.access_token_enc != "exchanged-at"
-    assert "exchanged-rt" not in connection.refresh_token_enc
-    assert decrypt(connection.access_token_enc) == "exchanged-at"
-    assert decrypt(connection.refresh_token_enc) == "exchanged-rt"
-    assert connection.status == YouTubeConnection.Status.CONNECTED
-    assert fake_youtube.exchange_calls == ["auth-code"]
-    assert fake_youtube.fetch_calls == ["exchanged-at"]  # first sync ran in the background
-    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
-    assert stats.is_verified is True
-    assert stats.followers == 10000
+    location = urlparse(response["Location"])
+    assert f"{location.scheme}://{location.netloc}{location.path}" == FRONTEND_PAGE
+    assert parse_qs(location.query) == {"youtube": ["confirm"], "code": ["the-google-code"], "state": [state]}
 
 
-def test_callback_replaces_manual_youtube_stats_with_verified_ones(
-    creator, fake_youtube, auth_client, run_on_commit
-):
-    PlatformStats.objects.create(
-        creator=creator, platform="youtube", followers=5, engagement_rate="1.00", is_verified=False
-    )
+def test_callback_changes_nothing(creator, fake_youtube, auth_client):
     state = get_state(auth_client(creator))
+    nonce = signing.loads(state, salt="youtube-oauth")["nonce"]
 
-    with run_on_commit():
-        callback(state)
+    google_redirects_back(state)
 
-    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
-    assert (stats.is_verified, stats.followers) == (True, 10000)
-
-
-def test_reconnect_after_revocation_restores_connected_status(
-    creator, fake_youtube, auth_client, run_on_commit
-):
-    connection = make_connection(
-        creator, status=YouTubeConnection.Status.NEEDS_RECONNECT, followers=77
-    )
-    connection.last_error = "token_revoked"
-    connection.save(update_fields=["last_error"])
-    PlatformStats.objects.filter(creator=creator).update(is_outdated=True)
-    state = get_state(auth_client(creator))
-
-    with run_on_commit():
-        response = callback(state)
-
-    assert response["Location"] == SUCCESS
-    connection.refresh_from_db()
-    assert connection.status == YouTubeConnection.Status.CONNECTED
-    assert connection.last_error == ""
-    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
-    assert stats.is_outdated is False
-    assert stats.followers == 10000
-
-
-def test_callback_without_a_new_refresh_token_keeps_the_existing_one(
-    creator, fake_youtube, auth_client, run_on_commit
-):
-    make_connection(creator, refresh="old-rt")
-    fake_youtube.exchange_result = TokenSet("fresh-at", None, 3600)
-    state = get_state(auth_client(creator))
-
-    with run_on_commit():
-        callback(state)
-
-    connection = YouTubeConnection.objects.get(creator=creator)
-    assert decrypt(connection.refresh_token_enc) == "old-rt"
-    assert decrypt(connection.access_token_enc) == "fresh-at"
+    assert not YouTubeConnection.objects.exists()  # nothing is linked yet
+    assert fake_youtube.exchange_calls == []  # Google's code has not been used
+    assert cache.get(f"youtube-oauth-nonce:{nonce}") is not None  # the state can still be completed
 
 
 def test_callback_is_reachable_without_an_auth_header(creator, fake_youtube, auth_client):
     state = get_state(auth_client(creator))
 
-    assert callback(state).status_code == 302
+    assert google_redirects_back(state).status_code == 302
 
 
 def test_callback_only_accepts_get(db):
     assert APIClient().post(CALLBACK, {}).status_code == 405
 
 
-# ---- callback: failures -----------------------------------------------------------------------
-
-
-def test_tampered_state_redirects_with_error_and_stores_nothing(creator, fake_youtube, auth_client):
+def test_callback_rejects_a_tampered_state_straight_away(creator, fake_youtube, auth_client):
     state = get_state(auth_client(creator))
 
-    response = callback(state[:-3] + "xyz")
+    response = google_redirects_back(state[:-3] + "xyz")
 
     assert response["Location"] == error_redirect("invalid_state")
-    assert not YouTubeConnection.objects.exists()
-    assert fake_youtube.exchange_calls == []
 
 
-def test_state_cannot_be_reused(creator, fake_youtube, auth_client, run_on_commit):
-    state = get_state(auth_client(creator))
-    with run_on_commit():
-        assert callback(state)["Location"] == SUCCESS
-
-    second = callback(state)
-
-    assert second["Location"] == error_redirect("invalid_state")
-    assert fake_youtube.exchange_calls == ["auth-code"]
-
-
-def test_expired_state_is_rejected(creator, fake_youtube, auth_client):
+def test_callback_rejects_an_expired_state(creator, fake_youtube, auth_client):
     with freeze_time("2026-10-13 12:00:00") as clock:
         state = get_state(auth_client(creator))
         clock.tick(timedelta(seconds=601))
 
-        response = callback(state)
+        response = google_redirects_back(state)
 
     assert response["Location"] == error_redirect("invalid_state")
-    assert fake_youtube.exchange_calls == []
 
 
-def test_state_for_a_non_creator_is_rejected(db, fake_youtube):
-    brand = UserFactory(role=Role.BRAND)
-    cache.set("youtube-oauth-nonce:n1", True, 600)
-    state = signing.dumps({"uid": brand.id, "nonce": "n1"}, salt="youtube-oauth")
-
-    assert callback(state)["Location"] == error_redirect("invalid_state")
-    assert not YouTubeConnection.objects.exists()
-
-
-def test_state_signed_for_another_purpose_is_rejected(creator, fake_youtube):
-    cache.set("youtube-oauth-nonce:n1", True, 600)
+def test_callback_rejects_a_state_signed_for_another_purpose(creator, fake_youtube):
     state = signing.dumps({"uid": creator.id, "nonce": "n1"}, salt="something-else")
 
-    assert callback(state)["Location"] == error_redirect("invalid_state")
+    assert google_redirects_back(state)["Location"] == error_redirect("invalid_state")
 
 
-@pytest.mark.parametrize("params", [{}, {"state": ""}, {"code": "x"}])
-def test_missing_state_is_rejected(db, fake_youtube, params):
+@pytest.mark.parametrize("params", [{}, {"state": ""}, {"code": "x"}, {"state": "abc"}])
+def test_callback_rejects_missing_or_junk_parameters(db, fake_youtube, params):
     response = APIClient().get(CALLBACK, params)
 
     assert response["Location"] == error_redirect("invalid_state")
@@ -225,28 +164,183 @@ def test_user_denied_consent(creator, fake_youtube, auth_client):
     assert not YouTubeConnection.objects.exists()
 
 
-@pytest.mark.parametrize("failure", [TokenRevoked(), TransientApiError("503")])
-def test_failed_code_exchange_redirects_with_error(creator, fake_youtube, auth_client, failure):
-    fake_youtube.exchange_result = failure
+# ---- step 3: the logged-in creator completes the link ---------------------------------------------------------
+
+
+def test_completing_stores_encrypted_tokens_and_starts_the_first_sync(creator, fake_youtube, auth_client, run_on_commit):
+    client = auth_client(creator)
+    state = get_state(client)
+    google_redirects_back(state)
+
+    with run_on_commit():
+        response = complete(client, state)
+
+    assert response.status_code == 200
+    assert response.json()["connected"] is True and response.json()["status"] == "connected"
+    connection = YouTubeConnection.objects.get(creator=creator)
+    assert connection.access_token_enc != "exchanged-at"
+    assert "exchanged-rt" not in connection.refresh_token_enc
+    assert decrypt(connection.access_token_enc) == "exchanged-at"
+    assert decrypt(connection.refresh_token_enc) == "exchanged-rt"
+    assert fake_youtube.exchange_calls == ["auth-code"]
+    assert fake_youtube.fetch_calls == ["exchanged-at"]  # the first sync ran in the background
+    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
+    assert (stats.is_verified, stats.followers) == (True, 10000)
+
+
+def test_someone_elses_connect_link_cannot_be_finished_by_another_creator(db, fake_youtube, auth_client):
+    attacker, victim = UserFactory(role=Role.CREATOR), UserFactory(role=Role.CREATOR)
+    attackers_state = get_state(auth_client(attacker))
+    # The victim is tricked into approving the attacker's link; Google sends THEIR code with the attacker's state.
+    google_redirects_back(attackers_state, code="victims-google-code")
+
+    response = complete(auth_client(victim), attackers_state, code="victims-google-code")
+
+    assert response.status_code == 400
+    assert error_code(response) == "invalid_state"
+    assert fake_youtube.exchange_calls == []  # the victim's code was never even used
+    assert not YouTubeConnection.objects.exists()  # neither account got linked
+    assert not PlatformStats.objects.exists()
+
+
+def test_a_refused_attempt_does_not_burn_the_rightful_owners_state(db, fake_youtube, auth_client, run_on_commit):
+    owner, other = UserFactory(role=Role.CREATOR), UserFactory(role=Role.CREATOR)
+    owners_client = auth_client(owner)
+    state = get_state(owners_client)
+    assert complete(auth_client(other), state).status_code == 400
+
+    with run_on_commit():
+        response = complete(owners_client, state)
+
+    assert response.status_code == 200
+    assert YouTubeConnection.objects.get().creator == owner
+
+
+def test_completing_requires_a_logged_in_creator(creator, fake_youtube, auth_client):
     state = get_state(auth_client(creator))
+    brand = UserFactory(role=Role.BRAND)
 
-    response = callback(state)
+    assert APIClient().post(COMPLETE, {"state": state, "code": "x"}, format="json").status_code == 401
+    assert complete(auth_client(brand), state).status_code == 403
+    assert not YouTubeConnection.objects.exists()
 
-    assert response["Location"] == error_redirect("exchange_failed")
+
+def test_a_state_can_be_completed_only_once(creator, fake_youtube, auth_client, run_on_commit):
+    client = auth_client(creator)
+    state = get_state(client)
+    with run_on_commit():
+        assert complete(client, state).status_code == 200
+
+    second = complete(client, state)
+
+    assert second.status_code == 400 and error_code(second) == "invalid_state"
+    assert fake_youtube.exchange_calls == ["auth-code"]
+
+
+def test_an_expired_state_is_rejected(creator, fake_youtube, auth_client):
+    with freeze_time("2026-10-13 12:00:00") as clock:
+        client = auth_client(creator)  # the login token must be issued under the frozen clock too
+        state = get_state(client)
+        clock.tick(timedelta(seconds=601))
+
+        response = complete(client, state)
+
+    assert response.status_code == 400 and error_code(response) == "invalid_state"
+    assert fake_youtube.exchange_calls == []
+
+
+def test_a_tampered_state_or_one_signed_for_another_purpose_is_rejected(creator, fake_youtube, auth_client):
+    client = auth_client(creator)
+    state = get_state(client)
+    cache.set("youtube-oauth-nonce:n1", True, 600)
+    foreign = signing.dumps({"uid": creator.id, "nonce": "n1"}, salt="something-else")
+
+    assert error_code(complete(client, state[:-3] + "xyz")) == "invalid_state"
+    assert error_code(complete(client, foreign)) == "invalid_state"
+    assert fake_youtube.exchange_calls == []
+
+
+@pytest.mark.parametrize("failure", [TokenRevoked(), TransientApiError("503")])
+def test_a_failed_code_exchange_is_reported_and_stores_nothing(creator, fake_youtube, auth_client, failure):
+    fake_youtube.exchange_result = failure
+    client = auth_client(creator)
+
+    response = complete(client, get_state(client))
+
+    assert response.status_code == 400 and error_code(response) == "exchange_failed"
     assert not YouTubeConnection.objects.exists()
 
 
 def test_no_refresh_token_and_no_existing_connection_is_an_error(creator, fake_youtube, auth_client):
     fake_youtube.exchange_result = TokenSet("at", None, 3600)
-    state = get_state(auth_client(creator))
+    client = auth_client(creator)
 
-    response = callback(state)
+    response = complete(client, get_state(client))
 
-    assert response["Location"] == error_redirect("no_refresh_token")
+    assert response.status_code == 400 and error_code(response) == "no_refresh_token"
     assert not YouTubeConnection.objects.exists()
 
 
-# ---- disconnect, status, recent content ---------------------------------------------------------
+def test_without_a_new_refresh_token_the_existing_one_is_kept(creator, fake_youtube, auth_client, run_on_commit):
+    make_connection(creator, refresh="old-rt")
+    fake_youtube.exchange_result = TokenSet("fresh-at", None, 3600)
+    client = auth_client(creator)
+
+    with run_on_commit():
+        complete(client, get_state(client))
+
+    connection = YouTubeConnection.objects.get(creator=creator)
+    assert decrypt(connection.refresh_token_enc) == "old-rt"
+    assert decrypt(connection.access_token_enc) == "fresh-at"
+
+
+def test_completing_replaces_manual_youtube_stats_with_verified_ones(creator, fake_youtube, auth_client, run_on_commit):
+    PlatformStats.objects.create(
+        creator=creator, platform="youtube", followers=5, engagement_rate="1.00", is_verified=False
+    )
+    client = auth_client(creator)
+
+    with run_on_commit():
+        complete(client, get_state(client))
+
+    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
+    assert (stats.is_verified, stats.followers) == (True, 10000)
+
+
+def test_reconnecting_after_a_revocation_restores_the_connection(creator, fake_youtube, auth_client, run_on_commit):
+    connection = make_connection(creator, status=YouTubeConnection.Status.NEEDS_RECONNECT, followers=77)
+    connection.last_error = "token_revoked"
+    connection.save(update_fields=["last_error"])
+    PlatformStats.objects.filter(creator=creator).update(is_outdated=True)
+    client = auth_client(creator)
+
+    with run_on_commit():
+        response = complete(client, get_state(client))
+
+    assert response.status_code == 200
+    connection.refresh_from_db()
+    assert connection.status == YouTubeConnection.Status.CONNECTED and connection.last_error == ""
+    stats = PlatformStats.objects.get(creator=creator, platform="youtube")
+    assert (stats.is_outdated, stats.followers) == (False, 10000)
+
+
+@pytest.mark.parametrize("body", [{}, {"state": "x"}, {"code": "x"}, {"state": "", "code": ""}])
+def test_completing_needs_both_the_state_and_the_code(creator, fake_youtube, auth_client, body):
+    response = auth_client(creator).post(COMPLETE, body, format="json")
+
+    assert response.status_code == 400
+    assert error_code(response) == "validation_error"
+
+
+def test_completing_is_throttled(creator, fake_youtube, auth_client):
+    client = auth_client(creator)
+    for _ in range(20):
+        assert complete(client, "junk").status_code == 400
+
+    assert complete(client, "junk").status_code == 429
+
+
+# ---- disconnect, status, recent content ---------------------------------------------------------------------
 
 
 def test_disconnect_deletes_tokens_and_keeps_stats_as_unverified(creator, auth_client):

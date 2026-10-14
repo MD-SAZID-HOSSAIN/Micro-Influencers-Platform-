@@ -3,6 +3,7 @@
 One fixed sentence per event, one button into the app, and a footer link to the notification
 settings. No names, titles, rates, proposal text or stats are ever put in an email body.
 """
+import logging
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -11,6 +12,8 @@ from apps.accounts.models import User
 from apps.core.emailing import queue_email
 
 from .models import Kind
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -67,19 +70,42 @@ def wants_email(user: User) -> bool:
     return bool(user.is_active and user.email_verified and user.email_notifications_enabled)
 
 
+def _link(kind: str, event: EmailEvent, payload: dict, base: str) -> str:
+    """The page the email button opens. Falls back to the app's home page if the payload lacks a field."""
+    try:
+        return base + event.path.format(**payload)
+    except (KeyError, IndexError):
+        logger.warning(
+            "Notification email link needs fields the payload does not have (kind=%s, path=%r, payload keys=%s)",
+            kind,
+            event.path,
+            sorted(payload),
+        )
+        return base
+
+
 def queue_notification_email(*, to: str, kind: str, payload: dict) -> None:
-    event = EMAIL_EVENTS[Kind(kind)]
-    sentence = event.sentence
-    if kind == Kind.PROPOSAL_WITHDRAWN and payload.get("slot_opened"):
-        sentence += SLOT_OPENED_SENTENCE
-    base = settings.FRONTEND_URL.rstrip("/")
-    queue_email(
-        to,
-        event.subject,
-        "notification",
-        {
-            "sentence": sentence,
-            "url": base + event.path.format(**payload),
-            "settings_url": base + SETTINGS_PATH,
-        },
-    )
+    """Prepare and queue the email for a notification. Never raises.
+
+    This runs in an on_commit callback, and Django lets an exception raised there reach the caller
+    after the commit: the request would fail even though everything was saved. So every problem is
+    logged here instead, and the in-app notification is unaffected.
+    """
+    try:
+        event = EMAIL_EVENTS[Kind(kind)]
+        sentence = event.sentence
+        if kind == Kind.PROPOSAL_WITHDRAWN and payload.get("slot_opened"):
+            sentence += SLOT_OPENED_SENTENCE
+        base = settings.FRONTEND_URL.rstrip("/")
+        queue_email(
+            to,
+            event.subject,
+            "notification",
+            {
+                "sentence": sentence,
+                "url": _link(kind, event, payload, base),
+                "settings_url": base + SETTINGS_PATH,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to queue notification email (kind=%s)", kind)

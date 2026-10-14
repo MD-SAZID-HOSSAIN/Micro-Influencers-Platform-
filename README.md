@@ -93,6 +93,18 @@ Unverified (see the PRD for why).
 4. Put the client ID, secret and redirect URI in `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
    `GOOGLE_REDIRECT_URI`), and generate `OAUTH_ENCRYPTION_KEY` as shown in `.env.example`.
 
+**How the connection finishes (for the frontend).** It takes three steps so that only the person who
+started it can finish it:
+
+1. `GET /api/v1/social/youtube/connect/` (logged in) returns the Google URL; send the browser there.
+2. After consent Google redirects the browser to the API's `/callback/`, which saves nothing and
+   redirects on to `FRONTEND_URL/settings/connections?youtube=confirm&code=...&state=...`
+   (or `?youtube=error&reason=access_denied|invalid_state`).
+3. The frontend, logged in, sends both values unchanged to `POST /api/v1/social/youtube/complete/`
+   with `{"state", "code"}`. It answers with the connection status, or a 400 whose `code` is
+   `invalid_state`, `exchange_failed` or `no_refresh_token`. A `state` that was issued to a different
+   creator is refused with `invalid_state`.
+
 **While the app is in Testing mode, Google expires refresh tokens after 7 days**, so creators may need to
 reconnect about once a week. The platform handles this: the creator gets a "reconnect" notification and
 their last known stats stay visible, marked as outdated. Publishing the app (Google verification) removes
@@ -105,6 +117,7 @@ All configuration comes from environment variables; nothing secret is stored in 
 
 | Variable | Purpose |
 |---|---|
+| `DJANGO_SETTINGS_MODULE` | Which settings to run: `config.settings.dev` locally; leave unset (or `config.settings.prod`) on a server. |
 | `SECRET_KEY` | Signs tokens and hashes reset codes. Long and random in production. |
 | `ALLOWED_HOSTS` | Comma-separated host names the API answers to. |
 | `DATABASE_URL` | PostgreSQL connection URL. |
@@ -126,8 +139,13 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `EMAIL_USE_TLS` | Use TLS for SMTP. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
 
-Settings modules: `config.settings.dev` (default for `manage.py`), `config.settings.test` (pytest) and
+Settings modules: `config.settings.dev` (local development), `config.settings.test` (pytest) and
 `config.settings.prod` (deployment; refuses to start with an unsafe configuration).
+
+**Production is the default.** `manage.py`, wsgi and Celery start in production mode unless
+`DJANGO_SETTINGS_MODULE` says otherwise, so a server that forgets the variable fails to start instead
+of running in debug mode. For local work, the `.env` you copy from `.env.example` already contains
+`DJANGO_SETTINGS_MODULE=config.settings.dev`.
 
 ## How the API behaves
 

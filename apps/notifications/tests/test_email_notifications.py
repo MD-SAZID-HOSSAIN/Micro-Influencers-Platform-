@@ -216,3 +216,47 @@ def test_user_model_defaults(db):
 
     assert User.objects.get(pk=created.pk).email_verified is False
     assert User.objects.get(pk=created.pk).email_notifications_enabled is True
+
+
+# ---- an email problem must never reach the person who triggered it -------------------------------------
+# notify() sends its email from an on_commit callback. Django lets an exception raised there propagate
+# after the commit, so the request would fail with a 500 even though everything was saved.
+
+
+def test_a_payload_missing_the_campaign_id_still_notifies_and_emails_a_safe_link(db, run_on_commit, caplog):
+    brand = verified(Role.BRAND)
+
+    with caplog.at_level(logging.WARNING):
+        with run_on_commit():
+            notify(brand, Kind.PROPOSAL_RECEIVED, "A proposal arrived")  # no campaign_id in the payload
+
+    assert Notification.objects.filter(user=brand, kind=Kind.PROPOSAL_RECEIVED).count() == 1
+    assert len(mail.outbox) == 1
+    assert FRONTEND in mail.outbox[0].body  # falls back to the app's home page
+    assert "/brand/campaigns/" not in mail.outbox[0].body
+    assert "proposal_received" in caplog.text  # the problem is logged for developers
+
+
+def test_nothing_is_raised_even_if_the_email_cannot_be_prepared(db, run_on_commit, caplog):
+    creator = verified()
+
+    with mock.patch("apps.notifications.emails.queue_email", side_effect=RuntimeError("boom")):
+        with caplog.at_level(logging.ERROR):
+            with run_on_commit():
+                notify(creator, Kind.PROPOSAL_ACCEPTED, "Accepted")  # must not raise
+
+    assert Notification.objects.filter(user=creator).count() == 1
+    assert "Failed to queue notification email" in caplog.text
+    assert mail.outbox == []
+
+
+def test_a_broken_email_step_does_not_turn_a_successful_action_into_an_error(db, auth_client, run_on_commit):
+    creator = verified()
+    proposal = ProposalFactory(creator=creator, campaign=CampaignFactory(status=Campaign.Status.PUBLISHED))
+
+    with mock.patch("apps.notifications.emails.queue_email", side_effect=RuntimeError("boom")):
+        with run_on_commit():
+            response = auth_client(proposal.campaign.brand).post(accept_url(proposal.pk))
+
+    assert response.status_code == 200
+    assert Proposal.objects.get(pk=proposal.pk).status == Proposal.Status.ACCEPTED

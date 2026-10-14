@@ -98,3 +98,73 @@ def test_server_errors_are_transient_and_a_bad_key_is_a_plain_error():
     with pytest.raises(YouTubeError) as caught:
         YouTubeClient().fetch_video_stats(["aaaaaaaaaaa"], "bad-key")
     assert not isinstance(caught.value, TransientApiError)
+
+
+# ---- the API key must never reach an error message or a log ---------------------------------------
+# `requests` puts the full URL (query string included) into its network error text, and the server's
+# API key travels in that query string.
+
+SECRET_KEY_VALUE = "AIzaSy-THE-SECRET-SERVER-KEY"
+
+
+@responses.activate
+def test_a_network_failure_does_not_carry_the_request_url_or_the_key():
+    import traceback
+
+    import requests
+
+    url = f"{VIDEOS}?part=statistics&id=aaaaaaaaaaa&key={SECRET_KEY_VALUE}"
+    responses.get(
+        VIDEOS, body=requests.exceptions.ConnectionError(f"Max retries exceeded with url: {url}")
+    )
+
+    with pytest.raises(TransientApiError) as caught:
+        YouTubeClient().fetch_video_stats(["aaaaaaaaaaa"], SECRET_KEY_VALUE)
+
+    assert SECRET_KEY_VALUE not in str(caught.value)
+    assert SECRET_KEY_VALUE not in "".join(traceback.format_exception(caught.value))  # nor the chained cause
+
+
+@responses.activate
+@pytest.mark.parametrize("failure", ["connection", "timeout"])
+def test_the_daily_sync_never_logs_the_key_when_google_is_unreachable(db, settings, monkeypatch, caplog, failure):
+    import logging
+
+    import requests
+
+    from apps.accounts.models import Role
+    from apps.accounts.tests.factories import UserFactory
+    from apps.campaigns.models import Campaign
+    from apps.campaigns.tests.factories import CampaignFactory
+    from apps.proposals.deliverable_stats import refresh_deliverable_stats
+    from apps.proposals.models import Deliverable, Proposal
+    from apps.proposals.tests.factories import ProposalFactory
+
+    settings.YOUTUBE_API_KEY = SECRET_KEY_VALUE
+    monkeypatch.setattr("apps.social.services.get_youtube_client", lambda: YouTubeClient())
+    proposal = ProposalFactory(
+        campaign=CampaignFactory(status=Campaign.Status.PUBLISHED), status=Proposal.Status.ACCEPTED
+    )
+    Deliverable.objects.create(
+        proposal=proposal, post_url="https://youtu.be/aaaaaaaaaaa", platform="youtube"
+    )
+    error_class = {"connection": requests.exceptions.ConnectionError, "timeout": requests.exceptions.ConnectTimeout}
+    responses.get(
+        VIDEOS,
+        body=error_class[failure](f"HTTPSConnectionPool: Max retries exceeded with url: /youtube/v3/videos?key={SECRET_KEY_VALUE}"),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        refresh_deliverable_stats()
+
+    assert "Could not fetch statistics" in caplog.text  # the failure IS reported...
+    assert SECRET_KEY_VALUE not in caplog.text  # ...without the secret
+    assert Role.CREATOR and UserFactory  # (imports kept for factory side effects)
+
+
+def test_the_http_library_cannot_log_request_urls_even_if_debug_logging_is_switched_on():
+    """urllib3 logs every request path, query string included, at DEBUG level."""
+    import logging
+
+    # An explicit level on the library's own logger, so turning on DEBUG for the root logger cannot undo it.
+    assert logging.getLogger("urllib3").level == logging.WARNING

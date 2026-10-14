@@ -20,8 +20,9 @@ USER app
 
 EXPOSE 8000
 
-# The probe sends a real Host header because ALLOWED_HOSTS rejects 127.0.0.1 in production.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import os, urllib.request; host = os.environ['ALLOWED_HOSTS'].split(',')[0]; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/api/v1/health/', headers={'Host': host}), timeout=4)"
+# There is deliberately NO Docker HEALTHCHECK here. This one image also runs the Celery worker and
+# beat, which listen on no port; a web probe baked into the image would mark them unhealthy for good.
+# The probe lives on the `web` service in docker-compose.yml. On another platform, point its HTTP
+# health check at GET /api/v1/health/ on the web container only (send a Host header from ALLOWED_HOSTS).
 
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]

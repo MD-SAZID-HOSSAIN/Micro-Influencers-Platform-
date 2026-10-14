@@ -181,11 +181,22 @@ def request_manual_refresh(user: User) -> None:
         transaction.on_commit(lambda: tasks.sync_connection_task.delay(connection_id))
 
 
-class ConnectError(Exception):
-    """The OAuth callback could not be completed; ``reason`` is passed to the frontend."""
+_CONNECT_MESSAGES = {
+    "invalid_state": "This connection request is invalid, expired or belongs to someone else. Please start again.",
+    "exchange_failed": "Google did not accept the sign-in. Please try connecting again.",
+    "no_refresh_token": (
+        "Google did not allow us to keep the connection. Please connect again and accept every requested permission."
+    ),
+}
+
+
+class ConnectError(DomainError):
+    """The YouTube connection could not be completed. ``reason`` doubles as the API error code."""
+
+    status_code = 400
 
     def __init__(self, reason: str):
-        super().__init__(reason)
+        super().__init__(detail=_CONNECT_MESSAGES.get(reason, "The connection could not be completed."), code=reason)
         self.reason = reason
 
 
@@ -197,27 +208,32 @@ def start_connect(user: User) -> str:
     return get_youtube_client().build_auth_url(state)
 
 
-def _consume_state(state: str) -> User:
-    """Validate and burn a ``state`` value; returns the creator who started the flow."""
+def read_state(state: str) -> dict:
+    """Check a ``state`` value's signature and age. Touches neither the database nor the cache."""
     try:
         payload = signing.loads(state, salt=OAUTH_STATE_SALT, max_age=OAUTH_STATE_MAX_AGE)
-        nonce, uid = payload["nonce"], payload["uid"]
+        payload["nonce"], payload["uid"]  # both must be present
     except (signing.BadSignature, KeyError, TypeError):
         raise ConnectError("invalid_state")
-    # cache.delete is the atomic "claim": only the first callback finds the nonce.
-    if not cache.delete(OAUTH_NONCE_KEY.format(nonce)):
-        raise ConnectError("invalid_state")
-    user = User.objects.filter(pk=uid, role=Role.CREATOR, is_active=True).first()
-    if user is None:
-        raise ConnectError("invalid_state")
-    return user
+    return payload
 
 
-def complete_connect(*, state: str, code: str) -> YouTubeConnection:
-    """Finish the OAuth flow: store encrypted tokens and queue the first stats sync."""
+def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
+    """Finish the OAuth flow for the logged-in creator: store encrypted tokens, queue the first sync.
+
+    The ``state`` must have been issued to THIS creator. Google's redirect carries no login, so
+    without this check one creator could send another person their own connect link, and the
+    person's channel would end up shown as Verified on the first creator's profile.
+    """
     from . import tasks
 
-    user = _consume_state(state)
+    payload = read_state(state)
+    if payload["uid"] != user.id:
+        raise ConnectError("invalid_state")  # checked before the nonce is claimed: a wrong person cannot burn it
+    # cache.delete is the atomic "claim": only the first completion finds the nonce.
+    if not cache.delete(OAUTH_NONCE_KEY.format(payload["nonce"])):
+        raise ConnectError("invalid_state")
+
     try:
         tokens = get_youtube_client().exchange_code(code)
     except YouTubeError:

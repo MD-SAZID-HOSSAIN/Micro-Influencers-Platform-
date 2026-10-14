@@ -1802,10 +1802,11 @@ paths:
     get:
       operationId: social_youtube_callback_retrieve
       description: |-
-        Google redirects the browser here, so there is no bearer token.
+        Google redirects the browser here, so there is no bearer token and nothing is saved.
 
-        The signed ``state`` identifies the creator. The response is always a redirect back to
-        the frontend: ``?youtube=success`` or ``?youtube=error&reason=...``.
+        It only checks the state's signature and age, then redirects to the frontend:
+        ``?youtube=confirm&code=...&state=...`` (the frontend, logged in, then POSTs both to
+        ``/social/youtube/complete/``) or ``?youtube=error&reason=...``.
       tags:
       - Social
       security:
@@ -1813,6 +1814,37 @@ paths:
       responses:
         '302':
           description: Redirect to the frontend connections page
+  /api/v1/social/youtube/complete/:
+    post:
+      operationId: social_youtube_complete_create
+      description: |-
+        Finish connecting YouTube. Send back the ``code`` and ``state`` the callback redirect carried.
+
+        The state must have been issued to the logged-in creator, so a link started by someone else
+        cannot be completed here.
+      tags:
+      - Social
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YouTubeStatus'
+          description: ''
   /api/v1/social/youtube/connect/:
     get:
       operationId: social_youtube_connect_retrieve
@@ -2418,6 +2450,20 @@ components:
         * `draft` - Draft
         * `published` - Published
         * `closed` - Closed
+    CompleteConnect:
+      type: object
+      description: 'What the frontend received from the callback redirect: pass both
+        back unchanged.'
+      properties:
+        state:
+          type: string
+          maxLength: 2048
+        code:
+          type: string
+          maxLength: 2048
+      required:
+      - code
+      - state
     CompletionResult:
       type: object
       properties:

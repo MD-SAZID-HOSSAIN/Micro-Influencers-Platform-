@@ -81,6 +81,14 @@ line of code, and the tests that pin them sit next to the code.
 - **Task 29** — AdminActionLog keeps admin_label/target_label text and SET_NULLs the admin FK so the audit trail survives deleting either party; a no-op admin close of an already-closed campaign is not logged; DELETE actions take the reason in the JSON body. Task 29: create_admin has no --password option by design (prompted twice, min 8 chars).
 - **Task 30** — campaign views are one counter row per (campaign, creator), incremented on the creator's campaign DETAIL request only (list browsing and the brand's own pages do not count); content performance reads a daily snapshot on Deliverable and the endpoint never calls Google; a failed YouTube batch keeps the previous numbers and is retried by the next daily run; engagement rate = (likes+comments)/views as a 2-decimal string, not_available unless all three counters are known and views>0; editing a deliverable link discards the old video's numbers; YOUTUBE_API_KEY is optional (absent -> not_available). Task 30: the content-performance subpart (cut-first per the PRD) WAS built because time remained.
 
+## Review fixes: After the whole-repo code review (findings 1 to 5)
+
+- finding 1 — production is the default for manage.py, wsgi and celery via one helper (config/bootstrap.py); local development opts in with DJANGO_SETTINGS_MODULE=config.settings.dev in .env (the example file has it); the real environment always beats .env; docker-compose forces prod for web/worker/beat because env_file values override the image ENV — cost if wrong: developers without a .env must export the variable; DOTENV_PATH exists only so tests can run without a .env.
+- finding 2 — the HEALTHCHECK moved from the Dockerfile (shared by worker and beat) to the web service in docker-compose.yml; worker and beat have none; other hosts must attach the probe to the web container only — cost if wrong: no automatic liveness for the worker/beat (add a celery inspect ping later).
+- finding 3 — network errors from Google now carry only the exception class name (raised 'from None' so the chained original with the URL is dropped), and urllib3 is pinned to WARNING in LOGGING; I did NOT move the API key to the X-Goog-Api-Key header because I cannot verify the YouTube Data API honours it without a real key — cost if wrong: the key still travels in the query string to Google (as before) but no longer reaches our logs.
+- finding 4 — YouTube connect now finishes in a separate authenticated step (POST /social/youtube/complete/ {state, code}) so the state must have been issued to the logged-in creator; the callback only validates the state signature and redirects to FRONTEND_URL/settings/connections?youtube=confirm&code=..&state=..; the uid check runs BEFORE the one-time nonce is claimed so a wrong person cannot burn another's state; this CHANGES the frontend contract (the old ?youtube=success redirect is gone) — cost if wrong: one extra frontend call; chosen over a cookie because the API and SPA may be on different sites.
+- finding 5 — notification emails are prepared inside a catch-all (never raises from on_commit) and a payload missing a link field falls back to the app home page with a warning — cost if wrong: a developer mistake produces a generic link instead of an error.
+
 ## Known gaps and things deliberately left alone
 
 - **Suspended accounts keep their content.** Suspending blocks login and invalidates tokens (and stops
@@ -100,6 +108,9 @@ line of code, and the tests that pin them sit next to the code.
   Python 3.12 and PostgreSQL 16 as originally planned.
 - **HSTS preload is on** in the production settings, which commits a domain to HTTPS only once it is
   submitted to the preload list; only deploy the API on a domain that will always serve HTTPS.
+- **Code-review findings 6 to 10 are still open** (Redis outage makes login fail; HSTS preload is forced on;
+  a private lock helper is imported across apps; the view counter costs 2-3 queries; the daily YouTube sync
+  starts every creator at once). Findings 1 to 5 were fixed; see the Review fixes section above.
 - **The independent whole-branch code review was not run.** The final pass was a self-review by the
   author (static checks, migration drift, a hunt for defects the tests cannot see). It found and fixed one
   defect: email retries did not actually back off. A fresh reviewer is still recommended before launch.

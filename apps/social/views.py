@@ -4,9 +4,10 @@ from django.conf import settings
 from django.http import Http404, HttpResponseRedirect
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.choices import Platform
@@ -15,6 +16,7 @@ from apps.core.permissions import IsCreator
 from .models import PlatformStats, YouTubeConnection
 from .serializers import (
     AuthorizationUrlSerializer,
+    CompleteConnectSerializer,
     PlatformStatsSerializer,
     RecentVideoSerializer,
     YouTubeStatusSerializer,
@@ -24,6 +26,7 @@ from .services import (
     complete_connect,
     connection_status,
     disconnect,
+    read_state,
     request_manual_refresh,
     set_manual_stats,
     start_connect,
@@ -94,10 +97,11 @@ class YouTubeConnectView(APIView):
 
 
 class YouTubeCallbackView(APIView):
-    """Google redirects the browser here, so there is no bearer token.
+    """Google redirects the browser here, so there is no bearer token and nothing is saved.
 
-    The signed ``state`` identifies the creator. The response is always a redirect back to
-    the frontend: ``?youtube=success`` or ``?youtube=error&reason=...``.
+    It only checks the state's signature and age, then redirects to the frontend:
+    ``?youtube=confirm&code=...&state=...`` (the frontend, logged in, then POSTs both to
+    ``/social/youtube/complete/``) or ``?youtube=error&reason=...``.
     """
 
     permission_classes = [AllowAny]
@@ -110,19 +114,41 @@ class YouTubeCallbackView(APIView):
     def get(self, request):
         params = request.query_params
         if params.get("error"):
-            return self._redirect(error="access_denied")
+            return self._redirect({"youtube": "error", "reason": "access_denied"})
+        state, code = params.get("state", ""), params.get("code", "")
+        if not state or not code:
+            return self._redirect({"youtube": "error", "reason": "invalid_state"})
         try:
-            complete_connect(state=params.get("state", ""), code=params.get("code", ""))
+            read_state(state)
         except ConnectError as exc:
-            return self._redirect(error=exc.reason)
-        return self._redirect()
+            return self._redirect({"youtube": "error", "reason": exc.reason})
+        return self._redirect({"youtube": "confirm", "code": code, "state": state})
 
     @staticmethod
-    def _redirect(error: str | None = None):
-        query = {"youtube": "error", "reason": error} if error else {"youtube": "success"}
+    def _redirect(query: dict):
         return HttpResponseRedirect(
             f"{settings.FRONTEND_URL}/settings/connections?{urlencode(query)}"
         )
+
+
+class YouTubeCompleteView(GenericAPIView):
+    """Finish connecting YouTube. Send back the ``code`` and ``state`` the callback redirect carried.
+
+    The state must have been issued to the logged-in creator, so a link started by someone else
+    cannot be completed here.
+    """
+
+    permission_classes = [IsCreator]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "youtube_complete"
+    serializer_class = CompleteConnectSerializer
+
+    @extend_schema(tags=["Social"], responses={200: YouTubeStatusSerializer})
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        complete_connect(user=request.user, **serializer.validated_data)
+        return Response(connection_status(request.user))
 
 
 class YouTubeRecentContentView(APIView):

@@ -52,3 +52,10 @@ class PlatformStatsSerializer(serializers.ModelSerializer):
             "last_synced_at",
         ]
         read_only_fields = ["platform", "is_verified", "is_outdated", "last_synced_at"]
+
+
+class CompleteConnectSerializer(serializers.Serializer):
+    """What the frontend received from the callback redirect: pass both back unchanged."""
+
+    state = serializers.CharField(max_length=2048)
+    code = serializers.CharField(max_length=2048)

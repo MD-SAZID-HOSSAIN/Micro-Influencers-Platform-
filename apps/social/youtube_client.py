@@ -249,7 +249,10 @@ class YouTubeClient:
         try:
             return requests.request(method, url, timeout=TIMEOUT_SECONDS, **kwargs)
         except (requests.Timeout, requests.ConnectionError) as exc:
-            raise TransientApiError(str(exc)) from exc
+            # Never pass the library's own message on: it contains the full request URL, and for
+            # the video-statistics call that URL carries the server's API key. `from None` also drops
+            # the chained original, which would otherwise print the same URL in a traceback.
+            raise TransientApiError(f"{type(exc).__name__} while calling Google") from None
 
     @staticmethod
     def _raise_for_status(response: requests.Response) -> None:

@@ -43,8 +43,14 @@ Create the first admin account (there is no sign-up for admins):
 docker compose run --rm web python manage.py create_admin --email you@example.com --username you
 ```
 
-For a first look without a real domain, set `DJANGO_SETTINGS_MODULE=config.settings.dev` in `.env`
-instead of using the production settings.
+The containers always run the **production** settings (`docker-compose.yml` forces
+`DJANGO_SETTINGS_MODULE=config.settings.prod`, so a `.env` copied from `.env.example` cannot switch them
+to development). For a first look over plain HTTP without a real domain, put these in `.env`:
+`ALLOWED_HOSTS=localhost`, `CORS_ALLOWED_ORIGINS=https://localhost:3000`, `SECURE_SSL_REDIRECT=false`,
+a long `SECRET_KEY` and a real `OAUTH_ENCRYPTION_KEY`.
+
+Anything that runs the app outside these containers (`gunicorn`, `celery`, `manage.py` on a server) also
+starts in production mode by default, and refuses to start if those values are missing.
 
 Roll out a new version by rebuilding, running `migrate` first, then restarting `web`, `worker` and `beat`.
 
@@ -66,7 +72,10 @@ If your setup has a different number of proxies, set `NUM_PROXIES` to match.
 ## 5. Health and monitoring
 
 - `GET /api/v1/health/` returns `{"status": "ok", "database": "ok"}` and is exempt from the HTTPS redirect,
-  so a plain-HTTP probe works. The image has a Docker `HEALTHCHECK` using it.
+  so a plain-HTTP probe works. In `docker-compose.yml` only the `web` service has this probe. The image itself
+has no `HEALTHCHECK` on purpose: the Celery worker and beat use the same image but listen on no port,
+so an image-level web probe would mark them unhealthy forever. On another platform, attach the HTTP
+health check to the web container only.
 - The worker log shows each failed email and YouTube sync; failures never reach users, so watch the logs.
 - Unhandled errors return a generic JSON `500` and are logged with the full traceback.
 

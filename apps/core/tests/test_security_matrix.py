@@ -259,6 +259,7 @@ def test_no_secret_fields_or_values_appear_in_any_response(db):
     [
         ("/api/v1/auth/login/", "login"),
         ("/api/v1/admin/auth/login/", "admin_login"),
+        ("/api/v1/social/youtube/complete/", "youtube_complete"),
         ("/api/v1/auth/register/", "register"),
         ("/api/v1/auth/password-reset/request/", "password_reset"),
         ("/api/v1/auth/password-reset/confirm/", "password_reset_confirm"),

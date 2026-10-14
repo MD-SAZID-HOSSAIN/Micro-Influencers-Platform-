@@ -4,12 +4,12 @@ from pathlib import Path
 import environ
 from celery.schedules import crontab
 
+from config.bootstrap import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+load_dotenv()  # same .env handling as manage.py / wsgi / celery (see config/bootstrap.py)
 env = environ.Env()
-_env_file = BASE_DIR / ".env"
-if _env_file.exists():
-    environ.Env.read_env(str(_env_file))
 
 SECRET_KEY = env("SECRET_KEY", default="")
 DEBUG = False
@@ -101,6 +101,7 @@ REST_FRAMEWORK = {
         "email_verify": "20/hour",
         "email_resend": "5/hour",
         "admin_login": "5/min",
+        "youtube_complete": "20/hour",
     },
 }
 
@@ -149,6 +150,16 @@ SPECTACULAR_SETTINGS = {
         "YouTubeConnectionStatusEnum": "apps.social.models.YouTubeConnection.Status",
         "ProposalStatusEnum": "apps.proposals.models.Proposal.Status",
         "RoleEnum": "apps.accounts.models.Role",
+    },
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "loggers": {
+        # urllib3 logs every outgoing request path, query string included, at DEBUG. One of our calls
+        # carries the YouTube API key in its query string, so keep this library quiet whatever the root level.
+        "urllib3": {"level": "WARNING"},
     },
 }
 

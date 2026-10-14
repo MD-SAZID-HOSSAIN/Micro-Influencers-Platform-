@@ -4,6 +4,7 @@ from .views import (
     ManualStatsView,
     MyStatsListView,
     YouTubeCallbackView,
+    YouTubeCompleteView,
     YouTubeConnectionView,
     YouTubeConnectView,
     YouTubeRecentContentView,
@@ -14,6 +15,7 @@ urlpatterns = [
     path("social/youtube/", YouTubeConnectionView.as_view(), name="youtube-connection"),
     path("social/youtube/connect/", YouTubeConnectView.as_view(), name="youtube-connect"),
     path("social/youtube/callback/", YouTubeCallbackView.as_view(), name="youtube-callback"),
+    path("social/youtube/complete/", YouTubeCompleteView.as_view(), name="youtube-complete"),
     path("social/youtube/refresh/", YouTubeRefreshView.as_view(), name="youtube-refresh"),
     path(
         "social/youtube/recent-content/",

@@ -1,7 +1,7 @@
-import os
+from config.bootstrap import configure
 
-from django.core.wsgi import get_wsgi_application
+configure()  # production settings unless the environment says otherwise
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
+from django.core.wsgi import get_wsgi_application  # noqa: E402
 
 application = get_wsgi_application()
