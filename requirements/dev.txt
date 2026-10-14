@@ -1,0 +1,7 @@
+-r base.txt
+pytest>=8
+pytest-django>=4.8
+pytest-repeat>=0.9
+factory_boy>=3.3
+responses>=0.25
+freezegun>=1.5
