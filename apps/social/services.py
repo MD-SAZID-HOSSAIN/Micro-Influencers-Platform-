@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
-from apps.accounts.models import Role, User
+from apps.accounts.models import User
 from apps.core.exceptions import Conflict, DomainError
 from apps.notifications.models import Kind
 from apps.notifications.services import notify
