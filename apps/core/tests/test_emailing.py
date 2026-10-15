@@ -77,6 +77,15 @@ def test_retry_delays_grow_exponentially_and_are_capped():
     assert retry_delay(20) <= 3600  # never longer than an hour
 
 
+def test_retry_delay_never_drops_below_its_lower_bound_whatever_the_jitter():
+    from apps.core.tasks import retry_delay
+
+    with mock.patch("apps.core.tasks.random.uniform", return_value=0.7501):
+        assert retry_delay(0) >= 0.75 * 30  # int() would round 22.5 down to 22
+    with mock.patch("apps.core.tasks.random.uniform", return_value=1.0):
+        assert retry_delay(0) == 30
+
+
 def test_a_failed_send_schedules_its_retry_with_the_backoff_delay():
     """Celery only applies retry_backoff to autoretry; a manual retry needs an explicit countdown."""
     from celery.exceptions import Retry

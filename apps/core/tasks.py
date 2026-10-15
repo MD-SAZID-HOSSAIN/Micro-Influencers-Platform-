@@ -1,4 +1,5 @@
 import logging
+import math
 import random
 
 from celery import shared_task
@@ -19,7 +20,7 @@ def retry_delay(retries: int) -> int:
     retry at the same instant.
     """
     base = min(BASE_DELAY_SECONDS * 2**retries, MAX_DELAY_SECONDS)
-    return int(base * random.uniform(0.75, 1.0))
+    return math.ceil(base * random.uniform(0.75, 1.0))
 
 
 @shared_task(bind=True, max_retries=MAX_RETRIES)
