@@ -59,8 +59,9 @@ I also kept a **progress notebook** (a "ledger") with one line per finished task
 decision I made that was not spelled out in the PRD. Those decisions are now in `docs/DECISIONS.md`.
 
 **Each phase lives on its own git branch** (`feature/phase-0-foundation` … `feature/phase-9-extensions`).
-Each branch was cut from the one before it, so the last branch contains everything. Nothing was pushed to
-GitHub and nothing was merged into `main`.
+Each branch was cut from the one before it, so the last branch contains everything. Later, the last branch
+(`feature/phase-9-extensions`) was pushed to GitHub and merged into `main` through pull requests #1 and #2.
+The earlier phase branches exist only on this computer.
 
 ## 3. The tools I chose (and why)
 
@@ -243,10 +244,10 @@ I want to be open about these:
 
 ## 6. The numbers
 
-- 30 tasks, 10 phases, 10 stacked git branches, about 36 commits ahead of `main`
-- About 218 files and 20,000 lines added (code, tests and docs)
-- **810 automated tests, all passing**
-- 49 written decisions in `docs/DECISIONS.md`
+- 30 tasks, 10 phases, 10 stacked git branches
+- About 220 files and 20,000+ lines added (code, tests and docs)
+- **872 automated tests, all passing** (810 before the code-review fixes)
+- 59 written decisions in `docs/DECISIONS.md`
 - Every one of the 5 "Review Focus" risks has tests
 
 ## 7. What I could NOT check
@@ -338,24 +339,11 @@ bug fixes only**, so try to finish items 1 to 8 before then.
 
 ### A. Do first (today or tomorrow)
 
-- [ ] **1. Decide about the code-review problems.** Section 8 lists 10 problems found in the review. None
-  are fixed yet. Tell me "fix the findings" (or pick which ones) and I will fix them with tests. The first
-  five matter most; do not put the app on the internet before they are fixed.
+- [x] **1. The code-review problems are fixed.** All 10 findings from section 8 were fixed, each with a
+  test. Nothing more to do here. Still do item 15 (a human review).
 
-- [ ] **2. Save the report and put the work on GitHub.** Right now everything is only on your computer.
-  `docs/BUILD_REPORT.md` is also not saved in git yet. In a terminal inside the project folder:
-
-  ```bash
-  git add docs/BUILD_REPORT.md
-  git commit -m "docs: add build report"
-  git push -u origin feature/phase-9-extensions
-  ```
-
-  Then open GitHub and make a **pull request** from `feature/phase-9-extensions` into `main` (your team
-  rule is "feature branch + pull request"). This one branch already contains all 10 phases, so one pull
-  request is enough. If you prefer smaller reviews, you can instead push each `feature/phase-N-…` branch
-  and open them one by one, in order.
-  Ask a teammate to read the pull request before merging.
+- [x] **2. The work is on GitHub.** `feature/phase-9-extensions` was pushed and merged into `main` through
+  pull requests #1 and #2. For every later change, use a new feature branch and a pull request.
 
 - [ ] **3. Give the frontend team what they need.** Send them:
   - `docs/openapi.yml`: import it into Postman or Insomnia. It lists every address, input and output.
@@ -406,10 +394,12 @@ bug fixes only**, so try to finish items 1 to 8 before then.
   If something fails, send me the error text and I will fix the files. (Known issue: the worker and
   beat no longer show "unhealthy": finding 2 was fixed by moving the health check to the web service only.)
 
-- [ ] **7. Stop the test database I started.** To run tests on this machine I started a small PostgreSQL
-  hidden inside the project (`.venv` and `.superpowers/pgdata`). It is still running in the background.
-  Once Docker works for you, stop it (Task Manager → end the `postgres.exe` processes, or restart the
-  computer). You can delete the `.superpowers` folder too; it is not part of the product and is ignored by git.
+- [ ] **7. Know about the temporary database on this computer.** To run tests and the app here without
+  Docker, a small PostgreSQL runs from the project's private Python folder (data in `.superpowers/pgdata`,
+  port 51314). It stops when the session ends or the computer sleeps, and your local `.env` points at it.
+  Once Docker or a normal PostgreSQL works for you, change `DATABASE_URL` in `.env` and stop it
+  (Task Manager → end the `postgres.exe` processes). The `.superpowers` folder is not part of the product
+  and is ignored by git.
 
 ### C. Create the real accounts and keys (needs your logins)
 
@@ -452,7 +442,7 @@ I cannot do these for you; they need your Google and email accounts.
   3. **Test with real inboxes:** request a password reset to a real Gmail address and a real Outlook
      address and check that the code arrives.
 
-- [ ] **11. Create the first admin.** Admins cannot sign up on the website.
+- [x] **11. Create the first admin** (done on this computer for local use; repeat it on the real server). Admins cannot sign up on the website.
 
   ```bash
   python manage.py create_admin --email you@example.com --username yourname
@@ -482,7 +472,7 @@ I cannot do these for you; they need your Google and email accounts.
 ### E. Decisions I need you to confirm
 
 The PRD did not say what to do in these cases, so I picked a sensible answer. Please read them, and tell
-me if you want any changed (each one is a small change). The full list of all 49 is in `docs/DECISIONS.md`.
+me if you want any changed (each one is a small change). The full list of all 59 is in `docs/DECISIONS.md`.
 
 | What I chose | Why | If you disagree |
 |---|---|---|
@@ -501,7 +491,7 @@ me if you want any changed (each one is a small change). The full list of all 49
 
 ### F. What the frontend must know
 
-Send this list to the frontend team:
+The complete guide is `docs/FRONTEND_GUIDE.md`; send that file to the frontend team. The short version:
 
 1. **Login:** `POST /api/v1/auth/login/` with `{"identifier": "<email or username>", "password": "…"}`.
    You get `{"access": "<token>", "user": {…}}`. Send the token on every request as

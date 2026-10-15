@@ -351,10 +351,19 @@ def test_cors_does_not_allow_credentials(db):
 # ---- production settings -----------------------------------------------------------------------------------------------
 
 
+def _settings_names():
+    """Every variable .env.example documents: a developer's local .env may have put any of them in os.environ."""
+    lines = (BASE_DIR / ".env.example").read_text(encoding="utf-8").splitlines()
+    names = {line.split("=", 1)[0].strip() for line in lines if "=" in line and not line.startswith("#")}
+    return names - {"DATABASE_URL", "REDIS_URL"}
+
+
 def _prod_env(**overrides):
+    inherited = {k: v for k, v in os.environ.items() if k not in _settings_names()}
     env = {
-        **os.environ,
+        **inherited,
         "DJANGO_SETTINGS_MODULE": "config.settings.prod",
+        "DOTENV_PATH": str(BASE_DIR / "no-such-file.env"),  # a developer's local .env must not leak in
         "SECRET_KEY": secrets.token_urlsafe(64),
         "ALLOWED_HOSTS": "api.example.com",
         "CORS_ALLOWED_ORIGINS": "https://app.example.com",
