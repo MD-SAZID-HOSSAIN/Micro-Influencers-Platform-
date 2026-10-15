@@ -491,7 +491,7 @@ me if you want any changed (each one is a small change). The full list of all 59
 
 ### F. What the frontend must know
 
-Send this list to the frontend team:
+The complete guide is `docs/FRONTEND_GUIDE.md`; send that file to the frontend team. The short version:
 
 1. **Login:** `POST /api/v1/auth/login/` with `{"identifier": "<email or username>", "password": "…"}`.
    You get `{"access": "<token>", "user": {…}}`. Send the token on every request as

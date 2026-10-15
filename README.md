@@ -8,6 +8,7 @@ post campaigns and manage the proposals they receive.
 - Build plan: [`plan.md`](plan.md)
 - API reference: Swagger UI at **`/api/docs/`** while the server runs, or import
   [`docs/openapi.yml`](docs/openapi.yml) into Postman / Insomnia.
+- Frontend integration guide: [`docs/FRONTEND_GUIDE.md`](docs/FRONTEND_GUIDE.md)
 - Deployment: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - Design decisions and known gaps: [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
