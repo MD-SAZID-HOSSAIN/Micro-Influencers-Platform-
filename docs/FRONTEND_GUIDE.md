@@ -3,7 +3,8 @@
 Everything the frontend team needs to build on this API. It is written from the code and from
 `docs/openapi.yml`, so every field name, status code and error code below exists.
 
-**How to use this document:** read sections 1 to 3 once. Then build screen by screen using sections 4 to 8.
+The frontend is built in **React**. **How to use this document:** read sections 1 to 3 once, then section 12
+(the React setup and traps), then build screen by screen using sections 4 to 9.
 Use the Swagger page (`/api/docs/`) as the exact reference for fields, and this guide for *how the pieces
 fit together* and *what can go wrong*.
 
@@ -18,9 +19,11 @@ fit together* and *what can go wrong*.
 | Machine-readable contract | `/api/schema/`, or the file `docs/openapi.yml` in the repo |
 | Health check | `GET /api/v1/health/` returns `{"status": "ok", "database": "ok"}` |
 
-**Generate your types and client from `docs/openapi.yml`** (for example with `openapi-typescript` or
-`orval`) instead of writing them by hand. The file is checked by a test, so it is never out of date with the
-backend. When the backend changes an endpoint, the file changes in the same pull request.
+**Generate your types and client from the contract** (`openapi-typescript` or `orval`, see section 12.2)
+instead of writing them by hand. The contract is checked by a test, so it is never out of date with the
+backend. When the backend changes an endpoint, `docs/openapi.yml` changes in the same pull request. The
+backend and frontend are separate repositories, so fetch it from a running backend at `/api/schema/` or copy
+the file.
 
 **Demo data for building screens.** Ask the backend developer to run `python manage.py seed_demo`. It creates
 200 creators, 20 brands, 100 campaigns and their applications. Log in as `demo_creator_001` or
@@ -85,7 +88,7 @@ Every error has the same shape:
 | 429 | Too many tries (`throttled`), or a cooldown (`resend_cooldown`, `refresh_cooldown`) | Show the message; the wait time is in it |
 | 503 | `temporarily_unavailable`: a dependency is down | Offer "try again" |
 
-The full list of codes is in section 9.
+The full list of codes is in section 11.
 
 ### 2.4 Lists and pages
 
@@ -96,18 +99,17 @@ List endpoints return:
 ```
 
 Use `?page=` and `?page_size=` (default 20, **maximum 50**). Asking for a page that does not exist returns
-404. Use the `next` and `previous` links as given. Three lists add extra fields next to `results`:
+404. Use the `next` and `previous` links as given. Two lists add extra fields next to `results`:
 
 - notifications add `unread_count` (the number for the bell badge, covering **all** unread, not just this page);
-- the brand's proposal list adds `accepted_count` and `creators_needed` ("2 of 3 accepted");
-- nothing else does.
+- the brand's proposal list adds `accepted_count` and `creators_needed` ("2 of 3 accepted").
 
 ### 2.5 Data formats
 
 | Kind | Format |
 |---|---|
 | Dates and times | ISO 8601 with a time zone, for example `"2026-11-01T18:00:00Z"`. Always send a zone (`Z` or `+06:00`). Show them in the user's local time |
-| Money (`budget`, `proposed_rate`, `rate_post`...) | **Strings** with 2 decimals, `"150.00"`. Never convert to a float for display or maths. Send strings back |
+| Money (`budget`, `proposed_rate`, `rate_post`...) | **Strings** with 2 decimals, `"150.00"`. Formatting one for display is fine, but do no maths with floats, and always send the string back. The API has **no currency field** |
 | Engagement rate (`engagement_rate`) | A **percentage** as a string, `"4.20"` means 4.2%. Allowed 0 to 100 |
 | Rating average (`rating_avg`) | A string such as `"4.50"`, or `null` when the creator has no reviews |
 | Acceptance rate (`acceptance_rate`) | A **number from 0 to 1** (0.5 means 50%), or `null` when nothing was sent. This one is a ratio, not a percentage |
@@ -195,7 +197,7 @@ The user object (also returned by `GET /auth/me/`):
   `verification_code_used`, `verification_code_locked` (5 wrong tries; ask for a new code).
 
 Verification does **not** block anything in the API. It decides whether notification emails are sent
-(section 7.8). Show a gentle "verify your email" banner while `email_verified` is `false`.
+(section 7.2). Show a gentle "verify your email" banner while `email_verified` is `false`.
 
 ### 4.3 Log in
 
@@ -641,9 +643,286 @@ links live in one dictionary in `apps/notifications/emails.py`).
 
 ---
 
-## 12. Mistakes to avoid
+## 12. Building this in React
 
-- Don't convert money strings to floats. Don't show `0` for `null` or `"not_available"`.
+The frontend is a React single-page app. The API does not care which libraries you use; this section is
+the setup we recommend and the React-specific traps. Examples use TypeScript, React 18, React Router 6 and
+TanStack Query 5. Adapt the names to your own project.
+
+### 12.1 Suggested stack
+
+| Need | Suggestion | Why |
+|---|---|---|
+| Build tool | Vite + React + TypeScript | Fast and simple; no server rendering is needed (the API is separate) |
+| Routing | React Router | Nested routes fit the creator / brand / admin areas |
+| Server data | TanStack Query | Caching, loading and error states, refetch after actions, polling |
+| API types | `openapi-typescript` (types) with `openapi-fetch`, or `orval` (full client) | Generated from the contract, so a renamed field breaks the build, not production |
+| Forms | React Hook Form (+ Zod if you want client checks) | The server's `details` map straight onto fields |
+| Mocks | MSW (Mock Service Worker) | The PRD asks for mock data until endpoints exist; the demo data now makes it optional |
+
+You do **not** need Redux. Everything that comes from the server lives in TanStack Query. The only global
+state is "who is logged in" (a small context).
+
+### 12.2 Setup
+
+**Two repositories.** Frontend and backend are separate repos, so generate types from a running backend or
+from the file in the backend repo:
+
+```bash
+npx openapi-typescript http://localhost:8000/api/schema/ -o src/api/schema.d.ts
+```
+
+Re-run it whenever the backend changes an endpoint, and commit the result. Use the generated types like
+this: `type Campaign = components["schemas"]["Campaign"]`.
+
+**Environment.** Keep the API address in `.env` (Vite exposes variables that start with `VITE_`):
+
+```
+VITE_API_URL=http://localhost:8000/api/v1
+```
+
+**Three addresses must agree** (tell the backend developer, who sets them in the backend `.env`):
+
+| Backend setting | Must be | Why |
+|---|---|---|
+| `CORS_ALLOWED_ORIGINS` | your frontend origin, e.g. `http://localhost:5173` (Vite's default port) | otherwise the browser blocks every call |
+| `FRONTEND_URL` | the same origin | the YouTube redirect and the email buttons are built from it |
+| `GOOGLE_REDIRECT_URI` | stays the **backend** callback address | Google talks to the backend, not to React |
+
+In production the frontend must be served over `https://`, and the same `https://` origin goes into
+`CORS_ALLOWED_ORIGINS`.
+
+**Deep links must load.** The backend redirects the browser to `/settings/connections?...` and emails link to
+`/creator/applications` and others. Configure your hosting to answer **every path with `index.html`** (the
+"SPA fallback"), otherwise these links show a 404 on a fresh page load. Vite's dev server already does this.
+
+### 12.3 One API function for everything
+
+Put the token, the error shape and the 401 rule in one place so no component repeats them:
+
+```ts
+// src/api/client.ts
+const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public details: Record<string, string[]> | null,
+  ) {
+    super(message);
+  }
+}
+
+let onUnauthorized: () => void = () => {};
+export const setUnauthorizedHandler = (fn: () => void) => { onUnauthorized = fn; };
+
+export const getToken = () => { try { return localStorage.getItem("token"); } catch { return null; } };
+
+export async function api<T = void>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  let body = init.body;
+  if (init.json !== undefined) {
+    headers.set("Content-Type", "application/json");
+    body = JSON.stringify(init.json);
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers, body });  // a network failure throws a TypeError
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401 && !path.endsWith("/login/")) onUnauthorized();  // not for the login forms
+    const e = data?.error;
+    throw new ApiError(res.status, e?.code ?? "error", e?.message ?? "Something went wrong.", e?.details ?? null);
+  }
+  return data as T;
+}
+```
+
+Notes:
+- `fetch` sends a body on `DELETE`, which the admin calls need. With axios you must write
+  `axios.delete(url, { data: { reason } })`.
+- Wrap the app in a `QueryClientProvider` and set the unauthorized handler once at start-up to clear the
+  token, clear the query cache and go to `/login`.
+
+### 12.4 Where to keep the token
+
+The API returns a bearer token in JSON (there is no cookie option). The simplest choice is
+`localStorage`, as above. It survives page reloads, and the token expires by itself after 24 hours. Because
+any script on the page can read it, **never render user text as HTML**: React escapes text by default, so
+avoid `dangerouslySetInnerHTML`, and never put the token in a URL. Keeping it only in memory is safer but logs
+the person out on every refresh.
+
+### 12.5 Login state and routes
+
+- Keep `{ user, token }` in a context. On start, if a token exists, call `GET /auth/me/`; a 401 means the token
+  is dead. Show a spinner until that finishes so the login page does not flash.
+- After login or `me`, send people by `user.role`: `creator` to the creator home, `brand` to the brand home,
+  `admin` to the admin area.
+- Guard routes by role, since the API answers 403 for the wrong role:
+
+```tsx
+function RequireRole({ role, children }: { role: "creator" | "brand" | "admin"; children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <Spinner />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== role) return <Navigate to={homeFor(user.role)} replace />;
+  return <>{children}</>;
+}
+```
+
+Suggested route map (routes marked with * are fixed by the backend, see section 10):
+
+| Route | Role | Screen |
+|---|---|---|
+| `/login`, `/register`, `/forgot-password`, `/reset-password` | public | section 4 |
+| `/verify-email` | any | enter the 6-digit code |
+| `/creator` | creator | dashboard |
+| `/creator/profile` | creator | profile, stats, portfolio |
+| `/creator/campaigns`, `/creator/campaigns/:id` | creator | find and apply |
+| `/creator/applications` * | creator | my proposals, deliverables |
+| `/brand` | brand | dashboard |
+| `/brand/profile` | brand | company profile |
+| `/brand/creators`, `/brand/creators/:id` | brand | directory and creator page |
+| `/brand/campaigns/new` | brand | create a campaign |
+| `/brand/campaigns/:id` * | brand | view, edit, publish, close |
+| `/brand/campaigns/:id/proposals` * | brand | proposals, deliverables, analytics |
+| `/settings/connections` * | creator | YouTube connection |
+| `/settings/notifications` * | any | notification email switch |
+| `/notifications` | any | notification list |
+| `/admin/login`, `/admin/...` | admin | section 9 |
+| `/privacy`, `/terms` | public | pages Google requires |
+
+### 12.6 Data fetching with TanStack Query
+
+Give every query a stable key, and after an action refresh what it changed:
+
+| Action (mutation) | Refresh these query keys |
+|---|---|
+| Apply to a campaign | `["campaign", id]`, `["my-proposals"]`, `["creator-dashboard"]` |
+| Withdraw a proposal | `["my-proposals"]`, `["campaign", id]`, `["creator-dashboard"]` |
+| Shortlist / accept / reject | `["campaign-proposals", id]`, `["brand-dashboard"]`, `["campaign-analytics", id]` |
+| Publish / close / edit a campaign | `["brand-campaigns"]`, `["brand-campaign", id]`, `["brand-dashboard"]` |
+| Mark Completed / review | `["campaign-proposals", id]`, `["campaign-deliverables", id]` |
+| Edit profile or stats | `["me-profile"]`, `["my-stats"]`, `["creator-dashboard"]` |
+| Mark notification read | `["notifications"]` |
+
+Other rules of thumb:
+- **Lists with filters:** put the filters in the query key, `["creators", filters, page]`, and use
+  `placeholderData: keepPreviousData` so the table does not blank out between pages.
+- **Notifications:** poll with `refetchInterval: 60_000` (the API has no push). `refetchOnWindowFocus` is on
+  by default and covers coming back to the tab. The badge number is `unread_count`.
+- **YouTube numbers after connecting:** the first sync takes a few seconds. Refetch `["youtube"]` and
+  `["my-stats"]` after about 5 seconds, and again if `last_synced_at` is still `null`.
+- **Retries:** TanStack retries failed queries 3 times by default. Turn that off for 4xx answers, or a 404 will
+  spin three times: `retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2`.
+- **Buttons:** use `mutation.isPending` to disable a button while its call runs.
+
+### 12.7 Forms and server errors
+
+The 400 `details` object lines up with form fields. Map it onto React Hook Form:
+
+```tsx
+async function onSubmit(values: FormValues) {
+  try {
+    await register.mutateAsync(values);
+  } catch (e) {
+    if (e instanceof ApiError && e.code === "validation_error" && e.details) {
+      for (const [field, messages] of Object.entries(e.details)) {
+        if (field === "non_field_errors") setFormError(messages.join(" "));
+        else setError(field as keyof FormValues, { message: messages.join(" ") });
+      }
+    } else if (e instanceof ApiError) {
+      setFormError(e.message);         // 409, 429, 503...: the message is written for people
+    } else {
+      setFormError("Cannot reach the server. Check your connection.");   // fetch itself failed
+    }
+  }
+}
+```
+
+For a failure that is not tied to a field (409 `campaign_full`, 429 `throttled`...), show `e.message` in a toast
+and, for 409, refetch the data it concerns.
+
+### 12.8 React-specific traps
+
+1. **StrictMode runs effects twice in development.** The YouTube `code` and `state` can be used **once**; a
+   second `complete` call fails with `invalid_state`. Guard the call (see 12.9). The same applies to any
+   effect that posts something.
+2. **Money:** keep prices as strings in state and in forms, and send the same strings back. Formatting a
+   number for display is fine (`new Intl.NumberFormat(...).format(Number(price))`), but do not add prices up
+   with floats. The API has **no currency field**; agree with the product owner what currency to show.
+3. **Deadline input:** `<input type="datetime-local">` gives a value with no time zone. Convert before sending:
+   `new Date(value).toISOString()`. Show deadlines back with `new Date(iso)` in the user's local time.
+4. **`null` is normal:** `photo_url`, `rating_avg`, `followers`, `engagement_rate`, `min_followers`, `niche`,
+   `apply_blocked_reason` and others can be `null`. Check before using them. `rating_avg` is a **string**, so
+   write `Number(rating_avg).toFixed(1)` after the `null` check.
+5. **Enums:** `niche` and `primary_platform` are `null` or one of the listed words. Put the lists in one
+   `constants.ts` instead of repeating them in selects and filters.
+6. **Keys in lists:** use the `id` the API gives, never the array index (lists reorder when statuses change).
+7. **Initials avatar:** one small `<Avatar src name />` component that falls back to initials when `src` is
+   `null` or the image fails to load. Use it for creators and brands everywhere.
+8. **Don't derive server facts on the client:** the Apply button comes from `can_apply`, slot counts from
+   `accepted_count` and `creators_needed`, the badge from `unread_count`.
+9. **Stale tab, stale token:** if another tab logs out, the next call here returns 401 and your handler takes
+   over. Optionally listen to the `storage` event to log out every tab at once.
+
+### 12.9 The YouTube page, step by step
+
+```tsx
+// /settings/connections
+function ConnectionsPage() {
+  const [params, setParams] = useSearchParams();
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["youtube"], queryFn: () => api<YouTubeStatus>("/social/youtube/") });
+  const complete = useMutation({
+    mutationFn: (v: { state: string; code: string }) =>
+      api<YouTubeStatus>("/social/youtube/complete/", { method: "POST", json: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["youtube"] });
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["my-stats"] }), 5000);   // the first sync takes a few seconds
+    },
+  });
+
+  // Read the redirect once, into state, because we clear the address bar right away.
+  const [googleError] = useState(() =>
+    params.get("youtube") === "error" ? (params.get("reason") ?? "invalid_state") : null);   // access_denied | invalid_state
+
+  const handled = useRef(false);                      // StrictMode runs this effect twice in development
+  useEffect(() => {
+    if (params.get("youtube") !== "confirm" || handled.current) return;
+    handled.current = true;
+    const state = params.get("state") ?? "";
+    const code = params.get("code") ?? "";
+    setParams({}, { replace: true });                 // take the one-time values out of the address bar
+    complete.mutate({ state, code });
+  }, []);                                             // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function connect() {
+    const { authorization_url } = await api<{ authorization_url: string }>("/social/youtube/connect/");
+    window.location.assign(authorization_url);        // a full-page redirect to Google, not a React Router link
+  }
+  // Render: the status, a "Connect" / "Reconnect" button that calls connect(), and messages for
+  // googleError and for complete.error (the ApiError codes are listed in section 8).
+}
+```
+
+### 12.10 Testing
+
+- **Screens before the backend was ready:** use MSW with handlers that return the examples in this guide.
+  Type the mock responses with the generated types so the mocks cannot drift.
+- **Real data:** run the backend with `seed_demo` (200 creators, 100 campaigns) and click through the test
+  route in section 14.
+- **Component tests:** React Testing Library with a fresh `QueryClient` per test and `retry: false`.
+- **Tokens in end-to-end tests:** log in once in a setup step (Playwright / Cypress) and reuse the token, so
+  the tests do not hit the login limit (10 per minute per IP).
+
+---
+
+## 13. Mistakes to avoid
+
+- Don't do maths with money strings as floats. Don't show `0` for `null` or `"not_available"`.
 - Don't block Apply because `eligible` is `false`. Use `can_apply`.
 - Don't count accepted creators yourself. Use `accepted_count` / `creators_needed` from the server.
 - Don't cache the token past a 401, and don't try to refresh it. There is no refresh.
@@ -655,7 +934,7 @@ links live in one dictionary in `apps/notifications/emails.py`).
 
 ---
 
-## 13. A full test route
+## 14. A full test route
 
 When everything is connected, walk through this once. If every step works, the main product works.
 
@@ -671,7 +950,7 @@ When everything is connected, walk through this once. If every step works, the m
 
 ---
 
-## 14. Who to ask
+## 15. Who to ask
 
 If a field is missing, a rule seems wrong or a response does not match this guide, tell the backend
 developer. The reasons behind the rules are in `docs/DECISIONS.md`. When an endpoint changes, regenerate
