@@ -142,6 +142,8 @@ def test_completion_percent_reaches_100_with_every_item(creator):
 
 @pytest.mark.django_db(transaction=True)
 def test_parallel_adds_never_exceed_ten():
+    if connection.vendor == "sqlite":
+        pytest.skip("Requires PostgreSQL row locks; SQLite table locks on concurrent threads")
     creator = UserFactory(role=Role.CREATOR)
 
     def attempt(n):

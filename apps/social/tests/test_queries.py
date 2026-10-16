@@ -1,3 +1,4 @@
+from decimal import Decimal
 import pytest
 
 from apps.accounts.models import Role
@@ -29,7 +30,7 @@ def test_annotation_uses_the_primary_platform_only(creator):
     profile = annotated(creator)
 
     assert profile.primary_followers == 5000
-    assert str(profile.primary_engagement) == "3.50"
+    assert profile.primary_engagement == Decimal("3.50")
     assert profile.primary_verified is True
 
 

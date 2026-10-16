@@ -1,6 +1,6 @@
-"""Query-string filtering and ordering for the brand-facing creator directory."""
-from django.db.models import F, Q, QuerySet
-from django.db.models.functions import Least
+from decimal import Decimal
+from django.db.models import F, Q, QuerySet, Value
+from django.db.models.functions import Coalesce, Least, NullIf
 from rest_framework import serializers
 
 from apps.core.choices import Niche, Platform
@@ -77,9 +77,14 @@ def _ordered(profiles: QuerySet, ordering: str) -> QuerySet:
 
 def directory_queryset(params: dict) -> QuerySet:
     """Active creators annotated with primary-platform stats, filtered and ordered."""
+    max_rate_sentinel = Value(Decimal("9999999999.99"))
+    cheapest_expr = NullIf(
+        Least(*(Coalesce(f, max_rate_sentinel) for f in _RATE_FIELDS)),
+        max_rate_sentinel,
+    )
     profiles = annotate_primary_stats(
         CreatorProfile.objects.filter(user__is_active=True).select_related("user")
-    ).annotate(cheapest_rate=Least(*_RATE_FIELDS))  # Postgres LEAST ignores NULLs
+    ).annotate(cheapest_rate=cheapest_expr)
 
     if q := params.get("q"):
         profiles = profiles.filter(

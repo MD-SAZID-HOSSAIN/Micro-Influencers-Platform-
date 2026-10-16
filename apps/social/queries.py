@@ -1,4 +1,4 @@
-from django.db.models import BooleanField, OuterRef, QuerySet, Subquery, Value
+from django.db.models import BooleanField, DecimalField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 
 from .models import PlatformStats
@@ -24,7 +24,10 @@ def annotate_primary_stats(
     )
     return rows.annotate(
         primary_followers=Subquery(stats.values("followers")[:1]),
-        primary_engagement=Subquery(stats.values("engagement_rate")[:1]),
+        primary_engagement=Subquery(
+            stats.values("engagement_rate")[:1],
+            output_field=DecimalField(max_digits=5, decimal_places=2),
+        ),
         primary_verified=Coalesce(
             Subquery(stats.values("is_verified")[:1]),
             Value(False),

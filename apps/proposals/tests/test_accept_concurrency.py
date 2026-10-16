@@ -23,7 +23,13 @@ from apps.proposals.tests.factories import ProposalFactory
 S = Proposal.Status
 FULL_MESSAGE = "All creators for this campaign have already been selected."
 
-pytestmark = pytest.mark.django_db(transaction=True)
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.skipif(
+        connection.vendor == "sqlite",
+        reason="Requires PostgreSQL row locks; SQLite table locks on concurrent threads",
+    ),
+]
 
 
 def accepted(campaign):

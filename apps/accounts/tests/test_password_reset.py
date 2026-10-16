@@ -248,6 +248,8 @@ def test_confirm_is_throttled(client, user):
 
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_confirms_with_same_code_succeed_only_once(run_on_commit):
+    if connection.vendor == "sqlite":
+        pytest.skip("Requires PostgreSQL row locks; SQLite table locks on concurrent threads")
     user = UserFactory(email="amina@example.com", username="amina")
     client = APIClient()
     with run_on_commit():

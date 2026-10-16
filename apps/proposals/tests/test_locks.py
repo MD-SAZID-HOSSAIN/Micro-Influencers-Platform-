@@ -45,6 +45,8 @@ def test_an_unknown_proposal_is_not_found(proposal):
 
 
 def test_the_campaign_is_locked_before_the_proposal(proposal):
+    if not connection.features.has_select_for_update:
+        pytest.skip("Database backend does not support SELECT ... FOR UPDATE (requires PostgreSQL)")
     with transaction.atomic(), CaptureQueriesContext(connection) as queries:
         lock_proposal_for_brand(proposal.campaign.brand, proposal.pk)
 

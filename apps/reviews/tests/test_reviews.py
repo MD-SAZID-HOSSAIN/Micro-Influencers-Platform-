@@ -195,6 +195,8 @@ def test_recalculate_rating_handles_removal_down_to_zero(db, auth_client):
 
 @pytest.mark.django_db(transaction=True)
 def test_simultaneous_reviews_of_one_creator_are_all_counted():
+    if connection.vendor == "sqlite":
+        pytest.skip("Requires PostgreSQL row locks; SQLite table locks on concurrent threads")
     creator = UserFactory(role=Role.CREATOR)
     proposals = [completed(creator=creator) for _ in range(8)]
 

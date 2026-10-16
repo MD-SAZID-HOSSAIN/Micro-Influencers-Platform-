@@ -129,6 +129,8 @@ def test_resubmitting_after_withdrawal_on_a_closed_campaign_is_blocked(creator, 
 
 
 def test_two_simultaneous_submits_create_exactly_one_active_proposal(transactional_db):  # RF4
+    if connection.vendor == "sqlite":
+        pytest.skip("Requires PostgreSQL row locks; SQLite table locks on concurrent threads")
     creator = UserFactory(role=Role.CREATOR)
     campaign = CampaignFactory(status=Campaign.Status.PUBLISHED)
 
