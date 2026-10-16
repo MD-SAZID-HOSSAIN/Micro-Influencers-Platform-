@@ -3,7 +3,13 @@ from .base import env
 
 DEBUG = True
 SECRET_KEY = env("SECRET_KEY", default="dev-insecure-key-change-me-0123456789")
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "testserver"]
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
+
+# Run Celery tasks synchronously in development so emails and background jobs
+# work immediately without requiring a standalone Celery worker process on Windows.
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=True)
+CELERY_TASK_EAGER_PROPAGATES = True
+

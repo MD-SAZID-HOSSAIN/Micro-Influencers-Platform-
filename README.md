@@ -142,6 +142,8 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `EMAIL_HOST_PASSWORD` | SMTP password. |
 | `EMAIL_USE_TLS` | Use TLS for SMTP. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
+| `MEDIA_URL` | Base URL for uploaded user media (avatars, logos). Default `/media/`. |
+| `MEDIA_ROOT` | Filesystem path where uploaded media files are stored. Default `<BASE_DIR>/media`. |
 
 Settings modules: `config.settings.dev` (local development), `config.settings.test` (pytest) and
 `config.settings.prod` (deployment; refuses to start with an unsafe configuration).

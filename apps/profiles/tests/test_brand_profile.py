@@ -114,3 +114,19 @@ def test_a_creators_id_is_not_a_brand_profile(db, auth_client):
     other_creator = UserFactory(role=Role.CREATOR)
 
     assert auth_client(creator).get(detail(other_creator.id)).status_code == 404
+
+
+def test_brand_can_upload_and_delete_logo(brand, auth_client):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    client = auth_client(brand)
+    image = SimpleUploadedFile("logo.png", b"\x89PNG\r\n\x1a\nfakeimagecontent", content_type="image/png")
+    response = client.post("/api/v1/brands/me/logo/", {"logo": image}, format="multipart")
+    assert response.status_code == 200
+    assert "/media/logos/" in response.json()["logo_url"]
+    assert BrandProfile.objects.get(user=brand).logo_url is not None
+
+    del_resp = client.delete("/api/v1/brands/me/logo/")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["logo_url"] is None
+    assert BrandProfile.objects.get(user=brand).logo_url is None

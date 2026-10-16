@@ -12,6 +12,8 @@ _MOBILE_RE = re.compile(r"^\+?[0-9]{7,15}$")
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -22,8 +24,16 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "mobile_number",
             "email_verified",
+            "avatar_url",
         ]
         read_only_fields = fields
+
+    def get_avatar_url(self, user) -> str | None:
+        if user.role == Role.CREATOR and hasattr(user, "creator_profile"):
+            return user.creator_profile.photo_url
+        if user.role == Role.BRAND and hasattr(user, "brand_profile"):
+            return user.brand_profile.logo_url
+        return None
 
 
 class LoginSerializer(serializers.Serializer):

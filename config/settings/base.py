@@ -168,6 +168,9 @@ LOGGING = {
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
+MEDIA_URL = env("MEDIA_URL", default="/media/")
+MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
+
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = "UTC"
