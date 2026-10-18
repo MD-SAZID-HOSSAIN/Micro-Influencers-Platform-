@@ -21,21 +21,56 @@ post campaigns and manage the proposals they receive.
 The test suite needs a real PostgreSQL: the "accept never exceeds Creators Needed" guarantee relies on
 row locks that SQLite does not provide.
 
-## Quick start
+## Run the project
+
+CollabNest is two programs: the Django API (port 8000) and the React website in [`frontend/`](frontend/)
+(port 5173). Run each in its own terminal. You also need Node 20 or newer for the website.
+
+### First-time setup
+
+**Terminal 1: backend** (repo root)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r requirements/dev.txt
-cp .env.example .env                   # then edit the values you need
-docker compose up -d db redis         # PostgreSQL + Redis
+cp .env.example .env                   # Windows: copy .env.example .env
+docker compose up -d db redis          # PostgreSQL + Redis (start Docker Desktop first)
 python manage.py migrate
 python manage.py seed_demo             # optional demo data (see below)
 python manage.py runserver
 ```
 
-Check it works: `GET http://localhost:8000/api/v1/health/` returns `{"status": "ok", "database": "ok"}`,
-and `http://localhost:8000/api/docs/` shows the API reference.
+**Terminal 2: frontend**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**. In development the website calls `/api/v1` on its own address and Vite
+forwards it to Django, so no CORS setup is needed.
+
+### Every time after that
+
+1. Start Docker Desktop.
+2. Terminal 1, from the repo root: `source .venv/bin/activate` (Windows: `.venv\Scripts\activate`), then
+   `docker compose up -d db redis`, then `python manage.py runserver`.
+3. Terminal 2: `cd frontend`, then `npm run dev`.
+4. Open http://localhost:5173. Stop either server with `Ctrl + C`.
+
+### Check it works
+
+- `GET http://localhost:8000/api/v1/health/` returns `{"status": "ok", "database": "ok"}`.
+- `http://localhost:8000/api/docs/` shows the API reference.
+- `http://localhost:8000/` itself shows "Not Found": port 8000 is the API only, the website is on 5173.
+
+### Where emails and codes go
+
+In development emails are printed in the **backend terminal** (`EMAIL_BACKEND` is the console backend), so
+that is where to find email-verification and password-reset codes. To send real email, set the SMTP
+variables in `.env` (see Configuration below).
 
 ### Demo data
 
@@ -70,16 +105,37 @@ application deadline has passed are closed every 5 minutes.
 
 ## Admin accounts
 
-Admins cannot register through the API. Create one on the server:
+Admins cannot register through the website or the API. Create one on the server, with the backend
+environment active (`.venv` activated, database running):
 
 ```bash
-python manage.py create_admin --email you@example.com --username you
+python manage.py create_admin --email you@example.com --username admin
 ```
 
-The password is prompted for (twice) and is never accepted as an argument. Admins sign in at
-`POST /api/v1/admin/auth/login/`; the public login rejects admin accounts, and ordinary accounts
-cannot use the admin login. Every admin action (suspend, reactivate, delete, close a campaign,
-remove a review) needs a written reason and is recorded in `GET /api/v1/admin/actions/`.
+The password (8 characters or more) is prompted for twice and is never accepted as an argument.
+
+**Local development admin** (used in this project's local setup):
+
+| | |
+|---|---|
+| Username | `admin` |
+| Password | `12345678` |
+
+To create it, run `python manage.py create_admin --email you@example.com --username admin` (use any email
+address) and type `12345678` when it asks for the password. These are throwaway local credentials: on any
+shared or deployed server, use a strong password instead.
+
+**Log in as admin**
+
+1. Start both servers (see Run the project).
+2. Open **http://localhost:5173/admin/login**.
+3. Enter the username `admin` and the password.
+
+The admin area has an overview, a user list (search, suspend, reactivate, delete) and an audit log. The
+public login page rejects admin accounts, and ordinary accounts cannot use the admin login. Every admin
+action (suspend, reactivate, delete, close a campaign, remove a review) needs a written reason and is
+recorded in `GET /api/v1/admin/actions/`. Through the API, admins sign in at
+`POST /api/v1/admin/auth/login/`.
 
 ## Connecting YouTube (Google OAuth)
 

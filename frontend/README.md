@@ -13,7 +13,8 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. In development the app calls `/api/v1/...` on its own origin and the Vite
+Open http://localhost:5173. Admins sign in at http://localhost:5173/admin/login (see "Admin accounts" in
+the root README for how to create one). In development the app calls `/api/v1/...` on its own origin and the Vite
 dev server forwards `/api` to `http://127.0.0.1:8000`, so the backend needs no CORS change.
 
 | Variable | When | Purpose |
