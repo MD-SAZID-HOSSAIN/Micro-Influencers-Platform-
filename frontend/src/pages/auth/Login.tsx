@@ -1,0 +1,107 @@
+import { Link, useNavigate } from 'react-router-dom';
+import AuthShell from '../../components/AuthShell';
+import { FormField, Input, Button } from '../../components/ui';
+import { useState } from 'react';
+import { useAuth } from '../../state/AuthContext';
+import { useToast } from '../../state/ToastContext';
+import { ApiError } from '../../api/client';
+import clsx from 'clsx';
+
+export default function Login() {
+  const { login, loading } = useAuth();
+  const navigate = useNavigate();
+  const { push } = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [role, setRole] = useState<'creator' | 'brand'>('creator');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+    setError('');
+    try {
+      const user = await login({ identifier: email, password });
+      // The role from the API is the source of truth — bounce the user
+      // to the right dashboard even if they toggled the wrong pill.
+      const target = user.role === 'creator' ? '/creator/dashboard' : '/brand/dashboard';
+      if (user.role !== role) {
+        push(`Heads up — this account is a ${user.role}, not a ${role}.`, 'info');
+      }
+      navigate(target);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err.message);
+      else setError('Could not sign in. Please try again.');
+    }
+  };
+
+  return (
+    <AuthShell
+      title="Welcome back"
+      subtitle="Log in to your account."
+      variant="neutral"
+    >
+      <div className="grid grid-cols-2 gap-1 p-1 bg-mist-100 border border-ink-200 rounded-md mb-5">
+        <button
+          onClick={() => setRole('creator')}
+          className={clsx(
+            'h-9 text-sm font-semibold rounded-sm transition-colors',
+            role === 'creator' ? 'bg-ink-900 text-mist-50' : 'text-ink-600 hover:text-ink-900'
+          )}
+          aria-pressed={role === 'creator'}
+          type="button"
+        >
+          I’m a creator
+        </button>
+        <button
+          onClick={() => setRole('brand')}
+          className={clsx(
+            'h-9 text-sm font-semibold rounded-sm transition-colors',
+            role === 'brand' ? 'bg-ink-900 text-mist-50' : 'text-ink-600 hover:text-ink-900'
+          )}
+          aria-pressed={role === 'brand'}
+          type="button"
+        >
+          I’m a brand
+        </button>
+      </div>
+      <form onSubmit={submit} noValidate>
+        <FormField label="Email or username" htmlFor="email">
+          <Input
+            id="email"
+            type="text"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+        </FormField>
+        <FormField label="Password" htmlFor="password">
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+          />
+        </FormField>
+        {error && <div className="error mb-3" role="alert">{error}</div>}
+        <div className="flex items-center justify-between text-sm mb-4 gap-2 flex-wrap">
+          <Link to="/forgot-password" className="text-brand-600 hover:text-brand-700 font-semibold">Forgot password?</Link>
+        </div>
+        <Button size="lg" className="w-full" disabled={loading}>
+          {loading ? 'Signing in…' : 'Log in'}
+        </Button>
+      </form>
+      <div className="mt-5 text-sm text-ink-500 text-center">
+        New here? <Link to="/register/role" className="text-brand-600 hover:text-brand-700 font-semibold">Create an account</Link>
+      </div>
+    </AuthShell>
+  );
+}

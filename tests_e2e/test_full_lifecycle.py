@@ -1,13 +1,27 @@
 """
 Complete End-to-End PRD Lifecycle Test Suite
 Verifies all functional workflows FR-01 through FR-24 against live backend and database.
+
+This is a standalone script, NOT a pytest test: start the server first, then run
+    python tests_e2e/test_full_lifecycle.py
+It exits with status 1 if any check fails. Settings (all optional):
+    E2E_BASE_URL        default http://127.0.0.1:8000/api/v1
+    E2E_ADMIN_USER      default admin
+    E2E_ADMIN_PASSWORD  default AdminPassword123!
+If the admin login works, the two users created by the run (and their data) are deleted at the end;
+otherwise they are left behind and the script says so.
 """
 import json
+import os
+import sys
 import urllib.request
 import urllib.error
 import time
+from datetime import datetime, timedelta, timezone
 
-BASE_URL = "http://127.0.0.1:8000/api/v1"
+BASE_URL = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000/api/v1")
+ADMIN_USER = os.environ.get("E2E_ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("E2E_ADMIN_PASSWORD", "AdminPassword123!")
 
 results = []
 
@@ -61,6 +75,7 @@ status, data = api("/auth/register/", "POST", {
     "password": "StrongPassword123!",
     "mobile_number": "+1234567890"
 })
+c_id = data.get("id")
 record("FR-01: User Registration (Creator)", status == 201 and data.get("username") == c_user, f"HTTP {status}")
 
 # 2. Register Brand
@@ -74,6 +89,7 @@ status, data = api("/auth/register/", "POST", {
     "password": "StrongPassword123!",
     "mobile_number": "+1987654321"
 })
+b_id = data.get("id")
 record("FR-01: User Registration (Brand)", status == 201 and data.get("username") == b_user, f"HTTP {status}")
 
 # 3. Login Creator
@@ -146,7 +162,7 @@ status, data = api("/brand/campaigns/", "POST", {
     "niche": "tech",
     "platform": "youtube",
     "budget": "500.00",
-    "deadline": "2026-12-31T23:59:59Z",
+    "deadline": (datetime.now(timezone.utc) + timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "deliverables": "1 dedicated 8-min review video",
     "creators_needed": 2,
     "min_followers": 0
@@ -256,7 +272,7 @@ record("FR-23: Campaign Performance Analytics (Proposal funnel)", status == 200 
 # ---------------------------------------------------------------------------
 # WORKFLOW H: Admin Panel Operations (FR-22)
 # ---------------------------------------------------------------------------
-status, data = api("/admin/auth/login/", "POST", {"identifier": "admin", "password": "AdminPassword123!"})
+status, data = api("/admin/auth/login/", "POST", {"identifier": ADMIN_USER, "password": ADMIN_PASSWORD})
 admin_token = data.get("access")
 record("FR-22: Admin Authentication (/admin/auth/login/)", status == 200 and admin_token is not None, f"HTTP {status}")
 
@@ -273,8 +289,22 @@ if admin_token:
     status, data = api("/admin/actions/", "GET", token=admin_token)
     record("FR-22: Admin Audit Log Actions", status == 200 and "results" in data, f"count={data.get('count')}")
 
+# ---------------------------------------------------------------------------
+# Cleanup: remove the users this run created (needs the admin login above)
+# ---------------------------------------------------------------------------
+if admin_token:
+    for label, uid in (("creator", c_id), ("brand", b_id)):
+        if uid is None:
+            print(f"Cleanup: no id for test {label}, left in the database")
+            continue
+        status, _ = api(f"/admin/users/{uid}/", "DELETE", {"reason": "E2E test cleanup"}, token=admin_token)
+        print(f"Cleanup: delete test {label} {uid} -> HTTP {status}")
+else:
+    print(f"Cleanup skipped (no admin login): test users {c_user} and {b_user} were left in the database")
+
 print("\n" + "="*70)
 passed = sum(1 for r in results if r["status"] == "PASS")
 total = len(results)
 print(f"  TOTAL END-TO-END TESTS: {passed}/{total} PASSED ({(passed/total)*100:.1f}%)")
 print("="*70 + "\n")
+sys.exit(0 if passed == total else 1)
