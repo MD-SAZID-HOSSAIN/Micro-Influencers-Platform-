@@ -24,7 +24,7 @@ class CreatorProfile(models.Model):
     # `photo_url` is what every reader uses. A link pasted through the API is stored as-is; an uploaded
     # photo lives in `photo` and its address is mirrored into `photo_url`, so nothing else has to care.
     photo_url = models.URLField(max_length=500, null=True, blank=True)
-    photo = models.FileField(upload_to="profiles/photos/%Y/%m/", max_length=200, blank=True)
+    photo = models.FileField(upload_to="avatars/%Y/%m/", max_length=200, blank=True)
     bio = models.TextField(blank=True, default="")
     niche = models.CharField(max_length=20, choices=Niche.choices, null=True, blank=True)
     primary_platform = models.CharField(
@@ -73,7 +73,7 @@ class BrandProfile(models.Model):
     website = models.URLField(max_length=500, null=True, blank=True)
     # Same arrangement as the creator's photo: `logo_url` is what readers use, `logo` is the upload.
     logo_url = models.URLField(max_length=500, null=True, blank=True)
-    logo = models.FileField(upload_to="profiles/logos/%Y/%m/", max_length=200, blank=True)
+    logo = models.FileField(upload_to="logos/%Y/%m/", max_length=200, blank=True)
     about = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

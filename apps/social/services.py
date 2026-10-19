@@ -51,7 +51,7 @@ def set_manual_stats(
 ) -> PlatformStats:
     """Create or update Unverified stats entered by hand; refuses to overwrite Verified ones."""
     existing = PlatformStats.objects.filter(creator=creator, platform=platform).first()
-    if existing is not None and existing.is_verified:
+    if existing is not None and existing.is_verified and platform == "youtube":
         raise StatsVerified()
     stats, _ = PlatformStats.objects.update_or_create(
         creator=creator,

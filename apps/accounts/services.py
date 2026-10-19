@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.db import IntegrityError, transaction
 from django.db.models import F
@@ -115,7 +116,7 @@ def request_password_reset(email: str) -> None:
     )
 
 
-def request_email_verification(user: User) -> None:
+def request_email_verification(user: User) -> str:
     """Email a fresh 6-digit verification code. Always sent, whatever the notification toggle says."""
     code = issue_code(user, CodePurpose.EMAIL_VERIFICATION)
     transaction.on_commit(
@@ -126,9 +127,10 @@ def request_email_verification(user: User) -> None:
             {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
         )
     )
+    return code
 
 
-def resend_email_verification(user: User) -> None:
+def resend_email_verification(user: User) -> str:
     """Send a new verification code, at most one per minute."""
     if user.email_verified:
         raise AlreadyVerified()
@@ -139,7 +141,7 @@ def resend_email_verification(user: User) -> None:
     )
     if latest is not None and timezone.now() - latest.created_at < RESEND_COOLDOWN:
         raise ResendCooldown()
-    request_email_verification(user)
+    return request_email_verification(user)
 
 
 def verify_email(user: User, code: str) -> User:

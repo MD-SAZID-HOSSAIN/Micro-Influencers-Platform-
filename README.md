@@ -166,7 +166,7 @@ creator search, on campaign cards and on the campaign page.
   `photo_url` / `logo_url`, and `GET /api/v1/auth/me/` reports it as `avatar_url`.
 - A new upload replaces the old one (the old file is deleted). Setting `photo_url` / `logo_url` to a link
   through `PATCH` also replaces an uploaded picture, so there is only ever one.
-- Stored and served like campaign media (see above), as paths such as `/media/profiles/photos/...`.
+- Stored and served like campaign media (see above), as paths such as `/media/avatars/...`.
 
 ## Connecting YouTube (Google OAuth)
 
@@ -235,6 +235,8 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `EMAIL_HOST_PASSWORD` | SMTP password. |
 | `EMAIL_USE_TLS` | Use TLS for SMTP. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
+| `MEDIA_URL` | Base URL for uploaded user media (avatars, logos). Default `/media/`. |
+| `MEDIA_ROOT` | Filesystem path where uploaded media files are stored. Default `<BASE_DIR>/media`. |
 
 Settings modules: `config.settings.dev` (local development), `config.settings.test` (pytest) and
 `config.settings.prod` (deployment; refuses to start with an unsafe configuration).

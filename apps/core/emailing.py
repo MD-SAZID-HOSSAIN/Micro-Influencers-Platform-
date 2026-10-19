@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.template.loader import render_to_string
 
 from . import tasks
@@ -17,3 +18,9 @@ def queue_email(to: str, subject: str, template: str, context: dict) -> None:
         tasks.deliver_email.delay(to, subject, body)
     except Exception:
         logger.exception("Failed to queue email (subject=%r, template=%r)", subject, template)
+        if getattr(settings, "DEBUG", False):
+            try:
+                from django.core.mail import send_mail
+                send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [to], fail_silently=True)
+            except Exception:
+                pass
