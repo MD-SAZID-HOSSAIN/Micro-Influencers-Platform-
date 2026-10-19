@@ -16,6 +16,8 @@ type AuthCtx = {
   logout: () => Promise<void>;
   /** Internal — used by the API client when a 401 comes back. */
   clearSession: () => void;
+  /** Show a new profile picture in the header straight after an upload or removal. */
+  setAvatar: (url: string | undefined) => void;
 };
 
 const Ctx = createContext<AuthCtx | undefined>(undefined);
@@ -78,7 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // An expired or revoked token anywhere in the app ends the session; route guards then
   // redirect to /login.
-  useEffect(() => onUnauthorized(clearSession), [clearSession]);
+  useEffect(
+    () => onUnauthorized((session) => session === 'user' && clearSession()),
+    [clearSession],
+  );
 
   const login = useCallback(async (input: { identifier: string; password: string }) => {
     setLoading(true);
@@ -125,6 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const setAvatar = useCallback((url: string | undefined) => {
+    setUser((u) => (u ? { ...u, avatarUrl: url } : u));
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -146,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerBrand,
         logout,
         clearSession,
+        setAvatar,
       }}
     >
       {children}

@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from apps.core.choices import Niche, Platform
 
@@ -19,7 +21,10 @@ class CreatorProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="creator_profile"
     )
+    # `photo_url` is what every reader uses. A link pasted through the API is stored as-is; an uploaded
+    # photo lives in `photo` and its address is mirrored into `photo_url`, so nothing else has to care.
     photo_url = models.URLField(max_length=500, null=True, blank=True)
+    photo = models.FileField(upload_to="profiles/photos/%Y/%m/", max_length=200, blank=True)
     bio = models.TextField(blank=True, default="")
     niche = models.CharField(max_length=20, choices=Niche.choices, null=True, blank=True)
     primary_platform = models.CharField(
@@ -66,7 +71,9 @@ class BrandProfile(models.Model):
     company_name = models.CharField(max_length=150, blank=True, default="")
     industry = models.CharField(max_length=100, blank=True, default="")
     website = models.URLField(max_length=500, null=True, blank=True)
+    # Same arrangement as the creator's photo: `logo_url` is what readers use, `logo` is the upload.
     logo_url = models.URLField(max_length=500, null=True, blank=True)
+    logo = models.FileField(upload_to="profiles/logos/%Y/%m/", max_length=200, blank=True)
     about = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -78,3 +85,19 @@ class BrandProfile(models.Model):
 
     def __str__(self):
         return f"BrandProfile({self.user_id})"
+
+
+def _delete_file_after_commit(file_field) -> None:
+    if file_field:
+        storage, name = file_field.storage, file_field.name
+        transaction.on_commit(lambda: storage.delete(name))
+
+
+@receiver(post_delete, sender=CreatorProfile)
+def _remove_photo_with_profile(sender, instance, **kwargs):
+    _delete_file_after_commit(instance.photo)
+
+
+@receiver(post_delete, sender=BrandProfile)
+def _remove_logo_with_profile(sender, instance, **kwargs):
+    _delete_file_after_commit(instance.logo)

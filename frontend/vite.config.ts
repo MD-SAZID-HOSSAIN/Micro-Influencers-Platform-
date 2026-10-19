@@ -11,7 +11,12 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       proxy: {
+        // Uploaded pictures are served from /media/ by the same Django server.
         '/api': {
+          target: env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
+        '/media': {
           target: env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000',
           changeOrigin: true,
         },

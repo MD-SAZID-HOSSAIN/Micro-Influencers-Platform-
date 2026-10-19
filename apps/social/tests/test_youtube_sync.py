@@ -18,6 +18,8 @@ from apps.social.tests.fakes import make_connection, snapshot
 from apps.social.youtube_client import (
     ChannelNotFound,
     QuotaExceeded,
+    SubscribersHidden,
+    YouTubeError,
     TokenRevoked,
     TransientApiError,
 )
@@ -193,6 +195,38 @@ def test_google_account_without_channel_marks_stats_outdated_quietly(creator, fa
     assert stats_of(creator).is_outdated is True
     assert reload(connection).last_error == "no_channel"
     assert not Notification.objects.filter(user=creator).exists()
+
+
+def test_hidden_subscriber_count_keeps_old_stats_outdated_and_says_why(creator, fake_youtube):
+    connection = make_connection(creator, access="hidden-at", followers=42)
+    fake_youtube.fetch_results["hidden-at"] = SubscribersHidden()
+
+    sync_connection(connection)
+
+    assert stats_of(creator).followers == 42
+    assert stats_of(creator).is_outdated is True
+    assert reload(connection).last_error == "subscribers_hidden"
+    assert not Notification.objects.filter(user=creator).exists()
+
+
+def test_hidden_subscribers_on_a_first_sync_create_no_verified_stats(creator, fake_youtube):
+    connection = make_connection(creator, access="hidden-at", with_stats=False)
+    fake_youtube.fetch_results["hidden-at"] = SubscribersHidden()
+
+    sync_connection(connection)
+
+    assert not PlatformStats.objects.filter(creator=creator, platform="youtube").exists()
+    assert reload(connection).last_error == "subscribers_hidden"
+
+
+def test_an_unexpected_google_error_is_logged_and_raised(creator, fake_youtube, caplog):
+    connection = make_connection(creator, access="odd-at")
+    fake_youtube.fetch_results["odd-at"] = YouTubeError("HTTP 400 (invalidParameter)")
+
+    with caplog.at_level("WARNING", logger="apps.social.services"), pytest.raises(YouTubeError):
+        sync_connection(connection)
+
+    assert f"creator {creator.id}" in caplog.text and "invalidParameter" in caplog.text
 
 
 def test_task_for_a_deleted_connection_is_a_quiet_no_op(db, fake_youtube):

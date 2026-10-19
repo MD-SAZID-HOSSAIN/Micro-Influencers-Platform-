@@ -45,11 +45,14 @@ export default function RegisterBrand() {
       navigate('/verify-email', { state: { email: form.email } });
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'http_400' && err.details && typeof err.details === 'object') {
+        if (err.code === 'validation_error' && err.details && typeof err.details === 'object') {
           const fieldErrors: Record<string, string> = {};
+          // The backend names fields in snake_case; this form uses its own names.
+          const formField: Record<string, string> = { full_name: 'fullName', mobile_number: 'mobile' };
           for (const [k, v] of Object.entries(err.details as Record<string, unknown>)) {
-            if (Array.isArray(v) && v.length) fieldErrors[k] = String(v[0]);
-            else if (typeof v === 'string') fieldErrors[k] = v;
+            const field = formField[k] ?? k;
+            if (Array.isArray(v) && v.length) fieldErrors[field] = String(v[0]);
+            else if (typeof v === 'string') fieldErrors[field] = v;
           }
           setErrors(fieldErrors);
           return;

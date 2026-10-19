@@ -121,6 +121,15 @@ export default function ConnectedAccounts() {
                 </div>
               )}
 
+              {yt.problem && (
+                <div className="bg-amber-50 border-y border-amber-200 px-5 py-3 flex items-center gap-2 text-sm text-amber-800">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {yt.problem === 'subscribers_hidden'
+                    ? 'Your channel hides its subscriber count, so your reach can’t be verified. Make subscribers public on YouTube, then press Refresh.'
+                    : 'This Google account has no YouTube channel. Connect the account that owns your channel.'}
+                </div>
+              )}
+
               <div className="p-5 sm:p-6 border-t border-ink-200">
                 <StatRow
                   items={[

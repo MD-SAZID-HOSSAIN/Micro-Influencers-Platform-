@@ -1,6 +1,9 @@
 import re
 
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.core.fields import SafeCharField
@@ -11,7 +14,19 @@ from .services import register_user
 _MOBILE_RE = re.compile(r"^\+?[0-9]{7,15}$")
 
 
+def check_password_strength(password: str, user: User | None = None) -> None:
+    """Run Django's password validators (too common, all digits, too like the username or email)."""
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError(list(exc.messages))
+
+
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField(
+        help_text="The creator's photo or the brand's logo, if they have one."
+    )
+
     class Meta:
         model = User
         fields = [
@@ -22,8 +37,19 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "mobile_number",
             "email_verified",
+            "avatar_url",
         ]
         read_only_fields = fields
+
+    def get_avatar_url(self, user) -> str | None:
+        try:
+            if user.role == Role.CREATOR:
+                return user.creator_profile.photo_url
+            if user.role == Role.BRAND:
+                return user.brand_profile.logo_url
+        except ObjectDoesNotExist:
+            pass
+        return None
 
 
 class LoginSerializer(serializers.Serializer):
@@ -48,6 +74,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(
         write_only=True, min_length=8, max_length=128, trim_whitespace=False
     )
+
+    def validate_new_password(self, value):
+        check_password_strength(value)
+        return value
 
 
 class EmailVerifySerializer(serializers.Serializer):
@@ -95,6 +125,17 @@ class RegisterSerializer(serializers.Serializer):
         if not _MOBILE_RE.match(cleaned):
             raise serializers.ValidationError("Enter a valid mobile number.")
         return cleaned
+
+    def validate(self, attrs):
+        # Checked last, with the other fields in hand, so a password that is just the username fails.
+        try:
+            check_password_strength(
+                attrs["password"],
+                User(username=attrs["username"], email=attrs["email"], full_name=attrs["full_name"]),
+            )
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"password": exc.detail})
+        return attrs
 
     def create(self, validated_data):
         return register_user(**validated_data)

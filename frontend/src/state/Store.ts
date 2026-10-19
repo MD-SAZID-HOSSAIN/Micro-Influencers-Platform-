@@ -112,6 +112,10 @@ export const loadCreatorProfile = () =>
           verified: !yt.needsReconnect,
           lastSyncedAt: yt.lastSyncedAt ?? new Date().toISOString(),
           status: yt.needsReconnect ? 'expired' : 'connected',
+          problem:
+            yt.lastError === 'subscribers_hidden' || yt.lastError === 'no_channel'
+              ? yt.lastError
+              : undefined,
         };
         merged.connectedAccount = acc;
         setState({ connectedAccounts: [acc] });
@@ -177,6 +181,18 @@ export const updateCreator = async (
   return merged;
 };
 
+/** Upload or replace the creator's profile photo; the store (and any open page) updates at once. */
+export const setCreatorPhoto = async (file: File): Promise<string | undefined> => {
+  const updated = await api.uploadCreatorPhoto(file);
+  if (state.creator) setState({ creator: { ...state.creator, avatarUrl: updated.avatarUrl } });
+  return updated.avatarUrl;
+};
+
+export const removeCreatorPhoto = async (): Promise<void> => {
+  await api.deleteCreatorPhoto();
+  if (state.creator) setState({ creator: { ...state.creator, avatarUrl: undefined } });
+};
+
 export const setCreatorPortfolio = async (links: PortfolioLink[]): Promise<void> => {
   if (!state.creator) return;
   const existing = state.creator.portfolio;
@@ -194,6 +210,17 @@ export const setCreatorPortfolio = async (links: PortfolioLink[]): Promise<void>
   }
   const fresh = await api.fetchPortfolio();
   if (state.creator) setState({ creator: { ...state.creator, portfolio: fresh } });
+};
+
+export const setBrandLogo = async (file: File): Promise<string | undefined> => {
+  const updated = await api.uploadBrandLogo(file);
+  if (state.brand) setState({ brand: { ...state.brand, logoUrl: updated.logoUrl } });
+  return updated.logoUrl;
+};
+
+export const removeBrandLogo = async (): Promise<void> => {
+  await api.deleteBrandLogo();
+  if (state.brand) setState({ brand: { ...state.brand, logoUrl: undefined } });
 };
 
 export const updateBrand = async (

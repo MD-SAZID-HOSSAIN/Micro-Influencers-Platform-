@@ -11,10 +11,13 @@ from django.conf import settings
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 API_URL = "https://www.googleapis.com/youtube/v3"
 SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
 TIMEOUT_SECONDS = 10
 RECENT_VIDEOS = 10
+# engagement_rate is stored as a DecimalField(max_digits=5, decimal_places=2).
+MAX_ENGAGEMENT_RATE = Decimal("999.99")
 
 _QUOTA_REASONS = {"quotaExceeded", "rateLimitExceeded", "dailyLimitExceeded", "userRateLimitExceeded"}
 _PERMISSION_REASONS = {"insufficientPermissions", "forbidden"}
@@ -38,6 +41,10 @@ class QuotaExceeded(TransientApiError):
 
 class ChannelNotFound(YouTubeError):
     """The Google account has no YouTube channel."""
+
+
+class SubscribersHidden(YouTubeError):
+    """The channel hides its subscriber count, so its reach cannot be verified."""
 
 
 @dataclass(frozen=True)
@@ -131,6 +138,16 @@ class YouTubeClient:
             {"refresh_token": refresh_token, "grant_type": "refresh_token"}
         )
 
+    def revoke_token(self, token: str) -> None:
+        """Tell Google to forget a grant, so the app disappears from the creator's Google permissions.
+
+        A token Google already considers invalid (revoked earlier, or expired) counts as done.
+        """
+        response = self._send("POST", REVOKE_URL, data={"token": token})
+        if response.status_code == 400 and "invalid_token" in _error_reasons(response):
+            return
+        self._raise_for_status(response)
+
     def fetch_channel(self, access_token: str) -> ChannelSnapshot:
         channels = self._api_get(
             "channels",
@@ -141,6 +158,9 @@ class YouTubeClient:
         if not channels:
             raise ChannelNotFound()
         channel = channels[0]
+        if channel.get("statistics", {}).get("hiddenSubscriberCount") is True:
+            # Google reports no usable number; storing 0 would show a "Verified" creator with no audience.
+            raise SubscribersHidden()
 
         custom_url = channel.get("snippet", {}).get("customUrl")
         if custom_url:
@@ -217,7 +237,9 @@ class YouTubeClient:
         if views == 0:
             return Decimal("0.00")
         rate = Decimal(interactions) / Decimal(views) * 100
-        return rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # Likes and comments can briefly outnumber views (new videos, delayed view counts). Without a
+        # cap, a rate of 1000% or more does not fit the database column and the whole sync fails.
+        return min(rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), MAX_ENGAGEMENT_RATE)
 
     def _token_request(self, form: dict) -> TokenSet:
         form = {
@@ -260,12 +282,15 @@ class YouTubeClient:
         if status < 400:
             return
         reasons = _error_reasons(response)
+        # Google's own reason codes (invalid_grant, quotaExceeded, ...) make a log line useful. They
+        # are short fixed words, so unlike the request URL they never contain a key or token.
+        why = f"HTTP {status}" + (f" ({', '.join(sorted(r for r in reasons if r))})" if reasons - {""} else "")
         if status == 401 or "invalid_grant" in reasons:
-            raise TokenRevoked(f"HTTP {status}")
+            raise TokenRevoked(why)
         if status == 403 and reasons & _QUOTA_REASONS:
-            raise QuotaExceeded(f"HTTP {status}")
+            raise QuotaExceeded(why)
         if status == 403 and reasons & _PERMISSION_REASONS:
-            raise TokenRevoked(f"HTTP {status}")
+            raise TokenRevoked(why)
         if status == 429 or status >= 500:
-            raise TransientApiError(f"HTTP {status}")
-        raise YouTubeError(f"HTTP {status}")
+            raise TransientApiError(why)
+        raise YouTubeError(why)

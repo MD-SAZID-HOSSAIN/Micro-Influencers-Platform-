@@ -13,6 +13,7 @@ import { Modal } from '../../components/Modal';
 import { FormField, Textarea, Input } from '../../components/ui';
 import { useToast } from '../../state/ToastContext';
 import { isApiError } from '../../api/client';
+import { MediaGallery } from '../../components/MediaPicker';
 
 type Detail = Awaited<ReturnType<typeof fetchCreatorCampaign>>;
 
@@ -46,14 +47,16 @@ export default function CampaignDetail() {
     );
   }
 
-  const { campaign, acceptedCount, allSelected, canApply, applyBlockedReason } = data;
+  const { campaign, acceptedCount, allSelected, canApply, applyBlockedReason, eligible } = data;
   const myProposalForCampaign = proposals.find(
     (p) => p.campaignId === campaign.id,
   );
 
-  const platformOk = campaign.requiredPlatform === creator?.primaryPlatform;
-  const followersOk = !campaign.minFollowers || (creator?.followers ?? 0) >= campaign.minFollowers;
-  const eligible = platformOk && followersOk;
+  // `eligible` comes from the server, which looks at the creator's stats for the campaign's own
+  // platform (verified or entered by hand). It is a hint only: it never stops anyone applying.
+  const requirement = campaign.minFollowers
+    ? `${campaign.requiredPlatform} with ${campaign.minFollowers.toLocaleString()}+ followers`
+    : campaign.requiredPlatform;
 
   const hasActive = myProposalForCampaign &&
     (myProposalForCampaign.status === 'pending' ||
@@ -72,8 +75,6 @@ export default function CampaignDetail() {
     buttonState = { label: 'You already applied', disabled: true };
   } else if (wasRejected) {
     buttonState = { label: 'Application closed', disabled: true };
-  } else if (!eligible) {
-    buttonState = { label: 'Not eligible', disabled: true };
   } else {
     buttonState = { label: 'Apply now', disabled: false };
   }
@@ -89,7 +90,7 @@ export default function CampaignDetail() {
         <div className="p-4 sm:p-6 -mt-10 sm:-mt-12">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div className="flex flex-col sm:flex-row sm:items-end gap-3 min-w-0">
-              <ChannelArt name={campaign.brandName} seed={campaign.brandId} height={56} className="w-12 sm:w-14 rounded-md ring-4 ring-mist-50 shrink-0" />
+              <ChannelArt name={campaign.brandName} seed={campaign.brandId} imageUrl={campaign.brandLogoUrl} height={56} className="w-12 sm:w-14 rounded-md ring-4 ring-mist-50 shrink-0" />
               <div className="min-w-0">
                 <div className="text-xs text-ink-500 truncate">{campaign.brandName} · {campaign.category}</div>
                 <h1 className="font-display text-xl sm:text-2xl md:text-3xl text-ink-900 leading-[1.15] tracking-[-0.02em] mt-1 break-words">
@@ -104,6 +105,8 @@ export default function CampaignDetail() {
           <p className="text-[15px] text-ink-700 mt-5 leading-relaxed whitespace-pre-line break-words">{campaign.description}</p>
         </div>
       </header>
+
+      <MediaGallery media={campaign.media} />
 
       <StatRow
         items={[
@@ -132,18 +135,15 @@ export default function CampaignDetail() {
         <div>
           <div className="eyebrow mb-1.5">Eligibility</div>
           <div className="text-sm font-semibold text-ink-900">
-            {eligible ? 'You meet the requirements.' : 'Not eligible for this brief.'}
+            {eligible ? 'Your profile fits this brief.' : 'Your profile may not fit this brief.'}
           </div>
-          {!eligible && (
-            <div className="text-xs text-ink-500 mt-1">
-              {!platformOk ? `Requires ${campaign.requiredPlatform}.` : `Needs ${campaign.minFollowers?.toLocaleString()}+ followers.`}
-            </div>
-          )}
+          <div className="text-xs text-ink-500 mt-1">
+            {eligible
+              ? `Looking for: ${requirement}.`
+              : `Looking for: ${requirement}. This is a guide only, you can still apply.`}
+          </div>
         </div>
-        <EligibilityChip
-          eligible={eligible}
-          reason={!platformOk ? `Requires ${campaign.requiredPlatform}` : `Needs ${campaign.minFollowers?.toLocaleString()}+ followers`}
-        />
+        <EligibilityChip eligible={eligible} reason={`Looking for ${requirement}`} />
       </section>
 
       {allSelected && (

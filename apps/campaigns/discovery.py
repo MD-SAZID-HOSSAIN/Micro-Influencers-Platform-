@@ -20,13 +20,15 @@ class CampaignFilterSerializer(serializers.Serializer):
 
 
 def open_campaigns() -> QuerySet:
-    """Published campaigns still accepting applications.
+    """Published campaigns still accepting applications, from brands that are not suspended.
 
     The deadline is checked here as well as by the auto-close job, which only runs every few
     minutes, so an expired campaign never shows up in the gap.
     """
     return Campaign.objects.filter(
-        status=Campaign.Status.PUBLISHED, deadline__gt=timezone.now()
+        status=Campaign.Status.PUBLISHED,
+        deadline__gt=timezone.now(),
+        brand__is_active=True,
     ).select_related("brand__brand_profile")
 
 

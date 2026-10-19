@@ -201,6 +201,7 @@ export default function AppShell() {
             <UserMenu
               name={user.fullName}
               email={user.email}
+              avatarUrl={user.avatarUrl}
               role={user.role}
               onLogout={() => { logout(); navigate('/'); }}
             />
@@ -596,10 +597,11 @@ function NotificationRow({ n, onClick }: { n: AppNotification; onClick: () => vo
 }
 
 function UserMenu({
-  name, email, role, onLogout,
+  name, email, avatarUrl, role, onLogout,
 }: {
   name: string;
   email: string;
+  avatarUrl?: string;
   role: Role;
   onLogout: () => void;
 }) {
@@ -622,7 +624,7 @@ function UserMenu({
         aria-expanded={open}
         aria-label="User menu"
       >
-        <Avatar name={name} size="sm" tone="ink" />
+        <Avatar name={name} src={avatarUrl} size="sm" tone="ink" />
         <ChevronDown
           className={clsx('w-3.5 h-3.5 text-ink-500 transition-transform duration-200 hidden sm:block', open && 'rotate-180')}
         />
@@ -637,7 +639,7 @@ function UserMenu({
         >
           <div className="px-4 py-3 border-b border-ink-200">
             <div className="flex items-center gap-2.5">
-              <Avatar name={name} size="sm" tone="ink" />
+              <Avatar name={name} src={avatarUrl} size="sm" tone="ink" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-ink-900 truncate">{name}</div>
                 <div className="text-xs text-ink-500 truncate">{email}</div>

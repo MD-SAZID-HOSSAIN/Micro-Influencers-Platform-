@@ -22,6 +22,7 @@ from .models import PlatformStats, YouTubeConnection
 from .youtube_client import (
     ChannelNotFound,
     ChannelSnapshot,
+    SubscribersHidden,
     TokenRevoked,
     YouTubeClient,
     YouTubeError,
@@ -137,6 +138,19 @@ def _mark_needs_reconnect(connection: YouTubeConnection) -> None:
         )
 
 
+def _flag_unusable_channel(connection: YouTubeConnection, reason: str) -> None:
+    """The channel is reachable but cannot be verified: keep the last stats (outdated) and say why.
+
+    Nothing is created or overwritten, so a creator whose channel hides its subscribers never
+    shows up as Verified with a made-up audience of 0.
+    """
+    PlatformStats.objects.filter(creator_id=connection.creator_id, platform="youtube").update(
+        is_outdated=True
+    )
+    connection.last_error = reason
+    connection.save(update_fields=["last_error"])
+
+
 def sync_connection(connection: YouTubeConnection) -> None:
     """Pull fresh stats for one connection.
 
@@ -149,16 +163,22 @@ def sync_connection(connection: YouTubeConnection) -> None:
     try:
         access_token = _usable_access_token(connection, client)
         snapshot = client.fetch_channel(access_token)
-    except TokenRevoked:
+    except TokenRevoked as exc:
+        logger.info("YouTube access ended for creator %s, asking them to reconnect: %s", connection.creator_id, exc)
         _mark_needs_reconnect(connection)
         return
     except ChannelNotFound:
-        PlatformStats.objects.filter(creator_id=connection.creator_id, platform="youtube").update(
-            is_outdated=True
-        )
-        connection.last_error = "no_channel"
-        connection.save(update_fields=["last_error"])
+        logger.info("Creator %s has no YouTube channel on the connected Google account", connection.creator_id)
+        _flag_unusable_channel(connection, "no_channel")
         return
+    except SubscribersHidden:
+        logger.info("Creator %s hides their subscriber count, so reach cannot be verified", connection.creator_id)
+        _flag_unusable_channel(connection, "subscribers_hidden")
+        return
+    except YouTubeError as exc:
+        # Transient errors are retried by the task; anything else ends here, so say what happened.
+        logger.warning("YouTube sync failed for creator %s: %s", connection.creator_id, exc)
+        raise
     apply_snapshot(connection, snapshot)
 
 
@@ -246,7 +266,10 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
 
     try:
         tokens = get_youtube_client().exchange_code(code)
-    except YouTubeError:
+    except YouTubeError as exc:
+        # The creator only sees "try again"; the real reason (bad client secret, redirect mismatch,
+        # an expired code...) is what a developer needs, so it goes in the log.
+        logger.warning("YouTube sign-in could not be completed for creator %s: %s", user.id, exc)
         raise ConnectError("exchange_failed")
 
     existing = YouTubeConnection.objects.filter(creator=user).first()
@@ -272,11 +295,32 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
     return connection
 
 
+def _revoke_quietly(token: str, creator_id: int) -> None:
+    """Best effort: a Google outage must never stop someone disconnecting, so problems are only logged."""
+    try:
+        get_youtube_client().revoke_token(token)
+    except Exception as exc:  # noqa: BLE001 - this runs after the disconnect is saved; nothing may escape
+        logger.warning("Could not revoke the YouTube grant for creator %s at Google: %s", creator_id, exc)
+
+
 def disconnect(user: User) -> None:
-    """Delete the stored tokens; the last stats stay but are no longer Verified."""
+    """Delete the stored tokens and revoke the grant at Google; the last stats stay but are no longer Verified.
+
+    The disconnect is saved first. Revoking afterwards (so the app also vanishes from the creator's
+    Google account permissions) is best effort and its failure is only logged.
+    """
     with transaction.atomic():
+        connection = YouTubeConnection.objects.filter(creator=user).first()
+        refresh_token = None
+        if connection is not None:
+            try:
+                refresh_token = decrypt(connection.refresh_token_enc)
+            except Exception:  # noqa: BLE001 - an unreadable token cannot be revoked; deleting it is still right
+                logger.warning("Stored YouTube token for creator %s could not be read, so it is not revoked", user.id)
         YouTubeConnection.objects.filter(creator=user).delete()
         PlatformStats.objects.filter(creator=user, platform="youtube").update(is_verified=False)
+        if refresh_token:
+            transaction.on_commit(lambda: _revoke_quietly(refresh_token, user.id))
 
 
 def connection_status(user: User) -> dict:

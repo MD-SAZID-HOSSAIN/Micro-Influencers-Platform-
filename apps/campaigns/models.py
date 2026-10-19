@@ -1,6 +1,8 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 from apps.core.choices import Niche, Platform
 
@@ -65,3 +67,32 @@ class CampaignView(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["campaign", "creator"], name="uniq_view_per_creator_campaign")
         ]
+
+
+class CampaignMedia(models.Model):
+    """A photo or video a brand attaches to a campaign brief: up to 2 photos, or 1 video."""
+
+    class Kind(models.TextChoices):
+        PHOTO = "photo", "Photo"
+        VIDEO = "video", "Video"
+
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="media")
+    kind = models.CharField(max_length=5, choices=Kind.choices)
+    # The stored name is generated (never the uploader's filename), see apps/campaigns/media.py.
+    file = models.FileField(upload_to="campaigns/%Y/%m/", max_length=200)
+    size = models.PositiveBigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"CampaignMedia({self.pk}, campaign={self.campaign_id}, {self.kind})"
+
+
+@receiver(post_delete, sender=CampaignMedia)
+def _remove_file_with_row(sender, instance, **kwargs):
+    """Delete the stored file once the row is really gone (also when its campaign is deleted)."""
+    if instance.file:
+        storage, name = instance.file.storage, instance.file.name
+        transaction.on_commit(lambda: storage.delete(name))

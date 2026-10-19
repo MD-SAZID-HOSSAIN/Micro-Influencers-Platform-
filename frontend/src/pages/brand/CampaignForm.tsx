@@ -82,7 +82,11 @@ export function CampaignForm({
               type="date"
               min={tomorrow}
               value={values.applicationDeadline.slice(0, 10)}
-              onChange={(e) => set('applicationDeadline', new Date(e.target.value).toISOString())}
+              onChange={(e) => {
+                // An emptied field arrives as '' and has no ISO form: keep it empty so validation can ask for a date.
+                const day = e.target.value;
+                set('applicationDeadline', day ? new Date(day).toISOString() : '');
+              }}
               invalid={!!errors?.applicationDeadline}
             />
           </FormField>
@@ -128,6 +132,8 @@ export function validateCampaign(values: CampaignFormValues): Record<string, str
   if (!values.requiredPlatform) errs.requiredPlatform = 'Required';
   if (values.budgetPerCreator <= 0) errs.budgetPerCreator = 'Must be greater than 0';
   if (values.creatorsNeeded < 1 || values.creatorsNeeded > 20) errs.creatorsNeeded = 'Between 1 and 20';
-  if (new Date(values.applicationDeadline).getTime() <= Date.now()) errs.applicationDeadline = 'Deadline must be in the future';
+  const deadline = Date.parse(values.applicationDeadline);
+  if (!values.applicationDeadline || Number.isNaN(deadline)) errs.applicationDeadline = 'Pick a deadline';
+  else if (deadline <= Date.now()) errs.applicationDeadline = 'Deadline must be in the future';
   return errs;
 }

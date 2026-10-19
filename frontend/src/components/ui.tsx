@@ -268,9 +268,11 @@ export function PlatformIcon({ platform, className }: { platform: Platform; clas
 
 // ---------- Avatar (initials with editorial monogram feel) ----------
 export function Avatar({
-  name, size = 'md', className, tone = 'ink',
+  name, size = 'md', className, tone = 'ink', src,
 }: {
   name: string;
+  /** A profile picture. Shown instead of the initials when present. */
+  src?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   tone?: 'ink' | 'ember' | 'paper';
@@ -292,6 +294,15 @@ export function Avatar({
     tone === 'ember' ? 'bg-brand-500 text-mist-50'
     : tone === 'paper' ? 'bg-mist-200 text-ink-700'
     : 'bg-ink-900 text-mist-50';
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className={clsx('rounded-sm shrink-0 object-cover bg-ink-100', sizeCls.split(' ').slice(0, 2).join(' '), className)}
+      />
+    );
+  }
   return (
     <div
       aria-hidden
@@ -312,10 +323,12 @@ export function Avatar({
  * for the same creator across pages. Editorial-feeling composition.
  */
 export function ChannelArt({
-  name, seed, height = 96, className, rounded = 'lg',
+  name, seed, height = 96, className, rounded = 'lg', imageUrl,
 }: {
   name: string;
   seed: string;
+  /** The real picture (photo or logo). The generated art is only the fallback. */
+  imageUrl?: string;
   height?: number;
   className?: string;
   rounded?: 'sm' | 'md' | 'lg' | 'full';
@@ -335,6 +348,17 @@ export function ChannelArt({
   const cy1 = 30 + (hash(seed + 'c') % 20);
   const cx2 = 60 + (hash(seed + 'd') % 30);
   const cy2 = 40 + (hash(seed + 'e') % 30);
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name}
+        loading="lazy"
+        className={clsx('object-cover bg-ink-100', r, className)}
+        style={{ height }}
+      />
+    );
+  }
   return (
     <div
       className={clsx('relative overflow-hidden', r, className)}

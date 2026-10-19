@@ -44,6 +44,8 @@ export type ConnectedAccount = {
   verified: boolean;
   lastSyncedAt: string; // ISO
   status: 'connected' | 'expired' | 'revoked';
+  /** Set when the last sync could not verify the channel (the stats shown are then out of date). */
+  problem?: 'subscribers_hidden' | 'no_channel';
 };
 
 export type PortfolioLink = {
@@ -71,6 +73,8 @@ export type Campaign = {
   id: string;
   brandId: string;
   brandName: string;
+  /** The brand's logo, when it has one (cards in the creator list carry it). */
+  brandLogoUrl?: string;
   title: string;
   description: string;
   category: Niche;
@@ -83,6 +87,15 @@ export type Campaign = {
   status: CampaignStatus;
   /** Only present on a brand's own campaigns; the creator-facing card payload does not carry it. */
   createdAt?: string;
+  /** Up to 2 photos, or 1 video. Cards in the creator list do not carry it. */
+  media?: CampaignMedia[];
+};
+
+export type CampaignMedia = {
+  id: string;
+  kind: 'photo' | 'video';
+  url: string;
+  size: number;
 };
 
 export type ProposalStatus =

@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, ArrowRight, ArrowUpRight, Inbox, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useStore, loadBrandCampaigns, setBrandProposals, updateProposalStatus } from '../../state/Store';
-import { listBrandCampaignProposals, fetchCreatorDetail } from '../../api/endpoints';
+import { listBrandCampaignProposals } from '../../api/endpoints';
 import { Button, EmptyState, ProposalStatusBadge, ChannelArt, PageHeader, StatRow } from '../../components/ui';
 import { fmtNumber, fmtRelativeTime, currency } from '../../lib/shared';
 import type { Proposal, ProposalStatus } from '../../types';
@@ -27,7 +27,6 @@ export default function ProposalManagement() {
   const [filter, setFilter] = useState<'all' | ProposalStatus>('all');
   const [showWithdrawn, setShowWithdrawn] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ p: Proposal; status: ProposalStatus } | null>(null);
-  const [followers, setFollowers] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -41,19 +40,6 @@ export default function ProposalManagement() {
         setProposals(res.results);
         setAcceptedCount(res.acceptedCount);
         setBrandProposals(res.results);
-        // Best-effort: fetch the engagement-rate-bearing detail for each creator.
-        const map: Record<string, number> = {};
-        await Promise.all(
-          res.results.slice(0, 10).map(async (p) => {
-            try {
-              const detail = await fetchCreatorDetail(p.creatorId);
-              map[p.creatorId] = detail.followers;
-            } catch {
-              /* ignore */
-            }
-          }),
-        );
-        if (!cancelled) setFollowers(map);
       } catch (err) {
         if (!cancelled) {
           push(isApiError(err) ? err.message : 'Failed to load proposals.', 'error');
@@ -191,7 +177,7 @@ export default function ProposalManagement() {
                       <ProposalStatusBadge status={p.status} />
                     </div>
                     <div className="text-xs text-ink-500 mt-1 break-words">
-                      {p.creatorNiche} · {p.creatorPlatform} · {fmtNumber(followers[p.creatorId] ?? p.creatorFollowers)} followers · {p.creatorEngagement}% engagement
+                      {p.creatorNiche} · {p.creatorPlatform} · {fmtNumber(p.creatorFollowers)} followers · {p.creatorEngagement}% engagement
                     </div>
                   </div>
                   <div className="text-left sm:text-right">

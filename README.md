@@ -137,6 +137,37 @@ action (suspend, reactivate, delete, close a campaign, remove a review) needs a 
 recorded in `GET /api/v1/admin/actions/`. Through the API, admins sign in at
 `POST /api/v1/admin/auth/login/`.
 
+## Photos and videos on campaigns
+
+While a campaign is a **draft**, its brand can attach **up to 2 photos or 1 video** (never both):
+
+| | Types | Largest |
+|---|---|---|
+| Photo | JPG, PNG, WebP | 5 MB |
+| Video | MP4, WebM | 50 MB |
+
+- In the website, add them on **Create a campaign** or **Edit campaign**; they upload when the draft is saved or
+  published. Creators see them on the campaign page.
+- API: `POST /api/v1/brand/campaigns/<id>/media/` (multipart field `file`) and
+  `DELETE /api/v1/brand/campaigns/<id>/media/<media_id>/`. The campaign payload lists them under `media`.
+- The server decides what a file is by reading its first bytes, not its name or `Content-Type`, and stores it
+  under a random name. Published and closed campaigns are frozen, so their media cannot change.
+- Files are saved in `media/` (ignored by git) and served by Django in development only. See
+  `docs/DEPLOYMENT.md` for production storage.
+
+## Profile pictures
+
+Creators have a **profile photo** and brands a **logo** (JPG, PNG or WebP, up to 5 MB). Both are set on the
+**Edit profile** page and saved as soon as the file is chosen. They show in the header, on profiles, in the
+creator search, on campaign cards and on the campaign page.
+
+- API: `PUT /api/v1/creators/me/photo/` and `PUT /api/v1/brands/me/logo/` (multipart field `file`), and
+  `DELETE` on the same addresses. Each returns the updated profile. The picture is the profile's
+  `photo_url` / `logo_url`, and `GET /api/v1/auth/me/` reports it as `avatar_url`.
+- A new upload replaces the old one (the old file is deleted). Setting `photo_url` / `logo_url` to a link
+  through `PATCH` also replaces an uploaded picture, so there is only ever one.
+- Stored and served like campaign media (see above), as paths such as `/media/profiles/photos/...`.
+
 ## Connecting YouTube (Google OAuth)
 
 Only YouTube is connected through OAuth; Instagram, TikTok and Facebook use manual entry and are labelled
@@ -162,6 +193,11 @@ started it can finish it:
    with `{"state", "code"}`. It answers with the connection status, or a 400 whose `code` is
    `invalid_state`, `exchange_failed` or `no_refresh_token`. A `state` that was issued to a different
    creator is refused with `invalid_state`.
+
+**Disconnecting** deletes the stored tokens and also revokes the grant at Google, so the app disappears from the
+creator's Google account permissions. The revoke is best effort: if Google cannot be reached the creator is
+still disconnected and a warning is logged. Failed sign-ins and syncs are logged with Google's reason code
+(look for "YouTube" in the backend log); tokens, codes and keys are never logged.
 
 **While the app is in Testing mode, Google expires refresh tokens after 7 days**, so creators may need to
 reconnect about once a week. The platform handles this: the creator gets a "reconnect" notification and

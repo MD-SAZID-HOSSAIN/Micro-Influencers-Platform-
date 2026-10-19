@@ -476,3 +476,47 @@ def test_a_background_queue_outage_after_connecting_does_not_fail_the_request(
     assert response.status_code == 200  # the link was saved; the first sync happens with the next daily run
     assert YouTubeConnection.objects.filter(creator=creator).exists()
     assert "Could not queue" in caplog.text
+
+
+# ---- what gets logged, and revoking at Google -------------------------------------------------------------------
+
+
+def test_a_failed_code_exchange_logs_the_real_reason(creator, fake_youtube, auth_client, caplog):
+    fake_youtube.exchange_result = TokenRevoked("HTTP 400 (invalid_grant)")
+    client = auth_client(creator)
+
+    with caplog.at_level("WARNING", logger="apps.social.services"):
+        complete(client, get_state(client))
+
+    assert f"creator {creator.id}" in caplog.text and "invalid_grant" in caplog.text
+    assert "auth-code" not in caplog.text  # the one-time code never goes in a log
+
+
+def test_disconnect_revokes_the_grant_at_google(creator, fake_youtube, auth_client, run_on_commit):
+    make_connection(creator, refresh="rt-to-revoke")
+
+    with run_on_commit():
+        response = auth_client(creator).delete(BASE)
+
+    assert response.status_code == 204
+    assert fake_youtube.revoked == ["rt-to-revoke"]  # the refresh token: revoking it ends the access token too
+    assert not YouTubeConnection.objects.filter(creator=creator).exists()
+
+
+def test_disconnect_still_works_when_google_is_down(creator, fake_youtube, auth_client, run_on_commit, caplog):
+    make_connection(creator, refresh="rt-1")
+    fake_youtube.revoke_error = TransientApiError("HTTP 503")
+
+    with caplog.at_level("WARNING", logger="apps.social.services"), run_on_commit():
+        response = auth_client(creator).delete(BASE)
+
+    assert response.status_code == 204
+    assert not YouTubeConnection.objects.filter(creator=creator).exists()
+    assert "Could not revoke" in caplog.text and "rt-1" not in caplog.text
+
+
+def test_disconnecting_without_a_connection_revokes_nothing(creator, fake_youtube, auth_client, run_on_commit):
+    with run_on_commit():
+        assert auth_client(creator).delete(BASE).status_code == 204
+
+    assert fake_youtube.revoked == []

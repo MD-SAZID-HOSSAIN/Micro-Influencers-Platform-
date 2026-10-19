@@ -98,7 +98,14 @@ health check to the web container only.
   queue background task") and the daily YouTube sync picks it up. Cache calls give up after 2 seconds.
 - **Daily YouTube sync** is spread over `YOUTUBE_SYNC_SPREAD_SECONDS` (default 1800) after 03:00 UTC instead of
   starting every creator at the same second.
-- **Backups:** back up PostgreSQL. Redis only holds queued jobs and counters and can be rebuilt.
+- **Uploaded photos and videos** (campaign briefs) are written to `MEDIA_ROOT` (the `media/` folder next to
+  `manage.py`) and linked as `/media/...`. Django only serves that folder in development (`DEBUG`), so in
+  production either serve it from the web server and keep the folder on persistent storage (a Docker
+  volume), or move it to object storage such as S3. Without one of these, uploads are lost when the
+  container is replaced and the links do not open. Let the proxy accept request bodies of at least 55 MB
+  (nginx: `client_max_body_size 55m`), since a video may be up to 50 MB.
+- **Backups:** back up PostgreSQL, and the media folder if you keep uploads on local disk. Redis only holds
+  queued jobs and counters and can be rebuilt.
 
 ## 7. Checklist before going live
 

@@ -9,6 +9,7 @@ import responses
 from apps.social.youtube_client import (
     ChannelNotFound,
     QuotaExceeded,
+    SubscribersHidden,
     TokenRevoked,
     TransientApiError,
     YouTubeClient,
@@ -204,11 +205,11 @@ def test_handle_falls_back_to_channel_url(client):
 
 
 @responses.activate
-def test_hidden_subscriber_count_is_zero(client):
+def test_hidden_subscriber_count_is_reported_not_stored_as_zero(client):
     mock_channel(subscribers="0", hidden=True)
-    mock_videos([{"id": "a", "views": 1, "likes": 0, "comments": 0}])
 
-    assert client.fetch_channel("t").subscribers == 0
+    with pytest.raises(SubscribersHidden):
+        client.fetch_channel("t")
 
 
 @responses.activate
@@ -266,3 +267,49 @@ def test_network_failures_are_transient(client, exc):
 
     with pytest.raises(TransientApiError):
         client.fetch_channel("t")
+
+
+# ---- revoking, error text, and the engagement cap ---------------------------------------------------------------
+
+
+@responses.activate
+def test_revoke_token_posts_the_token_to_googles_revoke_endpoint(client):
+    responses.post("https://oauth2.googleapis.com/revoke", status=200, json={})
+
+    client.revoke_token("the-refresh-token")
+
+    assert parse_qs(responses.calls[0].request.body) == {"token": ["the-refresh-token"]}
+
+
+@responses.activate
+def test_revoking_a_token_google_already_dropped_is_fine(client):
+    responses.post("https://oauth2.googleapis.com/revoke", status=400, json={"error": "invalid_token"})
+
+    client.revoke_token("old")  # no error
+
+
+@responses.activate
+def test_a_failed_revoke_is_an_error(client):
+    responses.post("https://oauth2.googleapis.com/revoke", status=503)
+
+    with pytest.raises(TransientApiError):
+        client.revoke_token("t")
+
+
+@responses.activate
+def test_error_messages_carry_googles_reason_but_not_the_request(client):
+    responses.post(TOKEN_URL, status=400, json={"error": "invalid_grant"})
+
+    with pytest.raises(TokenRevoked) as raised:
+        client.exchange_code("the-code")
+
+    assert "invalid_grant" in str(raised.value)
+    assert "the-code" not in str(raised.value) and "test-client-secret" not in str(raised.value)
+
+
+@responses.activate
+def test_engagement_rate_is_capped_to_fit_its_database_column(client):
+    mock_channel()
+    mock_videos([{"id": "a", "views": 1, "likes": 50, "comments": 20}])  # 7000% before the cap
+
+    assert client.fetch_channel("t").engagement_rate == Decimal("999.99")

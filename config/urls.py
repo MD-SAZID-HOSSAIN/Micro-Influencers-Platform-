@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -19,6 +21,9 @@ urlpatterns = [
     path("api/v1/", include("apps.reviews.urls")),
     path("api/v1/", include("apps.adminpanel.urls")),
 ]
+
+# Development only: serve uploaded media. (`static()` adds nothing when DEBUG is off.)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # JSON versions of Django's HTML 404/500 pages, so every error uses the same envelope.
 handler404 = "apps.core.views.not_found"

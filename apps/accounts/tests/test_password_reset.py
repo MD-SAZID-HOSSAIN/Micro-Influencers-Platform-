@@ -269,3 +269,14 @@ def test_concurrent_confirms_with_same_code_succeed_only_once(run_on_commit):
         results = list(pool.map(attempt, ["FirstNewPass11", "SecondNewPass22"]))
 
     assert sorted(results) == ["ok", "reset_code_used"]
+
+
+def test_a_common_password_is_refused_and_does_not_consume_the_code(client, user, run_on_commit):
+    request_code(client, run_on_commit)
+    code = last_code()
+
+    weak = confirm(client, code, password="12345678")
+
+    assert weak.status_code == 400
+    assert "new_password" in weak.json()["error"]["details"]
+    assert confirm(client, code).status_code == 200

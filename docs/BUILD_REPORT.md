@@ -486,7 +486,7 @@ me if you want any changed (each one is a small change). The full list of all 59
 | Marking a collaboration "Completed" needs no deliverable first | PRD silent | Say if at least one link should be required |
 | A completed collaboration **cannot be withdrawn** | "Completion is final" | Say if creators may still withdraw |
 | Admin login is **separate**; normal login refuses admins | Safer, and the PRD says "separate panel" | Tell me if admins should use the normal login |
-| Suspended users keep their campaigns/proposals visible | PRD only says "cannot log in" | Say if their content should be hidden |
+| A suspended brand's campaigns are **hidden** from creators and take no new proposals; a suspended creator is hidden from the brand search. Existing proposals are kept | Decided after the PRD: suspension should take someone off the marketplace | Say if existing proposals should be hidden too |
 | Strict HTTPS (HSTS) is on in production for one year; subdomains and preload are **off** | Those two are very hard to undo | Set `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` when ready |
 
 ### F. What the frontend must know

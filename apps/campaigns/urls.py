@@ -3,6 +3,8 @@ from django.urls import path
 from .views import (
     BrandCampaignDetailView,
     CampaignAnalyticsView,
+    CampaignMediaCreateView,
+    CampaignMediaDeleteView,
     BrandCampaignListCreateView,
     CloseCampaignView,
     CreatorCampaignDetailView,
@@ -15,6 +17,16 @@ urlpatterns = [
         "brand/campaigns/<int:pk>/analytics/",
         CampaignAnalyticsView.as_view(),
         name="brand-campaign-analytics",
+    ),
+    path(
+        "brand/campaigns/<int:pk>/media/",
+        CampaignMediaCreateView.as_view(),
+        name="brand-campaign-media",
+    ),
+    path(
+        "brand/campaigns/<int:pk>/media/<int:media_id>/",
+        CampaignMediaDeleteView.as_view(),
+        name="brand-campaign-media-item",
     ),
     path("campaigns/", CreatorCampaignListView.as_view(), name="campaigns"),
     path("campaigns/<int:pk>/", CreatorCampaignDetailView.as_view(), name="campaign-detail"),

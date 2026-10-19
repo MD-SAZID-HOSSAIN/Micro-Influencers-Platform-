@@ -35,6 +35,21 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Uploaded campaign photos and videos. In development Django serves them from here; a deployed
+# server needs this folder on persistent storage, served by the web server or replaced by object storage.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_MAX_PHOTO_BYTES = 5 * 1024 * 1024
+MEDIA_MAX_VIDEO_BYTES = 50 * 1024 * 1024
+
+# Applied when someone registers or resets a password (not when an admin is created on the server).
+# The 8-character minimum is enforced by the serializers' own `min_length`.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",

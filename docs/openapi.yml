@@ -686,6 +686,61 @@ paths:
                 items:
                   $ref: '#/components/schemas/CampaignDeliverablesRow'
           description: ''
+  /api/v1/brand/campaigns/{id}/media/:
+    post:
+      operationId: brand_campaigns_media_create
+      description: Attach a photo or video to one of the brand's Draft campaigns (2
+        photos, or 1 video).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Campaigns
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignMedia'
+          description: ''
+  /api/v1/brand/campaigns/{id}/media/{media_id}/:
+    delete:
+      operationId: brand_campaigns_media_destroy
+      description: Remove one photo or video from a Draft campaign.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: media_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Campaigns
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/brand/campaigns/{id}/proposals/:
     get:
       operationId: brand_campaigns_proposals_list
@@ -954,6 +1009,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/BrandDashboard'
           description: ''
+  /api/v1/brands/me/logo/:
+    put:
+      operationId: brands_me_logo_update
+      description: The brand's logo (JPG, PNG or WebP, up to 5 MB).
+      tags:
+      - Profiles
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandProfile'
+          description: ''
+    delete:
+      operationId: brands_me_logo_destroy
+      description: The brand's logo (JPG, PNG or WebP, up to 5 MB).
+      tags:
+      - Profiles
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandProfile'
+          description: ''
   /api/v1/campaigns/:
     get:
       operationId: campaigns_list
@@ -1046,8 +1141,8 @@ paths:
   /api/v1/campaigns/{id}/:
     get:
       operationId: campaigns_retrieve
-      description: Full details of a published or closed campaign. Drafts are never
-        visible.
+      description: Full details of a published or closed campaign. Drafts and suspended
+        brands' campaigns are never visible.
       parameters:
       - in: path
         name: id
@@ -1347,6 +1442,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreatorDashboard'
+          description: ''
+  /api/v1/creators/me/photo/:
+    put:
+      operationId: creators_me_photo_update
+      description: The creator's profile photo (JPG, PNG or WebP, up to 5 MB).
+      tags:
+      - Profiles
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatorProfile'
+          description: ''
+    delete:
+      operationId: creators_me_photo_destroy
+      description: The creator's profile photo (JPG, PNG or WebP, up to 5 MB).
+      tags:
+      - Profiles
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatorProfile'
           description: ''
   /api/v1/creators/me/portfolio/:
     get:
@@ -2219,6 +2354,11 @@ components:
           type: integer
           minimum: 0
           nullable: true
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/CampaignMedia'
+          readOnly: true
         status:
           allOf:
           - $ref: '#/components/schemas/CampaignStatusEnum'
@@ -2245,6 +2385,7 @@ components:
       - deliverables
       - description
       - id
+      - media
       - niche
       - platform
       - published_at
@@ -2372,6 +2513,11 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/CampaignMedia'
+          readOnly: true
         status:
           allOf:
           - $ref: '#/components/schemas/CampaignStatusEnum'
@@ -2403,11 +2549,43 @@ components:
       - description
       - eligible
       - id
+      - media
       - min_followers
       - niche
       - platform
       - status
       - title
+    CampaignMedia:
+      type: object
+      description: A photo or video attached to a campaign brief, with a link the
+        browser can open.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/CampaignMediaKindEnum'
+          readOnly: true
+        url:
+          type: string
+          readOnly: true
+        size:
+          type: integer
+          readOnly: true
+      required:
+      - id
+      - kind
+      - size
+      - url
+    CampaignMediaKindEnum:
+      enum:
+      - photo
+      - video
+      type: string
+      description: |-
+        * `photo` - Photo
+        * `video` - Video
     CampaignMetrics:
       type: object
       properties:
@@ -2926,24 +3104,6 @@ components:
       - rejected
       - shortlisted
       - withdrawn
-    KindEnum:
-      enum:
-      - proposal_shortlisted
-      - proposal_accepted
-      - proposal_rejected
-      - account_reconnect
-      - proposal_received
-      - proposal_withdrawn
-      - campaign_auto_closed
-      type: string
-      description: |-
-        * `proposal_shortlisted` - Proposal shortlisted
-        * `proposal_accepted` - Proposal accepted
-        * `proposal_rejected` - Proposal rejected
-        * `account_reconnect` - Account needs reconnecting
-        * `proposal_received` - New proposal received
-        * `proposal_withdrawn` - Proposal withdrawn
-        * `campaign_auto_closed` - Campaign closed at deadline
     Login:
       type: object
       properties:
@@ -3065,7 +3225,7 @@ components:
           readOnly: true
         kind:
           allOf:
-          - $ref: '#/components/schemas/KindEnum'
+          - $ref: '#/components/schemas/NotificationKindEnum'
           readOnly: true
         message:
           type: string
@@ -3086,6 +3246,24 @@ components:
       - kind
       - message
       - payload
+    NotificationKindEnum:
+      enum:
+      - proposal_shortlisted
+      - proposal_accepted
+      - proposal_rejected
+      - account_reconnect
+      - proposal_received
+      - proposal_withdrawn
+      - campaign_auto_closed
+      type: string
+      description: |-
+        * `proposal_shortlisted` - Proposal shortlisted
+        * `proposal_accepted` - Proposal accepted
+        * `proposal_rejected` - Proposal rejected
+        * `account_reconnect` - Account needs reconnecting
+        * `proposal_received` - New proposal received
+        * `proposal_withdrawn` - Proposal withdrawn
+        * `campaign_auto_closed` - Campaign closed at deadline
     NotificationSettings:
       type: object
       properties:
@@ -3453,6 +3631,11 @@ components:
           type: integer
           minimum: 0
           nullable: true
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/CampaignMedia'
+          readOnly: true
         status:
           allOf:
           - $ref: '#/components/schemas/CampaignStatusEnum'
@@ -3917,7 +4100,13 @@ components:
         email_verified:
           type: boolean
           readOnly: true
+        avatar_url:
+          type: string
+          nullable: true
+          readOnly: true
+          description: The creator's photo or the brand's logo, if they have one.
       required:
+      - avatar_url
       - email
       - email_verified
       - full_name

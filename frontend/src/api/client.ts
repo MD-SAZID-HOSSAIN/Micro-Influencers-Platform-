@@ -12,9 +12,15 @@
 
 const DEFAULT_BASE_URL: string = import.meta.env.VITE_API_URL || '/api/v1';
 
+/**
+ * Creators/brands and admins sign in separately and must not overwrite each other, so each
+ * keeps its own token. Calls under `admin/` use the admin session; everything else the user one.
+ */
+export type Session = 'user' | 'admin';
+
 const STORAGE_KEYS = {
   baseUrl: 'microinf_api_base',
-  token: 'microinf_token',
+  token: { user: 'microinf_token', admin: 'microinf_admin_token' } as Record<Session, string>,
 } as const;
 
 export const getBaseUrl = (): string => {
@@ -31,29 +37,40 @@ export const setBaseUrl = (url: string) => {
   } catch {}
 };
 
-export const getToken = (): string | null => {
+/**
+ * Uploaded pictures come back as paths like `/media/...`, which live on the API's server, not the
+ * website's. This turns them into addresses the browser can open (full links pass through untouched).
+ */
+export const resolveAssetUrl = (url: string | null | undefined): string | undefined => {
+  if (!url) return undefined;
+  if (!url.startsWith('/')) return url;
+  return new URL(url, new URL(getBaseUrl(), window.location.origin)).toString();
+};
+
+export const getToken = (session: Session = 'user'): string | null => {
   try {
-    return localStorage.getItem(STORAGE_KEYS.token);
+    return localStorage.getItem(STORAGE_KEYS.token[session]);
   } catch {
     return null;
   }
 };
 
-export const setToken = (token: string | null) => {
+export const setToken = (token: string | null, session: Session = 'user') => {
   try {
-    if (token) localStorage.setItem(STORAGE_KEYS.token, token);
-    else localStorage.removeItem(STORAGE_KEYS.token);
+    if (token) localStorage.setItem(STORAGE_KEYS.token[session], token);
+    else localStorage.removeItem(STORAGE_KEYS.token[session]);
   } catch {}
 };
 
 /**
- * Listeners told when an authenticated request comes back 401 (token expired or revoked).
- * The auth providers register here so a dead session is cleared and the route guards send the
- * user to /login, instead of the app staying "logged in" while every call fails.
+ * Listeners told when an authenticated request comes back 401 (token expired or revoked), with
+ * the session it belonged to. The auth providers register here so a dead session is cleared and
+ * the route guards send the user to the login page, instead of the app staying "logged in"
+ * while every call fails.
  */
-const unauthorizedListeners = new Set<() => void>();
+const unauthorizedListeners = new Set<(session: Session) => void>();
 
-export const onUnauthorized = (listener: () => void): (() => void) => {
+export const onUnauthorized = (listener: (session: Session) => void): (() => void) => {
   unauthorizedListeners.add(listener);
   return () => {
     unauthorizedListeners.delete(listener);
@@ -87,8 +104,12 @@ type RequestOpts = {
   formData?: FormData;
   /** Skip the Authorization header (e.g. for /auth/login). */
   anonymous?: boolean;
+  /** Which login to use. Defaults to the admin session for `admin/…` paths, else the user one. */
+  session?: Session;
   /** AbortController signal. */
   signal?: AbortSignal;
+  /** How long to wait before giving up. Defaults to 12 seconds; uploads ask for longer. */
+  timeoutMs?: number;
   /** Query string params, will be URL-encoded. */
   query?: Record<string, string | number | boolean | undefined | null>;
 };
@@ -110,7 +131,8 @@ const buildUrl = (path: string, base: string, query?: RequestOpts['query']) => {
 export async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promise<T> {
   const base = getBaseUrl();
   const url = buildUrl(path, base, opts.query);
-  const token = getToken();
+  const session: Session = opts.session ?? (path.replace(/^\//, '').startsWith('admin/') ? 'admin' : 'user');
+  const token = getToken(session);
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -129,7 +151,7 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
   }
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 12_000);
+  const timeoutId = window.setTimeout(() => controller.abort(), opts.timeoutMs ?? 12_000);
   // The request always uses our controller's signal, so the timeout applies even when the
   // caller passes its own signal; the caller's abort is forwarded to the controller.
   const signal = controller.signal;
@@ -185,8 +207,8 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
     // A 401 on a request that carried a token means the session is gone. Anonymous calls
     // (login, register, password reset) also return 401 for bad input, so they are excluded.
     if (res.status === 401 && token && !opts.anonymous) {
-      setToken(null);
-      unauthorizedListeners.forEach((listener) => listener());
+      setToken(null, session);
+      unauthorizedListeners.forEach((listener) => listener(session));
     }
     throw normaliseError(res, payload);
   }

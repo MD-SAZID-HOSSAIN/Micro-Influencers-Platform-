@@ -69,7 +69,7 @@ def test_password_shorter_than_8_rejected(client):
 
 @pytest.mark.django_db
 def test_password_of_exactly_8_characters_accepted(client):
-    response = client.post(URL, payload(password="abcd1234"), format="json")
+    response = client.post(URL, payload(password="tq7Xw9Zk"), format="json")
 
     assert response.status_code == 201
 
@@ -179,3 +179,20 @@ def test_register_is_throttled(client):
     response = client.post(URL, payload(username="u9", email="u9@x.com"), format="json")
 
     assert response.status_code == 429
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("password", ["12345678", "password", "qwertyuiop", "99999999"])
+def test_common_or_all_digit_passwords_are_rejected(client, password):
+    response = client.post(URL, payload(password=password), format="json")
+
+    assert response.status_code == 400
+    assert "password" in response.json()["error"]["details"]
+
+
+@pytest.mark.django_db
+def test_a_password_that_is_just_the_username_is_rejected(client):
+    response = client.post(URL, payload(username="amina_rahman", password="amina_rahman"), format="json")
+
+    assert response.status_code == 400
+    assert "password" in response.json()["error"]["details"]

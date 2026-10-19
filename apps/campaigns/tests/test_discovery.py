@@ -277,3 +277,27 @@ def test_list_query_count_is_constant(creator, auth_client, django_assert_max_nu
         response = client.get(LIST, {"page_size": 30})
 
     assert len(response.json()["results"]) == 30
+
+
+# ---- suspended brands ------------------------------------------------------------------------
+
+
+def test_a_suspended_brands_campaigns_are_hidden_from_creators(creator, auth_client):
+    suspended = UserFactory(role=Role.BRAND, is_active=False)
+    hidden = published(brand=suspended)
+    live = published()
+
+    assert ids(search(auth_client, creator)) == [live.id]
+    assert auth_client(creator).get(detail(hidden.pk)).status_code == 404
+    assert auth_client(creator).get(detail(live.pk)).status_code == 200
+
+
+def test_a_campaign_comes_back_when_its_brand_is_reactivated(creator, auth_client):
+    brand = UserFactory(role=Role.BRAND, is_active=False)
+    campaign = published(brand=brand)
+    assert ids(search(auth_client, creator)) == []
+
+    brand.is_active = True
+    brand.save(update_fields=["is_active"])
+
+    assert ids(search(auth_client, creator)) == [campaign.id]

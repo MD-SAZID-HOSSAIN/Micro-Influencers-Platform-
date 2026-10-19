@@ -3,12 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   FormField, Input, Textarea, Select, Button, PageHeader, SectionHeader,
 } from '../../components/ui';
-import { useStore, updateBrand, loadBrandProfile } from '../../state/Store';
+import { useStore, updateBrand, loadBrandProfile, setBrandLogo, removeBrandLogo } from '../../state/Store';
 import { useToast } from '../../state/ToastContext';
 import {
   Save, X, RotateCcw, ArrowLeft, AlertTriangle, CheckCircle2, Image as ImageIcon,
 } from 'lucide-react';
-import { ImagePicker } from '../../components/ImagePicker';
+import { ProfilePictureEditor } from '../../components/ProfilePictureEditor';
+import { useAuth } from '../../state/AuthContext';
 import { ChannelArt } from '../../components/ui';
 import type { BrandProfile } from '../../types';
 import clsx from 'clsx';
@@ -23,6 +24,7 @@ const COMPANY_SIZES = ['1–10', '11–50', '51–200', '201–1000', '1000+'] a
 
 export default function EditBrandProfile() {
   const { brand } = useStore();
+  const { setAvatar } = useAuth();
   const navigate = useNavigate();
   const { push } = useToast();
   const [form, setForm] = useState<BrandProfile | null>(brand);
@@ -89,6 +91,31 @@ export default function EditBrandProfile() {
             </Link>
           }
         />
+
+        <section className="card p-5 sm:p-6">
+          <SectionHeader eyebrow="Logo" title="Company logo" />
+          <div className="mt-5">
+            <ProfilePictureEditor
+              value={form.logoUrl}
+              name={form.companyName || 'Company'}
+              title="Your logo"
+              hint="Creators see it on your campaigns and your company page."
+              shape="rounded"
+              onUpload={async (file) => {
+                const url = await setBrandLogo(file);
+                set('logoUrl', url);
+                setAvatar(url);
+                push('Logo updated', 'success');
+              }}
+              onRemove={async () => {
+                await removeBrandLogo();
+                set('logoUrl', undefined);
+                setAvatar(undefined);
+                push('Logo removed', 'info');
+              }}
+            />
+          </div>
+        </section>
 
         <section className="card p-5 sm:p-6">
           <SectionHeader eyebrow="Identity" title="Company info" />

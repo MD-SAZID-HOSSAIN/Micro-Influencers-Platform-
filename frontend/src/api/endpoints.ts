@@ -6,12 +6,13 @@
  * field names.
  */
 
-import { request } from './client';
+import { request, resolveAssetUrl } from './client';
 import { NICHES } from '../lib/shared';
 import type {
   AppNotification,
   BrandProfile,
   Campaign,
+  CampaignMedia,
   CampaignStatus,
   ConnectedAccount,
   CreatorProfile,
@@ -46,7 +47,7 @@ type ApiUser = {
   mobile_number: string;
   email_verified: boolean;
   email_notifications_enabled?: boolean;
-  profile_photo_url?: string | null;
+  avatar_url?: string | null;
 };
 
 export const mapUser = (u: ApiUser): User => ({
@@ -56,7 +57,7 @@ export const mapUser = (u: ApiUser): User => ({
   email: u.email,
   username: u.username,
   mobile: u.mobile_number || undefined,
-  avatarUrl: u.profile_photo_url ?? undefined,
+  avatarUrl: resolveAssetUrl(u.avatar_url),
   emailVerified: u.email_verified,
   emailNotificationsEnabled: u.email_notifications_enabled,
 });
@@ -92,6 +93,12 @@ export async function logout() {
 
 export async function fetchMe(): Promise<User> {
   const data = await request<ApiUser>('auth/me/');
+  return mapUser(data);
+}
+
+/** Same endpoint, but for the admin session (its token is kept apart from the user one). */
+export async function fetchAdminMe(): Promise<User> {
+  const data = await request<ApiUser>('auth/me/', { session: 'admin' });
   return mapUser(data);
 }
 
@@ -197,7 +204,7 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
   return {
     id: String(p.id),
     fullName: p.full_name,
-    avatarUrl: p.photo_url ?? undefined,
+    avatarUrl: resolveAssetUrl(p.photo_url),
     coverUrl: undefined,
     bio: p.bio,
     niche: nicheFromBackend(p.niche),
@@ -232,6 +239,21 @@ export const fetchCreatorMe = async (): Promise<CreatorProfile> => {
   const data = await request<ApiCreatorMe>('creators/me/');
   return mapCreatorMe(data);
 };
+
+const imageForm = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return form;
+};
+
+/** Upload (replace) the creator's profile photo. Returns the updated profile. */
+export const uploadCreatorPhoto = async (file: File): Promise<CreatorProfile> =>
+  mapCreatorMe(
+    await request<ApiCreatorMe>('creators/me/photo/', { method: 'PUT', formData: imageForm(file), timeoutMs: 60_000 }),
+  );
+
+export const deleteCreatorPhoto = async (): Promise<CreatorProfile> =>
+  mapCreatorMe(await request<ApiCreatorMe>('creators/me/photo/', { method: 'DELETE' }));
 
 export const updateCreatorMe = async (patch: Partial<{
   fullName: string;
@@ -296,7 +318,7 @@ export const mapBrandMe = (p: ApiBrandMe): BrandProfile => ({
   companyName: p.company_name || p.display_name,
   industry: p.industry,
   website: p.website ?? '',
-  logoUrl: p.logo_url ?? undefined,
+  logoUrl: resolveAssetUrl(p.logo_url),
   coverUrl: undefined,
   about: p.about,
   size: undefined,
@@ -308,6 +330,15 @@ export const fetchBrandMe = async (): Promise<BrandProfile> => {
   const data = await request<ApiBrandMe>('brands/me/');
   return mapBrandMe(data);
 };
+
+/** Upload (replace) the brand's logo. Returns the updated company profile. */
+export const uploadBrandLogo = async (file: File): Promise<BrandProfile> =>
+  mapBrandMe(
+    await request<ApiBrandMe>('brands/me/logo/', { method: 'PUT', formData: imageForm(file), timeoutMs: 60_000 }),
+  );
+
+export const deleteBrandLogo = async (): Promise<BrandProfile> =>
+  mapBrandMe(await request<ApiBrandMe>('brands/me/logo/', { method: 'DELETE' }));
 
 export const updateBrandMe = async (patch: Partial<{
   companyName: string;
@@ -342,7 +373,7 @@ type ApiCreatorCard = {
 export const mapCreatorCard = (c: ApiCreatorCard): CreatorProfile => ({
   id: String(c.id),
   fullName: c.name,
-  avatarUrl: c.photo_url ?? undefined,
+  avatarUrl: resolveAssetUrl(c.photo_url),
   coverUrl: undefined,
   bio: '',
   niche: nicheFromBackend(c.niche),
@@ -456,7 +487,17 @@ type ApiCampaign = {
   published_at: string | null;
   closed_at: string | null;
   created_at: string;
+  media?: ApiMedia[];
 };
+
+type ApiMedia = { id: number; kind: 'photo' | 'video'; url: string; size: number };
+
+const mapMedia = (m: ApiMedia): CampaignMedia => ({
+  id: String(m.id),
+  kind: m.kind,
+  url: m.url,
+  size: m.size,
+});
 
 type ApiCampaignCard = {
   id: number;
@@ -479,12 +520,14 @@ type ApiCampaignDetail = ApiCampaignCard & {
   all_creators_selected: boolean;
   can_apply: boolean;
   apply_blocked_reason: string | null;
+  media?: ApiMedia[];
 };
 
 export const mapCampaignCard = (c: ApiCampaignCard): Campaign => ({
   id: String(c.id),
   brandId: String(c.brand.id),
   brandName: c.brand.name,
+  brandLogoUrl: resolveAssetUrl(c.brand.logo_url),
   title: c.title,
   description: '',
   category: nicheFromBackend(c.niche),
@@ -504,6 +547,7 @@ export const mapCampaignDetail = (c: ApiCampaignDetail): Campaign => ({
   deliverables: c.deliverables,
   minFollowers: c.min_followers ?? undefined,
   status: c.status,
+  media: (c.media ?? []).map(mapMedia),
 });
 
 export const mapBrandCampaign = (c: ApiCampaign): Campaign => ({
@@ -521,6 +565,7 @@ export const mapBrandCampaign = (c: ApiCampaign): Campaign => ({
   minFollowers: c.min_followers ?? undefined,
   status: c.status,
   createdAt: c.created_at,
+  media: (c.media ?? []).map(mapMedia),
 });
 
 export type CampaignListParams = { status?: CampaignStatus };
@@ -553,6 +598,8 @@ export const fetchCreatorCampaign = async (id: string | number): Promise<{
   campaign: Campaign;
   acceptedCount: number;
   allSelected: boolean;
+  /** Server's hint that the creator's stats fit the brief; it never blocks applying. */
+  eligible: boolean;
   canApply: boolean;
   applyBlockedReason: string | null;
 }> => {
@@ -561,6 +608,7 @@ export const fetchCreatorCampaign = async (id: string | number): Promise<{
     campaign: mapCampaignDetail(data),
     acceptedCount: data.accepted_count,
     allSelected: data.all_creators_selected,
+    eligible: data.eligible,
     canApply: data.can_apply,
     applyBlockedReason: data.apply_blocked_reason,
   };
@@ -619,6 +667,22 @@ export const updateCampaign = async (
 
 export const deleteCampaign = async (id: string | number) => {
   await request('brand/campaigns/' + id + '/', { method: 'DELETE' });
+};
+
+/** Attach a photo or video to a draft campaign (2 photos, or 1 video). Uploads get a longer timeout. */
+export const uploadCampaignMedia = async (campaignId: string | number, file: File): Promise<CampaignMedia> => {
+  const form = new FormData();
+  form.append('file', file);
+  const data = await request<ApiMedia>('brand/campaigns/' + campaignId + '/media/', {
+    method: 'POST',
+    formData: form,
+    timeoutMs: 120_000,
+  });
+  return mapMedia(data);
+};
+
+export const deleteCampaignMedia = async (campaignId: string | number, mediaId: string | number) => {
+  await request('brand/campaigns/' + campaignId + '/media/' + mediaId + '/', { method: 'DELETE' });
 };
 
 export const publishCampaign = async (id: string | number): Promise<Campaign> => {
@@ -824,7 +888,16 @@ const NOTIF_KIND_TO_UI: Record<string, AppNotification['type']> = {
   account_reconnect: 'account_reconnect',
   slot_opened: 'slot_opened',
   campaign_closed: 'campaign_closed',
+  // The backend's name for a campaign closed by its deadline.
+  campaign_auto_closed: 'campaign_closed',
 };
+
+/**
+ * The backend reports "a creator withdrew an accepted proposal" as `proposal_withdrawn` with a
+ * `slot_opened` flag in the payload. Show that as its own kind so it gets the "Slot opened" title.
+ */
+const effectiveKind = (kind: string, payload: Record<string, unknown> | null): string =>
+  kind === 'proposal_withdrawn' && payload?.slot_opened === true ? 'slot_opened' : kind;
 
 const kindToTitle = (kind: string): string => {
   const map: Record<string, string> = {
@@ -836,32 +909,43 @@ const kindToTitle = (kind: string): string => {
     account_reconnect: 'Reconnect your account',
     slot_opened: 'Slot opened',
     campaign_closed: 'Campaign closed',
+    campaign_auto_closed: 'Campaign closed',
   };
   return map[kind] ?? 'Update';
 };
 
+/**
+ * Where a notification leads. Brand notifications carry a `campaign_id` (and a `proposal_id`, which
+ * is NOT a campaign), so they must link by the campaign; creator notifications link by the proposal.
+ */
 const kindToLink = (kind: string, payload: Record<string, unknown> | null): string | undefined => {
-  if (!payload) return undefined;
-  const id = payload.proposal_id ?? payload.campaign_id;
-  if (kind === 'proposal_received' || kind === 'proposal_withdrawn' || kind === 'slot_opened' || kind === 'campaign_closed') {
-    return id ? `/brand/campaigns/${id}/proposals` : '/brand/campaigns';
+  const campaignId = payload?.campaign_id;
+  const proposalId = payload?.proposal_id;
+  if (kind === 'proposal_received' || kind === 'proposal_withdrawn' || kind === 'slot_opened') {
+    return campaignId ? `/brand/campaigns/${campaignId}/proposals` : '/brand/campaigns';
+  }
+  if (kind === 'campaign_closed' || kind === 'campaign_auto_closed') {
+    return campaignId ? `/brand/campaigns/${campaignId}` : '/brand/campaigns';
   }
   if (kind === 'proposal_shortlisted' || kind === 'proposal_accepted' || kind === 'proposal_rejected') {
-    return id ? `/creator/applications/${id}` : '/creator/applications';
+    return proposalId ? `/creator/applications/${proposalId}` : '/creator/applications';
   }
   if (kind === 'account_reconnect') return '/creator/accounts';
   return undefined;
 };
 
-export const mapNotification = (n: ApiNotification): AppNotification => ({
-  id: String(n.id),
-  type: NOTIF_KIND_TO_UI[n.kind] ?? 'proposal_received',
-  title: kindToTitle(n.kind),
-  description: n.message,
-  createdAt: n.created_at,
-  read: n.is_read,
-  link: kindToLink(n.kind, n.payload),
-});
+export const mapNotification = (n: ApiNotification): AppNotification => {
+  const kind = effectiveKind(n.kind, n.payload);
+  return {
+    id: String(n.id),
+    type: NOTIF_KIND_TO_UI[kind] ?? 'proposal_received',
+    title: kindToTitle(kind),
+    description: n.message,
+    createdAt: n.created_at,
+    read: n.is_read,
+    link: kindToLink(kind, n.payload),
+  };
+};
 
 export const listNotifications = async (): Promise<{
   results: AppNotification[];
@@ -892,6 +976,8 @@ export type YouTubeStatus = {
   needsReconnect: boolean;
   connectedAt: string | null;
   lastSyncedAt: string | null;
+  /** Why the last sync could not verify the channel, e.g. 'subscribers_hidden' or 'no_channel'. */
+  lastError: string | null;
 };
 
 export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
@@ -901,6 +987,7 @@ export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
     needs_reconnect: boolean;
     connected_at: string | null;
     last_synced_at: string | null;
+    last_error?: string | null;
   }>('social/youtube/');
   return {
     connected: data.connected,
@@ -908,6 +995,7 @@ export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
     needsReconnect: data.needs_reconnect,
     connectedAt: data.connected_at,
     lastSyncedAt: data.last_synced_at,
+    lastError: data.last_error ?? null,
   };
 };
 

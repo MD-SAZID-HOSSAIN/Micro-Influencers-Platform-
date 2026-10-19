@@ -10,6 +10,7 @@ import {
 import { currency, fmtDate } from '../../lib/shared';
 import { ConfirmDialog } from '../../components/Modal';
 import { useState, useEffect } from 'react';
+import { MediaGallery } from '../../components/MediaPicker';
 import { useToast } from '../../state/ToastContext';
 import { listBrandCampaignProposals } from '../../api/endpoints';
 import { isApiError } from '../../api/client';
@@ -124,6 +125,8 @@ export default function CampaignDetailBrand() {
           <p className="text-[15px] text-ink-700 mt-4 whitespace-pre-line leading-relaxed">{c.description}</p>
         </div>
       </header>
+
+      <MediaGallery media={c.media} />
 
       <StatRow
         items={[

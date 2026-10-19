@@ -238,7 +238,7 @@ export default function CreatorDiscovery() {
                 className="card card-hover p-4 sm:p-5 group block h-full"
               >
                 <div className="flex items-start gap-3">
-                  <ChannelArt name={c.fullName} seed={c.id} height={48} className="w-12 rounded-md shrink-0" />
+                  <ChannelArt name={c.fullName} seed={c.id} imageUrl={c.avatarUrl} height={48} className="w-12 rounded-md shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
                       {c.fullName}

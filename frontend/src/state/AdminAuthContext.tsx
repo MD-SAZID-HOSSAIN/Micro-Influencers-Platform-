@@ -31,23 +31,24 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem(USER_KEY);
   }, [user]);
 
-  useEffect(() => onUnauthorized(() => setUser(null)), []);
+  useEffect(() => onUnauthorized((session) => session === 'admin' && setUser(null)), []);
 
   useEffect(() => {
     let cancelled = false;
     const rehydrate = async () => {
-      if (!getToken()) {
+      if (!getToken('admin')) {
+        setUser(null); // a saved admin record without a token is not a session
         setReady(true);
         return;
       }
       try {
-        const me = await api.fetchMe();
+        const me = await api.fetchAdminMe();
         if (cancelled) return;
         setUser(me);
       } catch (err) {
         if (cancelled) return;
         if (isApiError(err) && (err.status === 401 || err.status === 403)) {
-          setToken(null);
+          setToken(null, 'admin');
           setUser(null);
         }
       } finally {
@@ -64,7 +65,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const { access, user: u } = await api.adminLogin(input);
-      setToken(access);
+      setToken(access, 'admin');
       setUser(u);
       return u;
     } finally {
@@ -73,7 +74,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
+    setToken(null, 'admin');
     setUser(null);
   }, []);
 

@@ -5,6 +5,7 @@ from apps.core.fields import OptionalUrlField, SafeCharField
 from apps.core.validators import validate_safe_url
 from apps.social.serializers import PlatformStatsSerializer
 
+from .images import discard_upload
 from .models import BrandProfile, CreatorProfile, PortfolioItem
 from .services import completion_percent
 
@@ -64,6 +65,8 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
         if "full_name" in user_data:
             instance.user.full_name = user_data["full_name"]
             instance.user.save(update_fields=["full_name"])
+        if "photo_url" in validated_data:
+            discard_upload(instance)  # a link set by hand replaces an uploaded photo
         return super().update(instance, validated_data)
 
 
@@ -87,6 +90,11 @@ class BrandProfileSerializer(serializers.ModelSerializer):
             "logo_url",
             "about",
         ]
+
+    def update(self, instance, validated_data):
+        if "logo_url" in validated_data:
+            discard_upload(instance)  # a link set by hand replaces an uploaded logo
+        return super().update(instance, validated_data)
 
 
 class CreatorCardSerializer(serializers.Serializer):

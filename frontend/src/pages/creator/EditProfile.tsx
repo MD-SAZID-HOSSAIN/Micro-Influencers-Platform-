@@ -4,7 +4,7 @@ import {
   FormField, Input, Textarea, Select, Button, PageHeader, SectionHeader,
 } from '../../components/ui';
 import {
-  useStore, updateCreator, setCreatorPortfolio, loadCreatorProfile,
+  useStore, updateCreator, setCreatorPortfolio, loadCreatorProfile, setCreatorPhoto, removeCreatorPhoto,
 } from '../../state/Store';
 import { useToast } from '../../state/ToastContext';
 import { NICHES, PLATFORMS } from '../../lib/shared';
@@ -12,7 +12,8 @@ import {
   Trash2, Save, X, RotateCcw, ExternalLink, ArrowLeft, AlertTriangle,
   CheckCircle2, Image as ImageIcon,
 } from 'lucide-react';
-import { ImagePicker } from '../../components/ImagePicker';
+import { ProfilePictureEditor } from '../../components/ProfilePictureEditor';
+import { useAuth } from '../../state/AuthContext';
 import { ChannelArt } from '../../components/ui';
 import type { CreatorProfile } from '../../types';
 import clsx from 'clsx';
@@ -20,6 +21,7 @@ import { isApiError } from '../../api/client';
 
 export default function EditCreatorProfile() {
   const { creator } = useStore();
+  const { setAvatar } = useAuth();
   const navigate = useNavigate();
   const { push } = useToast();
   const [form, setForm] = useState<CreatorProfile | null>(creator);
@@ -94,6 +96,31 @@ export default function EditCreatorProfile() {
             </Link>
           }
         />
+
+        <section className="card p-5 sm:p-6">
+          <SectionHeader eyebrow="Photo" title="Profile photo" />
+          <div className="mt-5">
+            <ProfilePictureEditor
+              value={form.avatarUrl}
+              name={form.fullName}
+              title="Your photo"
+              hint="Brands see it next to your name in search and on proposals."
+              shape="circle"
+              onUpload={async (file) => {
+                const url = await setCreatorPhoto(file);
+                set('avatarUrl', url);
+                setAvatar(url);
+                push('Photo updated', 'success');
+              }}
+              onRemove={async () => {
+                await removeCreatorPhoto();
+                set('avatarUrl', undefined);
+                setAvatar(undefined);
+                push('Photo removed', 'info');
+              }}
+            />
+          </div>
+        </section>
 
         <section className="card p-5 sm:p-6">
           <SectionHeader eyebrow="Basics" title="Identity & niche" />

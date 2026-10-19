@@ -4,6 +4,7 @@ import { CampaignForm, validateCampaign } from './CampaignForm';
 import type { CampaignFormValues } from './CampaignForm';
 import { updateCampaign, useStore, loadBrandCampaigns } from '../../state/Store';
 import { Button, PageHeader } from '../../components/ui';
+import { MediaPicker, useMediaDraft } from '../../components/MediaPicker';
 import { useToast } from '../../state/ToastContext';
 import { isApiError } from '../../api/client';
 
@@ -27,6 +28,7 @@ export default function EditCampaign() {
   } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const media = useMediaDraft(c?.media);
 
   useEffect(() => {
     if (!c) {
@@ -81,6 +83,14 @@ export default function EditCampaign() {
     setSaving(true);
     try {
       await updateCampaign(c.id, values);
+      try {
+        await media.commit(c.id);
+      } catch (err) {
+        const reason = isApiError(err) ? err.message : 'Something went wrong.';
+        push(`Changes saved, but the photo or video did not upload: ${reason} Press Save changes to retry.`, 'error');
+        return;
+      }
+      await loadBrandCampaigns();
       push('Draft updated', 'success');
       navigate(`/brand/campaigns/${c.id}`);
     } catch (err) {
@@ -98,6 +108,7 @@ export default function EditCampaign() {
         description="Changes apply to this draft. You can publish it when ready."
       />
       {values && <CampaignForm values={values} onChange={setValues} errors={errors} />}
+      {values && <MediaPicker draft={media} disabled={saving} />}
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
         <Button variant="ghost" onClick={() => navigate('/brand/campaigns')} className="w-full sm:w-auto" disabled={saving}>
           Cancel

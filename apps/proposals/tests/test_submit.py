@@ -340,3 +340,16 @@ def test_accepted_count_and_all_creators_selected(creator, auth_client):
     ProposalFactory(campaign=campaign, status=S.ACCEPTED)
     data = auth_client(creator).get(campaign_url(campaign.pk)).json()
     assert (data["accepted_count"], data["all_creators_selected"]) == (2, True)
+
+
+# ---- suspended brands ------------------------------------------------------------------------
+
+
+def test_applying_to_a_suspended_brands_campaign_is_a_404(creator, auth_client):
+    suspended = UserFactory(role=Role.BRAND, is_active=False)
+    campaign = CampaignFactory(status=Campaign.Status.PUBLISHED, brand=suspended)
+
+    response = submit(auth_client, creator, campaign)
+
+    assert response.status_code == 404
+    assert not Proposal.objects.filter(campaign=campaign).exists()

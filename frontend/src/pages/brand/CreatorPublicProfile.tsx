@@ -55,6 +55,7 @@ export default function CreatorPublicProfile() {
           <ChannelArt
             name={creator.fullName}
             seed={creator.id}
+            imageUrl={creator.avatarUrl}
             height={88}
             className="w-20 sm:w-24 rounded-md ring-4 ring-mist-50 shrink-0"
           />

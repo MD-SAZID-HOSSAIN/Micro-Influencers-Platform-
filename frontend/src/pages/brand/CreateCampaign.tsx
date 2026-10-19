@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CampaignForm, CampaignFormValues, validateCampaign } from './CampaignForm';
-import { addCampaign, setCampaignStatus, loadBrandCampaigns, useStore, loadBrandProfile } from '../../state/Store';
+import {
+  addCampaign,
+  updateCampaign,
+  setCampaignStatus,
+  loadBrandCampaigns,
+  useStore,
+  loadBrandProfile,
+} from '../../state/Store';
 import { Button, PageHeader } from '../../components/ui';
+import { MediaPicker, useMediaDraft } from '../../components/MediaPicker';
 import { useToast } from '../../state/ToastContext';
 import { useEffect } from 'react';
 import { isApiError } from '../../api/client';
@@ -26,6 +34,10 @@ export default function CreateCampaign() {
   const [values, setValues] = useState<CampaignFormValues>(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  // Set once the brief has been saved as a draft. If publishing then fails, pressing the button
+  // again updates and publishes this draft instead of creating a second copy.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const media = useMediaDraft();
 
   useEffect(() => {
     loadBrandProfile().catch(() => undefined);
@@ -40,15 +52,36 @@ export default function CreateCampaign() {
     }
     setSubmitting(true);
     try {
-      const created = await addCampaign(values);
+      let id = draftId;
+      if (id) {
+        await updateCampaign(id, values);
+      } else {
+        id = (await addCampaign(values)).id;
+        setDraftId(id);
+      }
+      // Photos and videos go up once the campaign exists. A failure here keeps the draft and the
+      // files still waiting, so pressing the button again only retries what is missing.
+      try {
+        await media.commit(id);
+      } catch (err) {
+        const reason = isApiError(err) ? err.message : 'Something went wrong.';
+        push(`Saved as a draft, but the photo or video did not upload: ${reason} Press the button again to retry.`, 'error');
+        return;
+      }
       if (action === 'publish') {
-        await setCampaignStatus(created.id, 'published');
+        try {
+          await setCampaignStatus(id, 'published');
+        } catch (err) {
+          const reason = isApiError(err) ? err.message : 'Something went wrong.';
+          push(`Saved as a draft, but not published: ${reason} Fix it and press Publish again.`, 'error');
+          return;
+        }
         push('Campaign published', 'success');
       } else {
         push('Draft saved', 'success');
       }
       await loadBrandCampaigns();
-      navigate(`/brand/campaigns/${created.id}`);
+      navigate(`/brand/campaigns/${id}`);
     } catch (err) {
       const msg = isApiError(err) ? err.message : 'Could not create campaign.';
       push(msg, 'error');
@@ -65,6 +98,7 @@ export default function CreateCampaign() {
         description="Save as a draft to keep editing, or publish to start receiving proposals."
       />
       <CampaignForm values={values} onChange={setValues} errors={errors} />
+      <MediaPicker draft={media} disabled={submitting} />
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
         <Button variant="ghost" onClick={() => navigate('/brand/campaigns')} className="w-full sm:w-auto" disabled={submitting}>
           Cancel

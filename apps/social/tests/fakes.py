@@ -40,6 +40,8 @@ class FakeYouTubeClient:
         self.fetch_calls: list[str] = []
         self.refresh_calls: list[str] = []
         self.exchange_calls: list[str] = []
+        self.revoked: list[str] = []
+        self.revoke_error: Exception | None = None
         # video statistics (FR-23 content performance): id -> VideoStats, or an exception per batch
         self.video_results: dict[str, object] = {}
         self.video_batch_errors: list[Exception | None] = []  # consumed one per call, in order
@@ -55,6 +57,11 @@ class FakeYouTubeClient:
     def refresh_access_token(self, refresh_token):
         self.refresh_calls.append(refresh_token)
         return self._result(self.refresh_result)
+
+    def revoke_token(self, token):
+        if self.revoke_error is not None:
+            raise self.revoke_error
+        self.revoked.append(token)
 
     def fetch_channel(self, access_token):
         self.fetch_calls.append(access_token)

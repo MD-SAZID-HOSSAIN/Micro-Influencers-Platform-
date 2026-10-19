@@ -9,7 +9,23 @@ from apps.core.choices import Niche, Platform
 from apps.core.fields import SafeCharField
 
 from .eligibility import is_eligible
-from .models import MAX_CREATORS_NEEDED, Campaign
+from .models import MAX_CREATORS_NEEDED, Campaign, CampaignMedia
+
+
+class CampaignMediaSerializer(serializers.ModelSerializer):
+    """A photo or video attached to a campaign brief, with a link the browser can open."""
+
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CampaignMedia
+        fields = ["id", "kind", "url", "size"]
+        read_only_fields = fields
+
+    def get_url(self, media) -> str:
+        url = media.file.url
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
 
 
 class CampaignSerializer(serializers.ModelSerializer):
@@ -25,6 +41,7 @@ class CampaignSerializer(serializers.ModelSerializer):
         min_value=1, max_value=MAX_CREATORS_NEEDED, default=1
     )
     min_followers = serializers.IntegerField(min_value=0, allow_null=True, required=False)
+    media = CampaignMediaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Campaign
@@ -39,6 +56,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             "deliverables",
             "creators_needed",
             "min_followers",
+            "media",
             "status",
             "published_at",
             "closed_at",
@@ -107,12 +125,14 @@ class CampaignDetailSerializer(CampaignCardSerializer):
     all_creators_selected = serializers.SerializerMethodField()
     can_apply = serializers.SerializerMethodField()
     apply_blocked_reason = serializers.SerializerMethodField()
+    media = CampaignMediaSerializer(many=True, read_only=True)
 
     class Meta(CampaignCardSerializer.Meta):
         fields = CampaignCardSerializer.Meta.fields + [
             "description",
             "deliverables",
             "min_followers",
+            "media",
             "status",
             "accepted_count",
             "all_creators_selected",

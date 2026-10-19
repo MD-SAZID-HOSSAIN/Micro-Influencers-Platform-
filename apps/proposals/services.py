@@ -57,7 +57,11 @@ def submit_proposal(
     with transaction.atomic():
         campaign = (
             Campaign.objects.select_for_update()
-            .filter(pk=campaign_id, status__in=[Campaign.Status.PUBLISHED, Campaign.Status.CLOSED])
+            .filter(
+                pk=campaign_id,
+                status__in=[Campaign.Status.PUBLISHED, Campaign.Status.CLOSED],
+                brand__is_active=True,  # a suspended brand's campaigns take no proposals
+            )
             .first()
         )
         if campaign is None:
