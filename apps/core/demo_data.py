@@ -210,11 +210,43 @@ def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
     return len(created), len(proposals)
 
 
+def _apply_verification() -> None:
+    """Make the demo accounts follow the verification rules (and repair data seeded before them).
+
+    Brands need a verified email to publish and accept. Creators need a connected YouTube channel
+    (Verified stats) to apply: every fifth demo creator (005, 010, ...) is left without one, so the
+    blocked state can be tried. Safe to repeat.
+    """
+    User.objects.filter(username__startswith=BRAND_PREFIX, email_verified=False).update(email_verified=True)
+
+    now = timezone.now()
+    for user in User.objects.filter(username__startswith=CREATOR_PREFIX):
+        index = int(user.username.removeprefix(CREATOR_PREFIX))
+        if index % 5 == 0:
+            PlatformStats.objects.filter(creator=user, platform=Platform.YOUTUBE).update(is_verified=False)
+            continue
+        rng = _rng(f"creator-youtube-{index}")
+        stats, created = PlatformStats.objects.get_or_create(
+            creator=user,
+            platform=Platform.YOUTUBE,
+            defaults={
+                "followers": rng.randint(1_000, 100_000),
+                "engagement_rate": Decimal(rng.randint(80, 900)) / 100,
+                "is_verified": True,
+                "last_synced_at": now,
+            },
+        )
+        if not created and not stats.is_verified:
+            stats.is_verified = True
+            stats.save(update_fields=["is_verified", "updated_at"])
+
+
 def seed(*, creators: int = 200, brands: int = 20, campaigns: int = 100) -> dict[str, int]:
     """Top the demo data up to the requested sizes. Returns how many of each were created."""
     hashed = make_password(DEMO_PASSWORD)
     new_creators = _seed_creators(creators, hashed)
     new_brands = _seed_brands(brands, hashed)
+    _apply_verification()
     new_campaigns, new_proposals = _seed_campaigns_and_proposals(campaigns)
     return {
         "creators": new_creators,

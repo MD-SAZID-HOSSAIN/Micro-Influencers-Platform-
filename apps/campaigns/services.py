@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.verification import require_verified_brand
 from apps.core.exceptions import Conflict, DomainError
 from apps.notifications.models import Kind
 from apps.notifications.services import notify
@@ -29,7 +30,8 @@ def _locked(campaign: Campaign) -> Campaign:
 
 
 def publish_campaign(campaign: Campaign) -> Campaign:
-    """Draft -> Published. The deadline must still be in the future."""
+    """Draft -> Published. The brand's email must be verified and the deadline still in the future."""
+    require_verified_brand(campaign.brand)
     with transaction.atomic():
         locked = _locked(campaign)
         if locked.status != Campaign.Status.DRAFT:

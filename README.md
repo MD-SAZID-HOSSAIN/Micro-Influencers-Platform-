@@ -137,6 +137,17 @@ action (suspend, reactivate, delete, close a campaign, remove a review) needs a 
 recorded in `GET /api/v1/admin/actions/`. Through the API, admins sign in at
 `POST /api/v1/admin/auth/login/`.
 
+## Who can publish, accept and apply
+
+- A **brand** must have a **verified email** to publish a campaign or accept a proposal (otherwise 403
+  `brand_email_unverified`). The 6-digit code is emailed after registration; in development it is printed in
+  the backend terminal.
+- A **creator** must have a **connected YouTube channel** (Verified stats) to apply to a campaign (otherwise
+  403 `creator_youtube_required`). Manually entered stats do not count.
+- Everything else (logging in, browsing, editing profiles, saving drafts) is open to unverified accounts.
+- This is stricter than the PRD; see `docs/DECISIONS.md`. `seed_demo` gives demo brands a verified email and
+  every demo creator except each fifth one (`demo_creator_005`, `010`, ...) a verified YouTube channel.
+
 ## Photos and videos on campaigns
 
 While a campaign is a **draft**, its brand can attach **up to 2 photos or 1 video** (never both):

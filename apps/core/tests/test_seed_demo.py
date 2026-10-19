@@ -88,14 +88,40 @@ def test_demo_data_does_not_depend_on_python_hash_randomisation(db, debug_on):
 
 def test_each_demo_user_is_the_same_regardless_of_how_many_were_seeded(db, debug_on):
     seed(creators=10, brands=1, campaigns=0)
-    niche = CreatorProfile.objects.get(user__username="demo_creator_003").niche
-    followers = PlatformStats.objects.get(creator__username="demo_creator_003").followers
+    profile = CreatorProfile.objects.get(user__username="demo_creator_003")
+    niche = profile.niche
+    stats = PlatformStats.objects.filter(creator=profile.user, platform=profile.primary_platform)
+    followers = stats.get().followers
     User.objects.filter(username__startswith="demo_").delete()
 
     seed(creators=30, brands=1, campaigns=0)
 
-    assert CreatorProfile.objects.get(user__username="demo_creator_003").niche == niche
-    assert PlatformStats.objects.get(creator__username="demo_creator_003").followers == followers
+    profile = CreatorProfile.objects.get(user__username="demo_creator_003")
+    assert profile.niche == niche
+    stats = PlatformStats.objects.filter(creator=profile.user, platform=profile.primary_platform)
+    assert stats.get().followers == followers
+
+
+def test_demo_brands_are_email_verified_and_demo_creators_have_youtube_except_every_fifth(db, debug_on):
+    seed(creators=10, brands=3, campaigns=0)
+
+    assert not User.objects.filter(role=Role.BRAND, email_verified=False).exists()
+    for i in range(1, 11):
+        verified = PlatformStats.objects.filter(
+            creator__username=f"demo_creator_{i:03d}", platform="youtube", is_verified=True
+        ).exists()
+        assert verified == (i % 5 != 0), i
+
+
+def test_seeding_again_repairs_accounts_created_before_the_verification_rules(db, debug_on):
+    seed(creators=5, brands=2, campaigns=0)
+    User.objects.filter(role=Role.BRAND).update(email_verified=False)
+    PlatformStats.objects.filter(platform="youtube").delete()
+
+    seed(creators=5, brands=2, campaigns=0)
+
+    assert not User.objects.filter(role=Role.BRAND, email_verified=False).exists()
+    assert PlatformStats.objects.filter(creator__username="demo_creator_001", platform="youtube", is_verified=True).exists()
 
 
 # ---- the data respects the product's rules --------------------------------------------------------------

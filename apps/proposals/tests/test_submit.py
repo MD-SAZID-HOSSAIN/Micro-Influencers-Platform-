@@ -40,7 +40,7 @@ def body(**overrides):
 
 @pytest.fixture
 def creator(db):
-    return UserFactory(role=Role.CREATOR, full_name="Amina Rahman")
+    return UserFactory(role=Role.CREATOR, full_name="Amina Rahman", youtube_verified=True)
 
 
 @pytest.fixture
@@ -131,7 +131,7 @@ def test_resubmitting_after_withdrawal_on_a_closed_campaign_is_blocked(creator, 
 def test_two_simultaneous_submits_create_exactly_one_active_proposal(transactional_db):  # RF4
     if connection.vendor == "sqlite":
         pytest.skip("Requires PostgreSQL row locks; SQLite table locks on concurrent threads")
-    creator = UserFactory(role=Role.CREATOR)
+    creator = UserFactory(role=Role.CREATOR, youtube_verified=True)
     campaign = CampaignFactory(status=Campaign.Status.PUBLISHED)
 
     def attempt(_):

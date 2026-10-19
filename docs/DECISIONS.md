@@ -94,6 +94,25 @@ line of code, and the tests that pin them sit next to the code.
 - finding 9 — the campaign view counter is one INSERT ... ON CONFLICT DO UPDATE statement (PostgreSQL), so there is one query and no race — cost if wrong: the counter now requires PostgreSQL (already required).
 - finding 10 — the daily YouTube sync spreads connections evenly over YOUTUBE_SYNC_SPREAD_SECONDS (default 1800) using task countdowns, ordered by id — cost if wrong: a creator's stats can refresh up to 30 minutes after 03:00 UTC.
 
+## Verification gates: a change from the PRD
+
+- **Brands need a verified email to publish a campaign or accept a proposal.** `publish_campaign` and
+  `accept_proposal` answer 403 `brand_email_unverified` otherwise. Saving, editing and deleting drafts,
+  shortlisting and rejecting stay open.
+- **Creators need a connected YouTube channel to apply.** `submit_proposal` answers 403
+  `creator_youtube_required` unless the creator has YouTube stats with `is_verified = true`. Manual stats
+  (any platform, including a hand-typed YouTube entry) do not count, and the channel works for campaigns on
+  any platform. Disconnecting YouTube marks the stats Unverified, so it removes the right to apply. A creator's
+  email verification does not replace this.
+- **Why this differs from the PRD:** FR-02, FR-10 and FR-24 say unverified users can use the platform and that
+  unverified stats still count towards applying. The owner chose stricter rules to keep fake or throwaway
+  accounts out of the marketplace.
+- **Cost if wrong:** while Google keeps the app in Testing mode only registered test users can connect
+  YouTube (and their tokens expire after 7 days), so most real creators cannot apply until the app is
+  verified by Google. A brand also depends on email delivery working to verify.
+- The checks live in `apps/accounts/verification.py`. `seed_demo` makes demo brands email-verified and gives
+  every demo creator except each fifth one (`demo_creator_005`, `_010`, ...) a verified YouTube channel.
+
 ## Known gaps and things deliberately left alone
 
 - **Suspended accounts keep their content.** Suspending blocks login and invalidates tokens (and stops

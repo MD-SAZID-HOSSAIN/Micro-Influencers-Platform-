@@ -14,7 +14,7 @@ class ProposalFactory(factory.django.DjangoModelFactory):
         model = Proposal
 
     campaign = factory.SubFactory(CampaignFactory, status=Campaign.Status.PUBLISHED)
-    creator = factory.SubFactory(UserFactory, role=Role.CREATOR)
+    creator = factory.SubFactory(UserFactory, role=Role.CREATOR, youtube_verified=True)
     status = Proposal.Status.PENDING
     cover_message = "I would love to work with you."
     proposed_rate = Decimal("300.00")

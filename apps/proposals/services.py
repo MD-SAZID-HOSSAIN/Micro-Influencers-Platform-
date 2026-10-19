@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.accounts.models import User
+from apps.accounts.verification import require_verified_brand, require_verified_creator
 from apps.campaigns.models import Campaign
 from apps.core.exceptions import Conflict
 from apps.notifications.models import Kind
@@ -48,12 +49,13 @@ def submit_proposal(
     portfolio_links: list[str],
     experience_note: str,
 ) -> Proposal:
-    """Apply to a campaign.
+    """Apply to a campaign. Only creators with a connected YouTube channel may apply.
 
     The campaign row is locked so simultaneous submits are handled one at a time; the
     partial unique constraint is the backstop. The deadline is checked here as well as by
     the auto-close job, which only runs every few minutes.
     """
+    require_verified_creator(creator)
     with transaction.atomic():
         campaign = (
             Campaign.objects.select_for_update()
@@ -195,7 +197,9 @@ def accept_proposal(*, brand: User, proposal_id: int) -> Proposal:
     """Accept a Pending or Shortlisted proposal, never beyond the campaign's Creators Needed.
 
     The campaign row is locked first, so simultaneous accepts are counted one at a time.
+    The brand's email must be verified.
     """
+    require_verified_brand(brand)
     return _transition(
         brand=brand,
         proposal_id=proposal_id,

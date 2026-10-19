@@ -196,8 +196,14 @@ The user object (also returned by `GET /auth/me/`):
 - Code errors (all 400): `invalid_verification_code`, `verification_code_expired` (10 minutes),
   `verification_code_used`, `verification_code_locked` (5 wrong tries; ask for a new code).
 
-Verification does **not** block anything in the API. It decides whether notification emails are sent
-(section 7.2). Show a gentle "verify your email" banner while `email_verified` is `false`.
+An unverified **brand** cannot publish a campaign or accept a proposal: those calls return 403 with code
+`brand_email_unverified`. Everything else works unverified (drafts, shortlisting, rejecting, browsing).
+For everyone, verification also decides whether notification emails are sent (section 7.2). Show a
+"verify your email" banner while `email_verified` is `false`.
+
+A **creator** cannot apply unless a YouTube channel is connected (YouTube stats with `is_verified: true`):
+`POST /campaigns/{id}/proposals/` returns 403 with code `creator_youtube_required`. Send them to the
+connections page to connect YouTube. Email verification does not unlock applying.
 
 ### 4.3 Log in
 

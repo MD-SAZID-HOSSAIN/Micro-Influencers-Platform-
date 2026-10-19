@@ -214,7 +214,11 @@ export default function AppShell() {
           <div className="container-page py-2.5 flex items-center justify-between gap-3 text-sm">
             <span className="text-amber-900 inline-flex items-center gap-2">
               <Mail className="w-4 h-4 text-amber-600" />
-              <span><strong>Verify your email</strong> to receive notification emails.</span>
+              {user.role === 'brand' ? (
+                <span><strong>Verify your email</strong> to publish campaigns and accept proposals.</span>
+              ) : (
+                <span><strong>Verify your email</strong> to receive notification emails.</span>
+              )}
             </span>
             <Link
               to="/verify-email"
