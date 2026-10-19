@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, ArrowRight, ArrowUpRight, Inbox, Sparkles } fr
 import { useEffect, useMemo, useState } from 'react';
 import { useStore, loadBrandCampaigns, setBrandProposals, updateProposalStatus } from '../../state/Store';
 import { listBrandCampaignProposals } from '../../api/endpoints';
-import { Button, EmptyState, ProposalStatusBadge, ChannelArt, PageHeader, StatRow } from '../../components/ui';
+import { Button, EmptyState, ProposalStatusBadge, ProfileTile, PageHeader, StatRow } from '../../components/ui';
 import { fmtNumber, fmtRelativeTime, currency } from '../../lib/shared';
 import type { Proposal, ProposalStatus } from '../../types';
 import { ConfirmDialog } from '../../components/Modal';
@@ -168,7 +168,7 @@ export default function ProposalManagement() {
             <li key={p.id}>
               <article className="card p-4 sm:p-5">
                 <div className="flex items-start gap-3 sm:gap-4 flex-wrap">
-                  <ChannelArt name={p.creatorName} seed={p.creatorId} height={48} className="w-12 rounded-md shrink-0" />
+                  <ProfileTile name={p.creatorName} seed={p.creatorId} height={48} className="w-12 rounded-md shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link to={`/brand/creators/${p.creatorId}`} className="font-semibold text-ink-900 hover:text-brand-600 transition-colors">

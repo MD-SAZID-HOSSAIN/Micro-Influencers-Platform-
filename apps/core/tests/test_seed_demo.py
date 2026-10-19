@@ -225,3 +225,38 @@ def _index_columns(table):
 )
 def test_the_indexes_the_list_queries_rely_on_exist(db, table, columns):
     assert columns in _index_columns(table)
+
+
+def test_the_verification_step_uses_a_handful_of_queries_however_many_creators_there_are(
+    db, debug_on, django_assert_max_num_queries
+):
+    from apps.core import demo_data
+
+    seed(creators=40, brands=3, campaigns=0)
+    PlatformStats.objects.filter(platform="youtube").delete()  # force it to create the missing rows
+    User.objects.filter(role=Role.BRAND).update(email_verified=False)
+
+    with django_assert_max_num_queries(8):
+        demo_data._apply_verification()
+
+    for i in range(1, 41):
+        verified = PlatformStats.objects.filter(
+            creator__username=f"demo_creator_{i:03d}", platform="youtube", is_verified=True
+        ).exists()
+        assert verified == (i % 5 != 0), i
+    assert not User.objects.filter(role=Role.BRAND, email_verified=False).exists()
+
+
+def test_the_verification_step_gives_the_same_youtube_numbers_every_time(db, debug_on):
+    from apps.core import demo_data
+
+    seed(creators=12, brands=1, campaigns=0)
+    PlatformStats.objects.filter(platform="youtube").delete()
+    demo_data._apply_verification()
+    first = dict(PlatformStats.objects.filter(platform="youtube").values_list("creator__username", "followers"))
+    PlatformStats.objects.filter(platform="youtube").delete()
+
+    demo_data._apply_verification()
+
+    second = dict(PlatformStats.objects.filter(platform="youtube").values_list("creator__username", "followers"))
+    assert first == second and len(first) == 10  # 12 creators, minus demo_creator_005 and _010

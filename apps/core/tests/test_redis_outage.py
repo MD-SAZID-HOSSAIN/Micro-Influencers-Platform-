@@ -76,7 +76,7 @@ def test_the_admin_login_works_while_the_cache_is_down(db, redis_down):
 
 
 def test_authenticated_throttled_endpoints_also_keep_working(db, redis_down, auth_client):
-    user = UserFactory()
+    user = UserFactory(role=Role.BRAND, email_verified=False)  # only brands verify their email
 
     response = auth_client(user).post("/api/v1/auth/email/resend/")
 

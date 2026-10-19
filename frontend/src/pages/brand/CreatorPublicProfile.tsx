@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, MapPin, Megaphone, Star } from 'lucide-react';
 import { useAsyncLoader } from '../../state/useEffectAsync';
 import { fetchCreatorDetail, listCreatorReviews, type Review } from '../../api/endpoints';
 import {
-  Button, VerifiedBadge, ChannelArt, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
+  Button, VerifiedBadge, ChannelArt, ProfileTile, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
 import { fmtNumber, currency, fmtDate, fmtRelativeTime } from '../../lib/shared';
 import { useEffect, useState } from 'react';
@@ -52,7 +52,7 @@ export default function CreatorPublicProfile() {
       <div className="card overflow-hidden">
         <ChannelArt name={creator.fullName} seed={creator.id} height={120} className="rounded-none" />
         <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end gap-4 -mt-10 sm:-mt-12">
-          <ChannelArt
+          <ProfileTile
             name={creator.fullName}
             seed={creator.id}
             imageUrl={creator.avatarUrl}

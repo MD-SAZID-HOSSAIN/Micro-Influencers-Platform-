@@ -25,6 +25,14 @@ class AlreadyVerified(Conflict):
     default_detail = "Your email address is already verified."
 
 
+class EmailVerificationBrandsOnly(DomainError):
+    status_code = 403
+    default_code = "email_verification_brands_only"
+    default_detail = (
+        "Email verification is only for brand accounts. Creators are verified by connecting YouTube."
+    )
+
+
 class ResendCooldown(DomainError):
     status_code = 429
     default_code = "resend_cooldown"
@@ -63,7 +71,8 @@ def register_user(
     except IntegrityError:
         # Lost a race against a concurrent registration of the same email/username.
         raise Conflict("Email or username is already in use.")
-    request_email_verification(user)
+    if role == Role.BRAND:  # creators are verified by connecting YouTube, not by email
+        request_email_verification(user)
     return user
 
 
@@ -131,7 +140,9 @@ def request_email_verification(user: User) -> str:
 
 
 def resend_email_verification(user: User) -> str:
-    """Send a new verification code, at most one per minute."""
+    """Send a new verification code to a brand, at most one per minute."""
+    if user.role != Role.BRAND:
+        raise EmailVerificationBrandsOnly()
     if user.email_verified:
         raise AlreadyVerified()
     latest = (
@@ -145,7 +156,9 @@ def resend_email_verification(user: User) -> str:
 
 
 def verify_email(user: User, code: str) -> User:
-    """Mark the address verified if ``code`` is the user's current valid verification code."""
+    """Mark a brand's address verified if ``code`` is the user's current valid verification code."""
+    if user.role != Role.BRAND:
+        raise EmailVerificationBrandsOnly()
     verify_code(user, CodePurpose.EMAIL_VERIFICATION, code)
     User.objects.filter(pk=user.pk).update(email_verified=True)
     user.email_verified = True

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useStore, loadCreatorProfile, profileCompletion } from '../../state/Store';
 import { fmtNumber, fmtDate, currency } from '../../lib/shared';
 import {
-  PlatformIcon, ChannelArt, VerifiedBadge, StatRow, SectionHeader, PageHeader,
+  PlatformIcon, ChannelArt, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader,
 } from '../../components/ui';
 import { CheckCircle2, MapPin, ArrowUpRight, Pencil, Link as LinkIcon, Plus, Sparkles, Youtube } from 'lucide-react';
 
@@ -77,20 +77,13 @@ export default function CreatorProfile() {
           )}
           <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-10 sm:-mt-12">
             <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 min-w-0">
-              {creator.avatarUrl ? (
-                <img
-                  src={creator.avatarUrl}
-                  alt={creator.fullName}
-                  className="w-20 sm:w-24 h-20 sm:h-24 rounded-md object-cover ring-4 ring-mist-50 shrink-0"
-                />
-              ) : (
-                <ChannelArt
-                  name={creator.fullName}
-                  seed={creator.id}
-                  height={88}
-                  className="w-20 sm:w-24 rounded-md ring-4 ring-mist-50 shrink-0"
-                />
-              )}
+              <ProfileTile
+                name={creator.fullName}
+                seed={creator.id}
+                imageUrl={creator.avatarUrl}
+                height={96}
+                className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-md ring-4 ring-mist-50 shrink-0"
+              />
               <div className="min-w-0 pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-display text-xl sm:text-2xl md:text-3xl text-ink-900 tracking-[-0.02em] leading-tight break-words">

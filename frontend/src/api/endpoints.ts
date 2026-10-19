@@ -1064,6 +1064,9 @@ export type CreatorDashboardData = {
   profileCompletion: number;
   youtube: { connected: boolean; status: ConnectedAccount['status'] | null; needsReconnect: boolean; lastSyncedAt: string | null; isOutdated: boolean };
   availableCampaigns: Campaign[];
+  /** Counts over every proposal (the `applications` list below is only the newest few). */
+  pendingCount: number;
+  shortlistedCount: number;
   applications: MyProposal[];
   acceptedCampaigns: MyProposal[];
   performance: { proposalsSent: number; accepted: number; acceptanceRate: number | null };
@@ -1079,6 +1082,8 @@ type ApiCreatorDashboard = {
     is_outdated: boolean;
   };
   available_campaigns: ApiCampaignCard[];
+  pending_count?: number;
+  shortlisted_count?: number;
   applications: ApiMyProposal[];
   accepted_campaigns: ApiMyProposal[];
   performance: { proposals_sent: number; accepted: number; acceptance_rate: number | null };
@@ -1096,6 +1101,8 @@ export const fetchCreatorDashboard = async (): Promise<CreatorDashboardData> => 
       isOutdated: data.youtube.is_outdated,
     },
     availableCampaigns: data.available_campaigns.map(mapCampaignCard),
+    pendingCount: data.pending_count ?? data.applications.filter((p) => p.status === 'pending').length,
+    shortlistedCount: data.shortlisted_count ?? data.applications.filter((p) => p.status === 'shortlisted').length,
     applications: data.applications.map(mapMyProposal),
     acceptedCampaigns: data.accepted_campaigns.map(mapMyProposal),
     performance: {
@@ -1110,14 +1117,20 @@ export type BrandDashboardData = {
   totalCampaigns: number;
   activeCampaigns: number;
   totalProposals: number;
+  pendingCount: number;
   shortlistedCount: number;
   acceptedCount: number;
+  /** Over every campaign, not just the listed ones. */
+  draftCount: number;
+  firstDraftId: number | null;
+  busiestCampaign: { id: number; title: string; pendingCount: number } | null;
   campaigns: Array<{
     id: number;
     title: string;
     status: CampaignStatus;
     proposalsUrl: string;
     proposalCount: number;
+    pendingCount: number;
     acceptedCount: number;
     creatorsNeeded: number;
   }>;
@@ -1127,14 +1140,19 @@ type ApiBrandDashboard = {
   total_campaigns: number;
   active_campaigns: number;
   total_proposals: number;
+  pending_count?: number;
   shortlisted_count: number;
   accepted_count: number;
+  draft_count?: number;
+  first_draft_id?: number | null;
+  busiest_campaign?: { id: number; title: string; pending_count: number } | null;
   campaigns: Array<{
     id: number;
     title: string;
     status: CampaignStatus;
     proposals_url: string;
     proposal_count: number;
+    pending_count?: number;
     accepted_count: number;
     creators_needed: number;
   }>;
@@ -1146,14 +1164,21 @@ export const fetchBrandDashboard = async (): Promise<BrandDashboardData> => {
     totalCampaigns: data.total_campaigns,
     activeCampaigns: data.active_campaigns,
     totalProposals: data.total_proposals,
+    pendingCount: data.pending_count ?? 0,
     shortlistedCount: data.shortlisted_count,
     acceptedCount: data.accepted_count,
+    draftCount: data.draft_count ?? data.campaigns.filter((c) => c.status === 'draft').length,
+    firstDraftId: data.first_draft_id ?? data.campaigns.find((c) => c.status === 'draft')?.id ?? null,
+    busiestCampaign: data.busiest_campaign
+      ? { id: data.busiest_campaign.id, title: data.busiest_campaign.title, pendingCount: data.busiest_campaign.pending_count }
+      : null,
     campaigns: data.campaigns.map((c) => ({
       id: c.id,
       title: c.title,
       status: c.status,
       proposalsUrl: c.proposals_url,
       proposalCount: c.proposal_count,
+      pendingCount: c.pending_count ?? 0,
       acceptedCount: c.accepted_count,
       creatorsNeeded: c.creators_needed,
     })),

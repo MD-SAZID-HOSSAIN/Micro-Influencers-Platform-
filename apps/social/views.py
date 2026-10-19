@@ -31,6 +31,8 @@ from .serializers import (
     YouTubeStatusSerializer,
 )
 from .services import (
+    DIRECT_ACCESS_TOKEN,
+    DIRECT_REFRESH_TOKEN,
     ConnectError,
     complete_connect,
     connection_status,
@@ -83,24 +85,6 @@ class YouTubeRefreshView(APIView):
 
     @extend_schema(tags=["Social"], request=None, responses={202: None})
     def post(self, request):
-        stats = PlatformStats.objects.filter(creator=request.user, platform="youtube").first()
-        connection = YouTubeConnection.objects.filter(creator=request.user).first()
-
-        # If this is a direct/public channel connection, refresh live immediately
-        if stats and stats.handle_url and connection and "direct-token" in (connection.access_token_enc or ""):
-            from .youtube_public import fetch_public_channel
-            live = fetch_public_channel(stats.handle_url)
-            if live.get("success"):
-                stats.followers = live["subscribers"]
-                stats.handle_url = live["canonical_url"]
-                stats.last_synced_at = timezone.now()
-                stats.is_verified = True
-                stats.is_outdated = False
-                stats.save()
-            connection.last_manual_refresh_at = timezone.now()
-            connection.save(update_fields=["last_manual_refresh_at"])
-            return Response({"detail": "Refresh completed."}, status=status.HTTP_202_ACCEPTED)
-
         request_manual_refresh(request.user)
         return Response({"detail": "Refresh scheduled."}, status=status.HTTP_202_ACCEPTED)
 
@@ -223,11 +207,11 @@ class YouTubeDirectConnectView(GenericAPIView):
                     clean_handle_url = norm_url
 
         try:
-            access_enc = encrypt("direct-token")
-            refresh_enc = encrypt("direct-refresh")
+            access_enc = encrypt(DIRECT_ACCESS_TOKEN)
+            refresh_enc = encrypt(DIRECT_REFRESH_TOKEN)
         except Exception:
-            access_enc = "direct-token-plain"
-            refresh_enc = "direct-refresh-plain"
+            access_enc = f"{DIRECT_ACCESS_TOKEN}-plain"
+            refresh_enc = f"{DIRECT_REFRESH_TOKEN}-plain"
 
         YouTubeConnection.objects.update_or_create(
             creator=request.user,

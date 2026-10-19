@@ -32,10 +32,32 @@ def test_empty_brand_dashboard_is_all_zero(brand, auth_client):
         "total_campaigns": 0,
         "active_campaigns": 0,
         "total_proposals": 0,
+        "pending_count": 0,
         "shortlisted_count": 0,
         "accepted_count": 0,
+        "draft_count": 0,
+        "first_draft_id": None,
+        "busiest_campaign": None,
         "campaigns": [],
     }
+
+
+def test_pending_count_is_the_proposals_still_waiting_for_a_first_decision(brand, auth_client):
+    campaign = campaign_of(brand, creators_needed=5)
+    other = campaign_of(brand, Campaign.Status.CLOSED)
+    for _ in range(2):
+        ProposalFactory(campaign=campaign, status=S.PENDING)
+    ProposalFactory(campaign=other, status=S.PENDING)
+    for status in (S.SHORTLISTED, S.ACCEPTED, S.REJECTED):
+        ProposalFactory(campaign=campaign, status=status)
+    ProposalFactory(campaign=campaign, status=S.WITHDRAWN)
+    ProposalFactory(campaign=CampaignFactory(status=Campaign.Status.PUBLISHED), status=S.PENDING)  # another brand
+
+    body = dashboard(auth_client, brand)
+
+    assert body["pending_count"] == 3
+    per_campaign = {row["id"]: row["pending_count"] for row in body["campaigns"]}
+    assert per_campaign == {campaign.id: 2, other.id: 1}
 
 
 def test_active_campaigns_counts_only_published(brand, auth_client):
@@ -95,6 +117,7 @@ def test_campaign_rows_link_to_each_proposal_list_newest_first(brand, auth_clien
         "status": "published",
         "proposals_url": f"/api/v1/brand/campaigns/{older.id}/proposals/",
         "proposal_count": 3,
+        "pending_count": 1,
         "accepted_count": 1,
         "creators_needed": 3,
     }
@@ -146,3 +169,36 @@ def test_query_count_is_constant_for_twenty_campaigns(brand, auth_client, django
         response = client.get(URL)
 
     assert len(response.json()["campaigns"]) == 20
+
+
+def test_attention_fields_cover_every_campaign_not_just_the_fifty_listed(brand, auth_client):
+    oldest = campaign_of(brand, Campaign.Status.PUBLISHED, title="Oldest")
+    old_draft = campaign_of(brand, Campaign.Status.DRAFT, title="Old draft")
+    ProposalFactory(campaign=oldest, status=S.PENDING)
+    ProposalFactory(campaign=oldest, status=S.PENDING)
+    for _ in range(52):  # the 50 newest rows are all these, so the two above are not listed
+        campaign_of(brand, Campaign.Status.CLOSED)
+
+    body = dashboard(auth_client, brand)
+
+    listed = {row["id"] for row in body["campaigns"]}
+    assert len(listed) == 50 and oldest.id not in listed and old_draft.id not in listed
+    assert body["busiest_campaign"] == {"id": oldest.id, "title": "Oldest", "pending_count": 2}
+    assert body["draft_count"] == 1
+    assert body["first_draft_id"] == old_draft.id
+
+
+def test_busiest_campaign_is_the_one_with_most_pending_proposals_and_ignores_other_brands(brand, auth_client):
+    quiet = campaign_of(brand, title="Quiet")
+    busy = campaign_of(brand, title="Busy")
+    ProposalFactory(campaign=quiet, status=S.PENDING)
+    for _ in range(3):
+        ProposalFactory(campaign=busy, status=S.PENDING)
+    ProposalFactory(campaign=busy, status=S.SHORTLISTED)  # not pending
+    stranger = CampaignFactory(status=Campaign.Status.PUBLISHED)
+    for _ in range(9):
+        ProposalFactory(campaign=stranger, status=S.PENDING)
+
+    assert dashboard(auth_client, brand)["busiest_campaign"] == {
+        "id": busy.id, "title": "Busy", "pending_count": 3,
+    }

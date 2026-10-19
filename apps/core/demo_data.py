@@ -220,25 +220,36 @@ def _apply_verification() -> None:
     User.objects.filter(username__startswith=BRAND_PREFIX, email_verified=False).update(email_verified=True)
 
     now = timezone.now()
-    for user in User.objects.filter(username__startswith=CREATOR_PREFIX):
-        index = int(user.username.removeprefix(CREATOR_PREFIX))
-        if index % 5 == 0:
-            PlatformStats.objects.filter(creator=user, platform=Platform.YOUTUBE).update(is_verified=False)
+    numbers = {
+        user_id: int(username.removeprefix(CREATOR_PREFIX))
+        for user_id, username in User.objects.filter(username__startswith=CREATOR_PREFIX).values_list("id", "username")
+    }
+    without_youtube = [user_id for user_id, n in numbers.items() if n % 5 == 0]
+    with_youtube = [user_id for user_id, n in numbers.items() if n % 5 != 0]
+    youtube = PlatformStats.objects.filter(platform=Platform.YOUTUBE)
+
+    youtube.filter(creator_id__in=without_youtube, is_verified=True).update(is_verified=False, updated_at=now)
+    existing = dict(youtube.filter(creator_id__in=with_youtube).values_list("creator_id", "is_verified"))
+    youtube.filter(creator_id__in=[c for c, verified in existing.items() if not verified]).update(
+        is_verified=True, updated_at=now
+    )
+
+    missing = []
+    for user_id in with_youtube:
+        if user_id in existing:
             continue
-        rng = _rng(f"creator-youtube-{index}")
-        stats, created = PlatformStats.objects.get_or_create(
-            creator=user,
-            platform=Platform.YOUTUBE,
-            defaults={
-                "followers": rng.randint(1_000, 100_000),
-                "engagement_rate": Decimal(rng.randint(80, 900)) / 100,
-                "is_verified": True,
-                "last_synced_at": now,
-            },
+        rng = _rng(f"creator-youtube-{numbers[user_id]}")
+        missing.append(
+            PlatformStats(
+                creator_id=user_id,
+                platform=Platform.YOUTUBE,
+                followers=rng.randint(1_000, 100_000),
+                engagement_rate=Decimal(rng.randint(80, 900)) / 100,
+                is_verified=True,
+                last_synced_at=now,
+            )
         )
-        if not created and not stats.is_verified:
-            stats.is_verified = True
-            stats.save(update_fields=["is_verified", "updated_at"])
+    PlatformStats.objects.bulk_create(missing)
 
 
 def seed(*, creators: int = 200, brands: int = 20, campaigns: int = 100) -> dict[str, int]:

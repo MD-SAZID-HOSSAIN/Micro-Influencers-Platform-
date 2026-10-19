@@ -196,6 +196,10 @@ The user object (also returned by `GET /auth/me/`):
 - Code errors (all 400): `invalid_verification_code`, `verification_code_expired` (10 minutes),
   `verification_code_used`, `verification_code_locked` (5 wrong tries; ask for a new code).
 
+Only **brands** verify their email: for a creator, `POST /auth/email/verify/` and `/auth/email/resend/` return 403
+`email_verification_brands_only`, and registering as a creator sends no code (do not send creators to the verify
+page). A creator's email is used for password reset only.
+
 An unverified **brand** cannot publish a campaign or accept a proposal: those calls return 403 with code
 `brand_email_unverified`. Everything else works unverified (drafts, shortlisting, rejecting, browsing).
 For everyone, verification also decides whether notification emails are sent (section 7.2). Show a

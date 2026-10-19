@@ -35,8 +35,7 @@ export default function RegisterCreator() {
         password: form.password,
         mobileNumber: form.mobile,
       });
-      // The backend creates the account; we now need to log the user in so
-      // the verify-email page can call /auth/email/verify (which requires auth).
+      // Creators are verified by connecting YouTube, not by email, so there is no verify step.
       try {
         await login({ identifier: form.email, password: form.password });
       } catch {
@@ -44,8 +43,8 @@ export default function RegisterCreator() {
         navigate('/login');
         return;
       }
-      push(`Welcome, ${form.fullName.split(' ')[0]}! Check your inbox to verify your email.`, 'success');
-      navigate('/verify-email', { state: { email: form.email } });
+      push(`Welcome, ${form.fullName.split(' ')[0]}! Connect YouTube to start applying to campaigns.`, 'success');
+      navigate('/creator/dashboard');
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'validation_error' && err.details && typeof err.details === 'object') {

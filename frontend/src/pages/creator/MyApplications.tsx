@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  EmptyState, ProposalStatusBadge, PageHeader, ChannelArt, StatRow,
+  EmptyState, ProposalStatusBadge, PageHeader, ProfileTile, StatRow,
 } from '../../components/ui';
 import { fmtRelativeTime, currency } from '../../lib/shared';
 import clsx from 'clsx';
@@ -150,7 +150,7 @@ export default function MyApplications() {
                       className="block p-4 sm:p-5 hover:bg-mist-100/60 transition-colors group"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
-                        <ChannelArt
+                        <ProfileTile
                           name={c?.brandName ?? p.brandName ?? 'Brand'}
                           seed={c?.brandId ?? p.brandId ?? 'unknown'}
                           height={48}

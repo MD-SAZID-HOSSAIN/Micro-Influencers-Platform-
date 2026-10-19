@@ -193,3 +193,27 @@ def test_query_count_is_bounded(creator, auth_client, django_assert_max_num_quer
         response = client.get(URL)
 
     assert response.status_code == 200
+
+
+def test_status_counts_cover_every_proposal_not_just_the_ten_listed(creator, auth_client):
+    for _ in range(3):
+        ProposalFactory(creator=creator, status=S.SHORTLISTED)
+    for _ in range(9):
+        ProposalFactory(creator=creator, status=S.PENDING)
+    for _ in range(11):
+        ProposalFactory(creator=creator, status=S.REJECTED)
+
+    body = dashboard(auth_client, creator)
+
+    assert len(body["applications"]) == 10
+    assert body["pending_count"] == 9
+    assert body["shortlisted_count"] == 3
+
+
+def test_status_counts_are_zero_for_a_new_creator_and_ignore_other_creators(creator, auth_client):
+    ProposalFactory(status=S.PENDING)
+    ProposalFactory(status=S.SHORTLISTED)
+
+    body = dashboard(auth_client, creator)
+
+    assert body["pending_count"] == 0 and body["shortlisted_count"] == 0

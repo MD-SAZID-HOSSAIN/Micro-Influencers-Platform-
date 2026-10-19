@@ -31,12 +31,12 @@ def error_code(response):
 
 @pytest.fixture
 def user(db):
-    return UserFactory(role=Role.CREATOR, email="amina@example.com")
+    return UserFactory(role=Role.BRAND, email="amina@example.com", email_verified=False)
 
 
 def register(client, run_on_commit, **overrides):
     data = {
-        "role": "creator",
+        "role": "brand",
         "full_name": "Amina Rahman",
         "email": "new@example.com",
         "username": "newuser",
@@ -59,6 +59,36 @@ def test_a_verification_code_is_emailed_after_registration(db, run_on_commit):
     assert mail.outbox[0].to == ["new@example.com"]
     assert re.search(r"\b\d{6}\b", mail.outbox[0].body)
     assert OneTimeCode.objects.filter(user__email="new@example.com", purpose="email_verification").count() == 1
+
+
+def test_a_creator_gets_no_verification_code_after_registration(db, run_on_commit):
+    response = register(APIClient(), run_on_commit, role="creator")
+
+    assert response.status_code == 201
+    assert mail.outbox == []
+    assert not OneTimeCode.objects.filter(user__email="new@example.com", purpose="email_verification").exists()
+
+
+def test_creators_cannot_verify_or_resend_an_email_code(db, auth_client):
+    creator = UserFactory(role=Role.CREATOR)
+    client = auth_client(creator)
+
+    for url, body in ((RESEND, None), (VERIFY, {"code": "123456"})):
+        response = client.post(url, body, format="json")
+
+        assert response.status_code == 403, url
+        assert error_code(response) == "email_verification_brands_only"
+    assert User.objects.get(pk=creator.pk).email_verified is False
+
+
+def test_a_creator_can_still_reset_a_forgotten_password(db, run_on_commit):
+    UserFactory(role=Role.CREATOR, email="amina@example.com")
+
+    with run_on_commit():
+        response = APIClient().post(RESET_REQUEST, {"email": "amina@example.com"}, format="json")
+
+    assert response.status_code == 200
+    assert len(mail.outbox) == 1 and "reset" in mail.outbox[0].subject.lower()
 
 
 def test_new_accounts_are_unverified_and_can_still_log_in(db, run_on_commit):

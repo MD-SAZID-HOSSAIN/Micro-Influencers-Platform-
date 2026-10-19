@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Loader2, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { MAX_PHOTO_BYTES, fileKind, formatSize } from '../lib/media';
 import { isApiError } from '../api/client';
+import { initialsOf } from './ui';
 
 /**
  * Upload, replace or remove a profile picture: a creator's photo or a brand's logo.
@@ -29,14 +30,10 @@ export function ProfilePictureEditor({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'upload' | 'remove' | null>(null);
   const [error, setError] = useState('');
+  // A saved picture whose file is gone shows the initials, like a missing one.
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [value]);
 
-  const initials = name
-    .split(' ')
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
   const frame = shape === 'circle' ? 'rounded-full' : 'rounded-2xl';
 
   const run = async (kind: 'upload' | 'remove', action: () => Promise<void>) => {
@@ -72,11 +69,16 @@ export function ProfilePictureEditor({
           frame,
         )}
       >
-        {value ? (
-          <img src={value} alt={`${name} profile picture`} className="w-full h-full object-cover" />
+        {value && !broken ? (
+          <img
+            src={value}
+            alt={`${name} profile picture`}
+            onError={() => setBroken(true)}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center font-display text-2xl font-semibold text-white">
-            {initials || '?'}
+            {initialsOf(name)}
           </span>
         )}
         {busy && (

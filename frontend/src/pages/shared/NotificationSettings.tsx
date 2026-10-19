@@ -97,7 +97,11 @@ export default function NotificationSettingsPage() {
       <PageHeader
         eyebrow="FR-24"
         title="Notification settings"
-        description="In-app notifications are always on. Use this page to also get them as emails."
+        description={
+          role === 'creator'
+            ? 'Notifications appear in the app. This page lists what you will be told about.'
+            : 'In-app notifications are always on. Use this page to also get them as emails.'
+        }
       />
 
       {error ? (
@@ -106,6 +110,16 @@ export default function NotificationSettingsPage() {
         <div className="card p-6 text-sm text-ink-500">Loading…</div>
       ) : (
         <div className="space-y-6">
+          {role === 'creator' ? (
+            <section className="card p-5 sm:p-6">
+              <div className="eyebrow">Email</div>
+              <div className="mt-1.5 font-display text-lg text-ink-900 tracking-[-0.01em]">Updates arrive in the app</div>
+              <div className="text-sm text-ink-500 mt-1">
+                Creators see updates in the bell and on the notifications page. Your email ({user.email}) is used to
+                reset your password. Creators are verified by connecting YouTube, so there is no email verification.
+              </div>
+            </section>
+          ) : (
           <section className="card p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -166,12 +180,17 @@ export default function NotificationSettingsPage() {
               </div>
             </div>
           </section>
+          )}
 
           <section className="card p-5 sm:p-6">
             <SectionHeader
               eyebrow="What you'll be notified about"
               title="Events"
-              description="In-app only — the bell badge and the notifications page. Toggle above to also get these by email."
+              description={
+                role === 'creator'
+                  ? 'In the app: the bell badge and the notifications page.'
+                  : 'In-app only — the bell badge and the notifications page. Toggle above to also get these by email.'
+              }
             />
             <ul className="mt-5 divide-y divide-ink-200/60">
               {EVENTS.filter((e) => (e.roles as readonly string[]).includes(role)).map((e) => (

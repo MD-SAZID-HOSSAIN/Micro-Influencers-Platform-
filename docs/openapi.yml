@@ -2292,12 +2292,28 @@ components:
         total_proposals:
           type: integer
           description: Across all campaigns, withdrawn included.
+        pending_count:
+          type: integer
+          description: Proposals currently Pending (no decision yet).
         shortlisted_count:
           type: integer
           description: Proposals currently Shortlisted.
         accepted_count:
           type: integer
           description: Proposals currently Accepted.
+        draft_count:
+          type: integer
+          description: Campaigns still in Draft, over all of them.
+        first_draft_id:
+          type: integer
+          nullable: true
+          description: The newest Draft campaign, or null when there is none.
+        busiest_campaign:
+          allOf:
+          - $ref: '#/components/schemas/BusiestCampaign'
+          nullable: true
+          description: The campaign with the most Pending proposals, or null when
+            none are pending.
         campaigns:
           type: array
           items:
@@ -2306,14 +2322,18 @@ components:
       required:
       - accepted_count
       - active_campaigns
+      - busiest_campaign
       - campaigns
+      - draft_count
+      - first_draft_id
+      - pending_count
       - shortlisted_count
       - total_campaigns
       - total_proposals
     BrandDashboardCampaign:
       type: object
-      description: One quick-link row. Expects ``proposal_count`` / ``accepted_count``
-        annotations.
+      description: One quick-link row. Expects ``proposal_count`` / ``pending_count``
+        / ``accepted_count`` annotations.
       properties:
         id:
           type: integer
@@ -2331,6 +2351,9 @@ components:
         proposal_count:
           type: integer
           description: All proposals received, withdrawn included.
+        pending_count:
+          type: integer
+          description: Proposals currently Pending (no decision yet).
         accepted_count:
           type: integer
           description: Proposals currently Accepted.
@@ -2341,6 +2364,7 @@ components:
       - accepted_count
       - creators_needed
       - id
+      - pending_count
       - proposal_count
       - proposals_url
       - status
@@ -2447,6 +2471,20 @@ components:
       - id
       - logo_url
       - name
+    BusiestCampaign:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        pending_count:
+          type: integer
+          description: Proposals currently Pending on this campaign.
+      required:
+      - id
+      - pending_count
+      - title
     Campaign:
       type: object
       description: A campaign as its owning brand sees and edits it.
@@ -2921,6 +2959,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CampaignCard'
+        pending_count:
+          type: integer
+          description: Proposals currently Pending, over all of them (the list below
+            shows only the newest).
+        shortlisted_count:
+          type: integer
+          description: Proposals currently Shortlisted, over all of them (the list
+            below shows only the newest).
         applications:
           type: array
           items:
@@ -2935,8 +2981,10 @@ components:
       - accepted_campaigns
       - applications
       - available_campaigns
+      - pending_count
       - performance
       - profile_completion
+      - shortlisted_count
       - youtube
     CreatorDetail:
       type: object

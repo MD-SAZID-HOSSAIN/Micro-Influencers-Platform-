@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, Inbox, Users, Megaphone, ChevronRight } from 'lucide-react';
+import { Plus, ArrowRight, Users, Megaphone, ChevronRight, Mail, Inbox, Star, FilePen, CheckCircle2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandProfile, loadBrandCampaigns } from '../../state/Store';
 import { fetchBrandDashboard, type BrandDashboardData } from '../../api/endpoints';
-import { fmtRelativeTime, currency } from '../../lib/shared';
 import { useAuth } from '../../state/AuthContext';
 import {
   CampaignStatusBadge, PageHeader, ChannelArt, StatRow, EmptyState, SectionHeader,
 } from '../../components/ui';
+import AttentionList, { type AttentionItem } from '../../components/AttentionList';
 import { isApiError } from '../../api/client';
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export default function BrandDashboard() {
   const { user } = useAuth();
@@ -21,7 +23,7 @@ export default function BrandDashboard() {
     (async () => {
       try {
         await loadBrandProfile();
-        const [dash, _] = await Promise.all([
+        const [dash] = await Promise.all([
           fetchBrandDashboard(),
           loadBrandCampaigns(),
         ]);
@@ -47,27 +49,77 @@ export default function BrandDashboard() {
 
   const campaigns = data?.campaigns ?? [];
   const totalProposals = data?.totalProposals ?? 0;
+  const pending = data?.pendingCount ?? 0;
   const shortlisted = data?.shortlistedCount ?? 0;
   const accepted = data?.acceptedCount ?? 0;
   const activeCampaigns = data?.activeCampaigns ?? 0;
   const totalCampaigns = data?.totalCampaigns ?? 0;
+  // These come from the API over every campaign, so they do not depend on which rows are listed below.
+  const draftCount = data?.draftCount ?? 0;
+  const firstDraftId = data?.firstDraftId ?? null;
+  const busiest = data?.busiestCampaign ?? null;
+  const emailUnverified = user?.emailVerified === false;
+
+  // Most important first. A brand with an unverified email cannot publish or accept, so that comes first.
+  const attention: AttentionItem[] = [];
+  if (emailUnverified) {
+    attention.push({
+      key: 'verify',
+      tone: 'amber',
+      icon: <Mail className="w-5 h-5" />,
+      title: 'Verify your email to publish and accept',
+      text: 'Until your email is verified you can save drafts, but you cannot publish campaigns or accept proposals.',
+      to: '/verify-email',
+      state: { email: user?.email, sendCode: true },
+      cta: 'Verify email',
+    });
+  }
+  if (pending > 0 && busiest) {
+    attention.push({
+      key: 'pending',
+      tone: 'brand',
+      icon: <Inbox className="w-5 h-5" />,
+      title: `${plural(pending, 'new proposal')} waiting for your decision`,
+      text: `Most are on “${busiest.title}” (${busiest.pendingCount}). Shortlist, accept or reject each one.`,
+      to: `/brand/campaigns/${busiest.id}/proposals`,
+      cta: 'Review proposals',
+    });
+  }
+  if (shortlisted > 0) {
+    attention.push({
+      key: 'shortlisted',
+      tone: 'brand',
+      icon: <Star className="w-5 h-5" />,
+      title: `${plural(shortlisted, 'creator')} shortlisted`,
+      text: 'These are your strongest candidates. Accept the ones you want to work with.',
+      to: '/brand/campaigns',
+      cta: 'Open campaigns',
+    });
+  }
+  if (draftCount > 0 && firstDraftId !== null) {
+    attention.push({
+      key: 'drafts',
+      tone: 'amber',
+      icon: <FilePen className="w-5 h-5" />,
+      title: `${plural(draftCount, 'draft')} not published yet`,
+      text: 'Creators cannot see a campaign until you publish it.',
+      to: `/brand/campaigns/${firstDraftId}`,
+      cta: 'Finish and publish',
+    });
+  }
 
   const summary =
     totalProposals > 0
-      ? `${totalProposals} proposal${totalProposals === 1 ? '' : 's'} across ${totalCampaigns} campaign${totalCampaigns === 1 ? '' : 's'} — ${shortlisted} shortlisted, ${accepted} accepted.`
+      ? `${plural(totalProposals, 'proposal')} received across ${plural(totalCampaigns, 'campaign')}. ${accepted} accepted so far.`
       : activeCampaigns > 0
-        ? `${activeCampaigns} live campaign${activeCampaigns === 1 ? '' : 's'} — share them with creators to fill faster.`
-        : 'Get started by creating your first campaign.';
+        ? `${plural(activeCampaigns, 'campaign')} live. Proposals will appear here when creators apply.`
+        : 'Create your first campaign to start receiving proposals from creators.';
 
   return (
     <div className="container-page py-6 sm:py-8">
       <PageHeader
-        eyebrow={`Today · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}`}
-        title={
-          <>
-            {brand?.companyName || user?.fullName} <span className="text-ink-400">/</span> <span className="font-medium">control room</span>
-          </>
-        }
+        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}
+        title={<>Welcome back, <span className="font-medium">{brand?.companyName || user?.fullName}</span></>}
         description={summary}
         action={
           <Link to="/brand/campaigns/create" className="btn btn-primary btn-md self-start sm:self-auto">
@@ -77,20 +129,43 @@ export default function BrandDashboard() {
       />
 
       <div className="space-y-8">
+        <section aria-label="What needs your attention">
+          <SectionHeader eyebrow="To do" title="What needs your attention" />
+          <div className="mt-5">
+            {!data ? (
+              <div className="card p-5 text-sm text-ink-500">Loading…</div>
+            ) : attention.length > 0 ? (
+              <AttentionList items={attention} />
+            ) : (
+              <div className="card p-5 sm:p-6 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </span>
+                <div>
+                  <div className="text-sm sm:text-base font-semibold text-ink-900">You’re all caught up</div>
+                  <div className="text-xs sm:text-sm text-ink-500 mt-0.5">
+                    No proposals are waiting. Browse creators to invite more interest in your campaigns.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         <StatRow
           items={[
-            { label: 'Total campaigns', value: totalCampaigns, hint: 'all time' },
-            { label: 'Active', value: activeCampaigns, hint: 'live now' },
-            { label: 'Shortlisted', value: shortlisted, hint: 'awaiting you' },
-            { label: 'Accepted', value: accepted, hint: 'in progress' },
+            { label: 'Live campaigns', value: activeCampaigns, hint: `${totalCampaigns} in total` },
+            { label: 'New proposals', value: pending, hint: 'waiting for you' },
+            { label: 'Shortlisted', value: shortlisted, hint: 'ready to accept' },
+            { label: 'Accepted', value: accepted, hint: 'creators hired' },
           ]}
         />
 
         <section>
           <SectionHeader
-            eyebrow="Proposals"
+            eyebrow="Campaigns"
             title="Your campaigns"
-            description="Open a campaign to manage its proposals, publish, or close it."
+            description="Open a campaign to review its proposals, publish it or close it."
             action={
               <Link to="/brand/campaigns" className="text-sm link-accent inline-flex items-center gap-1">
                 All campaigns <ArrowRight className="w-3.5 h-3.5" />
@@ -102,7 +177,7 @@ export default function BrandDashboard() {
               <EmptyState
                 icon={<Megaphone className="w-5 h-5" />}
                 title="No campaigns yet"
-                description="Create your first brief to start receiving proposals."
+                description="Create your first campaign to start receiving proposals."
                 action={
                   <Link to="/brand/campaigns/create" className="btn btn-primary btn-md">
                     <Plus className="w-4 h-4" /> New campaign
@@ -113,11 +188,12 @@ export default function BrandDashboard() {
           ) : (
             <ul className="mt-5 card divide-y divide-ink-200/60 stagger">
               {campaigns.slice(0, 8).map((c) => {
-                const fill = c.creatorsNeeded > 0 ? Math.round((c.acceptedCount / c.creatorsNeeded) * 100) : 0;
+                const fill = c.creatorsNeeded > 0 ? Math.min(100, Math.round((c.acceptedCount / c.creatorsNeeded) * 100)) : 0;
+                const isDraft = c.status === 'draft';
                 return (
                   <li key={c.id}>
                     <Link
-                      to={`/brand/campaigns/${c.id}/proposals`}
+                      to={isDraft ? `/brand/campaigns/${c.id}` : `/brand/campaigns/${c.id}/proposals`}
                       className="block p-4 sm:p-5 hover:bg-mist-100/60 transition-colors group"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
@@ -125,28 +201,36 @@ export default function BrandDashboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <CampaignStatusBadge status={c.status} />
-                            <span className="text-[11px] text-ink-500 font-mono uppercase tracking-[0.12em]">
-                              {c.acceptedCount} of {c.creatorsNeeded} filled
-                            </span>
-                            <span className="sm:hidden text-[11px] text-ink-500 font-mono">
-                              · {c.proposalCount} proposal{c.proposalCount === 1 ? '' : 's'}
-                            </span>
+                            {c.pendingCount > 0 && (
+                              <span className="tag tag-amber">{c.pendingCount} new</span>
+                            )}
                           </div>
                           <div className="mt-1 font-semibold text-ink-900 line-clamp-1 leading-snug">{c.title}</div>
-                          <div className="mt-1.5 h-1.5 bg-mist-100 rounded-sm overflow-hidden max-w-xs">
-                            <div
-                              className="h-full bg-ink-900 transition-all duration-500 ease-out-quint"
-                              style={{ width: fill + '%' }}
-                            />
-                          </div>
+                          {isDraft ? (
+                            <div className="mt-1 text-xs text-ink-500">Draft. Open it to finish and publish.</div>
+                          ) : (
+                            <>
+                              <div className="mt-1.5 h-1.5 bg-mist-100 rounded-sm overflow-hidden max-w-xs">
+                                <div
+                                  className="h-full bg-ink-900 transition-all duration-500 ease-out-quint"
+                                  style={{ width: fill + '%' }}
+                                />
+                              </div>
+                              <div className="mt-1 text-xs text-ink-500">
+                                {c.acceptedCount} of {c.creatorsNeeded} creators accepted
+                                <span className="sm:hidden"> · {plural(c.proposalCount, 'proposal')}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
-                        <div className="hidden sm:flex flex-col items-end shrink-0">
-                          <div className="text-sm font-mono font-semibold text-ink-900 inline-flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-ink-500" />
-                            {c.proposalCount} proposal{c.proposalCount === 1 ? '' : 's'}
+                        {!isDraft && (
+                          <div className="hidden sm:flex flex-col items-end shrink-0">
+                            <div className="text-sm font-mono font-semibold text-ink-900 inline-flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5 text-ink-500" />
+                              {plural(c.proposalCount, 'proposal')}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-ink-500">{c.acceptedCount} accepted · {fill}%</div>
-                        </div>
+                        )}
                         <ChevronRight className="w-4 h-4 text-ink-300 group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
                       </div>
                     </Link>
@@ -155,21 +239,6 @@ export default function BrandDashboard() {
               })}
             </ul>
           )}
-        </section>
-
-        <section className="card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="eyebrow mb-1.5">Total spend committed</div>
-            <div className="font-display text-xl text-ink-900 tracking-[-0.01em]">
-              {currency(0)}
-            </div>
-            <div className="text-xs text-ink-500 mt-0.5">
-              See a campaign for its per-creator budget and total commitment.
-            </div>
-          </div>
-          <Link to="/brand/campaigns" className="btn btn-secondary btn-md">
-            Open campaigns <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </section>
       </div>
     </div>

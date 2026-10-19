@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Pencil, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandProfile, loadBrandCampaigns } from '../../state/Store';
-import { PageHeader, SectionHeader, StatRow, ChannelArt } from '../../components/ui';
+import { PageHeader, SectionHeader, StatRow, ChannelArt, ProfileTile } from '../../components/ui';
 
 export default function BrandProfile() {
   const { brand, campaigns } = useStore();
@@ -65,11 +65,13 @@ export default function BrandProfile() {
           <ChannelArt name={brand.companyName} seed={brand.id} height={120} className="rounded-none w-full" />
         )}
         <div className="p-5 sm:p-6 flex items-end gap-4 -mt-10 sm:-mt-12">
-          {brand.logoUrl ? (
-            <img src={brand.logoUrl} alt={brand.companyName} className="w-20 sm:w-24 h-20 sm:h-24 rounded-md object-cover ring-4 ring-mist-50 shrink-0" />
-          ) : (
-            <ChannelArt name={brand.companyName} seed={brand.id} height={72} className="w-20 sm:w-24 rounded-md ring-4 ring-mist-50 shrink-0" />
-          )}
+          <ProfileTile
+            name={brand.companyName}
+            seed={brand.id}
+            imageUrl={brand.logoUrl}
+            height={96}
+            className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-md ring-4 ring-mist-50 shrink-0"
+          />
           <div className="min-w-0 pb-1 flex-1">
             <h1 className="font-display text-2xl sm:text-3xl text-ink-900 leading-none tracking-[-0.02em]">
               {brand.companyName}

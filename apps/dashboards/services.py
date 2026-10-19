@@ -1,5 +1,5 @@
 """Read-only aggregation for the two dashboards. Nothing here writes to the database."""
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 
 from apps.accounts.models import User
 from apps.campaigns.discovery import discovery_queryset
@@ -24,6 +24,8 @@ def creator_dashboard(user: User) -> dict:
     totals = my_proposals.aggregate(
         sent=Count("id"),  # withdrawn proposals still count as sent
         accepted=Count("id", filter=Q(status=Proposal.Status.ACCEPTED)),  # only currently Accepted
+        pending=Count("id", filter=Q(status=Proposal.Status.PENDING)),
+        shortlisted=Count("id", filter=Q(status=Proposal.Status.SHORTLISTED)),
     )
     sent, accepted = totals["sent"], totals["accepted"]
 
@@ -34,6 +36,8 @@ def creator_dashboard(user: User) -> dict:
             for key in ("connected", "status", "needs_reconnect", "last_synced_at", "is_outdated")
         },
         "available_campaigns": list(discovery_queryset({})[:AVAILABLE_CAMPAIGNS_LIMIT]),
+        "pending_count": totals["pending"],  # over every proposal, not just the listed ones
+        "shortlisted_count": totals["shortlisted"],
         "applications": list(my_proposals[:APPLICATIONS_LIMIT]),
         "accepted_campaigns": list(
             my_proposals.filter(status=Proposal.Status.ACCEPTED)[:ACCEPTED_LIMIT]
@@ -49,21 +53,34 @@ def creator_dashboard(user: User) -> dict:
 def brand_dashboard(user: User) -> dict:
     """A brand's home: headline counts over everything, plus rows for its newest campaigns.
 
-    The counts come from two aggregate queries and the rows from one annotated query,
-    so the cost does not grow with the number of campaigns or proposals.
+    The counts come from two aggregate queries, the busiest campaign from one more and the rows
+    from one annotated query, so the cost does not grow with the number of campaigns or proposals.
     """
     campaigns = Campaign.objects.filter(brand=user)
     campaign_totals = campaigns.aggregate(
         total=Count("id"),
         active=Count("id", filter=Q(status=Campaign.Status.PUBLISHED)),
+        drafts=Count("id", filter=Q(status=Campaign.Status.DRAFT)),
+        newest_draft_id=Max("id", filter=Q(status=Campaign.Status.DRAFT)),
+    )
+    busiest = (
+        campaigns.annotate(
+            pending_count=Count("proposals", filter=Q(proposals__status=Proposal.Status.PENDING))
+        )
+        .filter(pending_count__gt=0)
+        .order_by("-pending_count", "-id")
+        .values("id", "title", "pending_count")
+        .first()
     )
     proposal_totals = Proposal.objects.filter(campaign__brand=user).aggregate(
         total=Count("id"),  # withdrawn proposals included
+        pending=Count("id", filter=Q(status=Proposal.Status.PENDING)),
         shortlisted=Count("id", filter=Q(status=Proposal.Status.SHORTLISTED)),
         accepted=Count("id", filter=Q(status=Proposal.Status.ACCEPTED)),  # only currently Accepted
     )
     rows = campaigns.annotate(
         proposal_count=Count("proposals"),
+        pending_count=Count("proposals", filter=Q(proposals__status=Proposal.Status.PENDING)),
         accepted_count=Count("proposals", filter=Q(proposals__status=Proposal.Status.ACCEPTED)),
     ).order_by("-created_at", "-id")[:BRAND_CAMPAIGN_ROWS_LIMIT]
 
@@ -71,7 +88,11 @@ def brand_dashboard(user: User) -> dict:
         "total_campaigns": campaign_totals["total"],
         "active_campaigns": campaign_totals["active"],
         "total_proposals": proposal_totals["total"],
+        "pending_count": proposal_totals["pending"],
         "shortlisted_count": proposal_totals["shortlisted"],
         "accepted_count": proposal_totals["accepted"],
+        "draft_count": campaign_totals["drafts"],
+        "first_draft_id": campaign_totals["newest_draft_id"],
+        "busiest_campaign": busiest,
         "campaigns": list(rows),
     }

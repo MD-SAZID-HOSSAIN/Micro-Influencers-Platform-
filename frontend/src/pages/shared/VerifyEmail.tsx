@@ -15,6 +15,9 @@ export default function VerifyEmail() {
   const { push } = useToast();
   const location = useLocation();
   const email = (location.state as { email?: string })?.email ?? user?.email ?? '';
+  // Coming from the "Verify your email" banner: no code was just sent (unlike right after registering).
+  const sendOnOpen = (location.state as { sendCode?: boolean } | null)?.sendCode === true;
+  const sentOnOpen = useRef(false);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const [error, setError] = useState('');
@@ -24,8 +27,28 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (ready && !user) {
       navigate('/login', { replace: true });
+    } else if (ready && user && user.role !== 'brand') {
+      // Only brands verify their email. Creators are verified by connecting YouTube.
+      navigate(user.role === 'creator' ? '/creator/dashboard' : '/', { replace: true });
     }
   }, [ready, user]);
+
+  useEffect(() => {
+    if (!sendOnOpen || !ready || !user || user.role !== 'brand' || sentOnOpen.current) return;
+    sentOnOpen.current = true;
+    // The flag lives in the browser's history entry, so it would survive a reload or going back to this
+    // page and send another email each time. Drop it from this entry now that the request is made.
+    navigate(location.pathname, { replace: true, state: { email } });
+    resendVerificationEmail()
+      .then(() => push('A verification code was sent.', 'info'))
+      .catch((err) => {
+        if (isApiError(err) && err.code === 'already_verified') push('Your email is already verified.', 'info');
+        // A code was sent less than a minute ago (cooldown): the one already in the inbox still works.
+        else if (!(isApiError(err) && (err.code === 'resend_cooldown' || err.status === 429))) {
+          push(isApiError(err) ? err.message : 'Could not send the code.', 'error');
+        }
+      });
+  }, [sendOnOpen, ready, user]);
 
   useEffect(() => {
     if (cooldown <= 0) return;

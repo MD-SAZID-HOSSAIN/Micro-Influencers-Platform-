@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, InputHTMLAttributes } from 'react';
+import { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, InputHTMLAttributes, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import {
   Inbox, AlertTriangle, Loader2,
@@ -267,6 +267,70 @@ export function PlatformIcon({ platform, className }: { platform: Platform; clas
 }
 
 // ---------- Avatar (initials with editorial monogram feel) ----------
+/** "Amina Patel" -> "AP". Falls back to "?" for an empty name. */
+export function initialsOf(name: string): string {
+  const letters = name
+    .split(' ')
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return letters || '?';
+}
+
+/** Background and accent colour pairs for generated pictures. The same seed always picks the same pair. */
+const ART_PALETTE = [
+  ['#212F41', '#0DA0FD'],
+  ['#16212F', '#06CAB5'],
+  ['#2A3A52', '#5DB6EE'],
+  ['#0E1826', '#14C1CC'],
+  ['#364255', '#9FD2F5'],
+];
+
+/** A small stable number from some text: picks colours and shapes without storing anything. */
+const hashSeed = (s: string) => Array.from(s).reduce((a, c) => a + c.charCodeAt(0), 0);
+
+/**
+ * A profile picture (photo or logo) in a tile of any size. When there is no picture, or it fails to
+ * load, it shows the initials on a colour that stays the same for the same `seed`.
+ */
+export function ProfileTile({
+  name, seed, imageUrl, height = 48, className,
+}: {
+  name: string;
+  seed: string;
+  imageUrl?: string;
+  height?: number;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageUrl]);
+  if (imageUrl && !failed) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className={clsx('object-cover bg-ink-100', className)}
+        style={{ height }}
+      />
+    );
+  }
+  const [background] = ART_PALETTE[hashSeed(String(seed)) % ART_PALETTE.length];
+  return (
+    <div
+      role="img"
+      aria-label={name}
+      className={clsx('flex items-center justify-center font-semibold text-mist-50 select-none overflow-hidden', className)}
+      style={{ height, background, fontSize: Math.max(12, Math.round(height * 0.36)) }}
+    >
+      {initialsOf(name)}
+    </div>
+  );
+}
+
 export function Avatar({
   name, size = 'md', className, tone = 'ink', src,
 }: {
@@ -277,13 +341,10 @@ export function Avatar({
   className?: string;
   tone?: 'ink' | 'ember' | 'paper';
 }) {
-  const initials = name
-    .split(' ')
-    .map((s) => s[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  const initials = initialsOf(name);
+  // A picture that fails to load (dead link, deleted file) falls back to the initials.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
   const sizeCls =
     size === 'xs' ? 'w-6 h-6 text-[10px]'
     : size === 'sm' ? 'w-8 h-8 text-xs'
@@ -294,11 +355,12 @@ export function Avatar({
     tone === 'ember' ? 'bg-brand-500 text-mist-50'
     : tone === 'paper' ? 'bg-mist-200 text-ink-700'
     : 'bg-ink-900 text-mist-50';
-  if (src) {
+  if (src && !failed) {
     return (
       <img
         src={src}
         alt=""
+        onError={() => setFailed(true)}
         className={clsx('rounded-sm shrink-0 object-cover bg-ink-100', sizeCls.split(' ').slice(0, 2).join(' '), className)}
       />
     );
@@ -318,47 +380,27 @@ export function Avatar({
 
 // ---------- Channel art (procedural SVG; replaces stock avatars) ----------
 /**
- * ChannelArt — a deterministic, generated SVG that stands in for creator
- * profile/cover art. Uses the creator name as a seed so it stays stable
- * for the same creator across pages. Editorial-feeling composition.
+ * ChannelArt — a deterministic, generated SVG used as cover art and for campaign tiles.
+ * Uses the seed so it stays stable for the same item across pages. Editorial-feeling composition.
+ * For a person's or brand's picture use ProfileTile, which shows the real image or the initials.
  */
 export function ChannelArt({
-  name, seed, height = 96, className, rounded = 'lg', imageUrl,
+  name, seed, height = 96, className, rounded = 'lg',
 }: {
   name: string;
   seed: string;
-  /** The real picture (photo or logo). The generated art is only the fallback. */
-  imageUrl?: string;
   height?: number;
   className?: string;
   rounded?: 'sm' | 'md' | 'lg' | 'full';
 }) {
   const r = rounded === 'full' ? 'rounded-full' : rounded === 'sm' ? 'rounded-sm' : rounded === 'md' ? 'rounded-md' : 'rounded-lg';
-  const palette = [
-    ['#212F41', '#0DA0FD'],
-    ['#16212F', '#06CAB5'],
-    ['#2A3A52', '#5DB6EE'],
-    ['#0E1826', '#14C1CC'],
-    ['#364255', '#9FD2F5'],
-  ];
-  const hash = (s: string) => Array.from(s).reduce((a, c) => a + c.charCodeAt(0), 0);
-  const [bg, accent] = palette[hash(seed) % palette.length];
+  const hash = hashSeed;
+  const [bg, accent] = ART_PALETTE[hash(seed) % ART_PALETTE.length];
   const angle = (hash(seed + 'a') % 24) - 12;
   const cx1 = 20 + (hash(seed + 'b') % 30);
   const cy1 = 30 + (hash(seed + 'c') % 20);
   const cx2 = 60 + (hash(seed + 'd') % 30);
   const cy2 = 40 + (hash(seed + 'e') % 30);
-  if (imageUrl) {
-    return (
-      <img
-        src={imageUrl}
-        alt={name}
-        loading="lazy"
-        className={clsx('object-cover bg-ink-100', r, className)}
-        style={{ height }}
-      />
-    );
-  }
   return (
     <div
       className={clsx('relative overflow-hidden', r, className)}

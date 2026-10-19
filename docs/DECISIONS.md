@@ -104,6 +104,10 @@ line of code, and the tests that pin them sit next to the code.
   (any platform, including a hand-typed YouTube entry) do not count, and the channel works for campaigns on
   any platform. Disconnecting YouTube marks the stats Unverified, so it removes the right to apply. A creator's
   email verification does not replace this.
+- **Only brands verify their email.** Registering as a creator sends no verification code, and
+  `POST /auth/email/verify/` and `/auth/email/resend/` answer 403 `email_verification_brands_only` for creators.
+  A creator's email is used for password reset only. Because notification emails go only to verified
+  addresses, creators get no notification emails (in-app only); this changes FR-24.
 - **Why this differs from the PRD:** FR-02, FR-10 and FR-24 say unverified users can use the platform and that
   unverified stats still count towards applying. The owner chose stricter rules to keep fake or throwaway
   accounts out of the marketplace.

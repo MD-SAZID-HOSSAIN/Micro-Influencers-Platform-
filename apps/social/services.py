@@ -151,6 +151,44 @@ def _flag_unusable_channel(connection: YouTubeConnection, reason: str) -> None:
     connection.save(update_fields=["last_error"])
 
 
+# A channel linked by handle (no Google sign-in) keeps these placeholders instead of real tokens.
+DIRECT_ACCESS_TOKEN = "direct-token"
+DIRECT_REFRESH_TOKEN = "direct-refresh"
+
+
+def is_direct_connection(connection: YouTubeConnection) -> bool:
+    """True when the channel was linked by handle, so there is no Google grant to use or refresh."""
+    stored = connection.access_token_enc or ""
+    if stored.startswith(DIRECT_ACCESS_TOKEN):  # plain fallback used when no encryption key is configured
+        return True
+    try:
+        return decrypt(stored) == DIRECT_ACCESS_TOKEN
+    except Exception:  # noqa: BLE001 - a real, unreadable token is not a placeholder
+        return False
+
+
+def refresh_direct_channel(connection: YouTubeConnection) -> None:
+    """Refresh a channel linked by handle from its public page.
+
+    Google is never involved, so a failure here leaves the last stats as they were and does not
+    flag the connection as needing a reconnect.
+    """
+    from . import youtube_public
+
+    stats = PlatformStats.objects.filter(creator_id=connection.creator_id, platform="youtube").first()
+    if stats is None or not stats.handle_url:
+        return
+    live = youtube_public.fetch_public_channel(stats.handle_url)
+    if not live.get("success"):
+        logger.info("Could not read the public page of creator %s's linked channel", connection.creator_id)
+        return
+    stats.followers = live["subscribers"]
+    stats.handle_url = live["canonical_url"]
+    stats.is_outdated = False
+    stats.last_synced_at = timezone.now()
+    stats.save(update_fields=["followers", "handle_url", "is_outdated", "last_synced_at", "updated_at"])
+
+
 def sync_connection(connection: YouTubeConnection) -> None:
     """Pull fresh stats for one connection.
 
@@ -158,6 +196,9 @@ def sync_connection(connection: YouTubeConnection) -> None:
     last known stats. Transient errors propagate so the Celery task can retry them.
     """
     if connection.status != YouTubeConnection.Status.CONNECTED:
+        return
+    if is_direct_connection(connection):
+        refresh_direct_channel(connection)
         return
     client = get_youtube_client()
     try:

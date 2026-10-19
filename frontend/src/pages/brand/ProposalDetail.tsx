@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, Megaphone, Star, CheckCircle2, ClipboardCheck,
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandCampaigns } from '../../state/Store';
 import { listBrandCampaignProposals, listCampaignDeliverables, completeProposal, createReview, type CampaignDeliverableRow } from '../../api/endpoints';
-import { Button, ChannelArt, ProposalStatusBadge, SectionHeader, PageHeader, StatRow } from '../../components/ui';
+import { Button, ProfileTile, ProposalStatusBadge, SectionHeader, PageHeader, StatRow } from '../../components/ui';
 import { currency, fmtDate, fmtRelativeTime } from '../../lib/shared';
 import { Modal, ConfirmDialog } from '../../components/Modal';
 import { Textarea } from '../../components/ui';
@@ -148,7 +148,7 @@ export default function BrandProposalDetail() {
       <div className="card p-6">
         <div className="flex items-start gap-3 justify-between flex-wrap">
           <div className="flex items-start gap-3 min-w-0">
-            <ChannelArt name={proposal.creatorName} seed={proposal.creatorId} height={56} className="w-14 rounded-md shrink-0" />
+            <ProfileTile name={proposal.creatorName} seed={proposal.creatorId} height={56} className="w-14 rounded-md shrink-0" />
             <div className="min-w-0">
               <Link to={`/brand/creators/${proposal.creatorId}`} className="font-display text-xl text-ink-900 hover:text-brand-600 transition-colors block truncate">
                 {proposal.creatorName}

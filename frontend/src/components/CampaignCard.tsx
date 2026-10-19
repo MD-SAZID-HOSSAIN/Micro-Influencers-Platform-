@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Campaign } from '../types';
-import { EligibilityChip, CampaignStatusBadge, ChannelArt, PlatformIcon, SaveButton } from './ui';
+import { EligibilityChip, CampaignStatusBadge, ProfileTile, PlatformIcon, SaveButton } from './ui';
 import { fmtDate, currency } from '../lib/shared';
 import { Megaphone } from 'lucide-react';
 
@@ -23,7 +23,7 @@ export function CampaignCard({
       className="card card-hover p-4 sm:p-5 group block"
     >
       <div className="flex items-start gap-3">
-        <ChannelArt name={campaign.brandName} seed={campaign.brandId} imageUrl={campaign.brandLogoUrl} height={48} className="w-12 rounded-md shrink-0" />
+        <ProfileTile name={campaign.brandName} seed={campaign.brandId} imageUrl={campaign.brandLogoUrl} height={48} className="w-12 rounded-md shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="text-xs text-ink-500 truncate flex items-center gap-1.5">
             <span className="truncate">{campaign.brandName}</span>
