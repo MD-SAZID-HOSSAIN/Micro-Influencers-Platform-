@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,7 +47,8 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  // Rendered at the top of the page, so no transformed or clipped parent can move it off the screen.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/40 p-0 sm:p-4 anim-pop-in"
       onMouseDown={(e) => {
@@ -87,7 +89,8 @@ export function Modal({
         <div className="p-4 sm:p-5 overflow-y-auto flex-1">{children}</div>
         {footer && <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-t border-ink-200 bg-mist-100/60 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

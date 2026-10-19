@@ -2,11 +2,16 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthShell from '../../components/AuthShell';
 import { Button } from '../../components/ui';
 import { useEffect, useRef, useState } from 'react';
+import { requestPasswordReset } from '../../api/endpoints';
+import { isApiError } from '../../api/client';
+import { useToast } from '../../state/ToastContext';
 
 export default function VerifyCode() {
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as { email?: string })?.email ?? 'your email';
+  const { push } = useToast();
+  const stateEmail = (location.state as { email?: string } | null)?.email ?? '';
+  const email = stateEmail || 'your email';
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const [error, setError] = useState('');
@@ -59,8 +64,22 @@ export default function VerifyCode() {
       setError('Please enter the full 6-digit code.');
       return;
     }
-    // The code is checked together with the new password on the next screen.
-    navigate('/reset-password', { state: { resetToken: 'demo-token' } });
+    // The server checks the code together with the new password, so hand both to the next screen.
+    navigate('/reset-password', { state: { email: stateEmail, code } });
+  };
+
+  const resend = async () => {
+    if (!stateEmail) {
+      push('Start again from the "Forgot password" page.', 'error');
+      return;
+    }
+    try {
+      await requestPasswordReset(stateEmail);
+      setCooldown(60);
+      push('If an account exists for that email, a new code was sent.', 'info');
+    } catch (err) {
+      push(isApiError(err) ? err.message : 'Could not send a new code. Try again.', 'error');
+    }
   };
 
   return (
@@ -113,7 +132,7 @@ export default function VerifyCode() {
           ) : (
             <button
               type="button"
-              onClick={() => setCooldown(60)}
+              onClick={resend}
               className="text-brand-600 hover:text-brand-700 font-semibold"
             >
               Resend code

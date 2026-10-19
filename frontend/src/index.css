@@ -269,7 +269,10 @@
   }
 
   /* Small inline animations */
-  .anim-page-in { animation: fade-up .45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  /* "backwards", not "both": with "both" the finished animation keeps its last transform, and a transformed
+     parent turns every position:fixed child (pop-ups, the Edit profile save bar) into one positioned inside the
+     page instead of the screen. */
+  .anim-page-in { animation: fade-up .45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
   .anim-fade-in { animation: fade-in .8s ease both; }
   .anim-pop-in  { animation: pop-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both; }
   .anim-pop-out { animation: pop-out 140ms cubic-bezier(0.22, 1, 0.36, 1) both; }

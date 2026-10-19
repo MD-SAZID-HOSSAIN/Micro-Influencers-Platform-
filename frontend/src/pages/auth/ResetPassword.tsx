@@ -10,9 +10,12 @@ import { isApiError } from '../../api/client';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const location = useLocation();
-  const email = (location.state as { email?: string })?.email ?? '';
+  const handedOver = (location.state as { email?: string; code?: string } | null) ?? {};
   const { push } = useToast();
-  const [code, setCode] = useState('');
+  // The previous screen passes the email and the code it already collected, so they are not asked for again.
+  const [email, setEmail] = useState(handedOver.email ?? '');
+  const emailKnown = !!handedOver.email;
+  const [code, setCode] = useState(handedOver.code ?? '');
   const [pw, setPw] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -21,18 +24,15 @@ export default function ResetPassword() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
+    if (!email.trim()) errs.email = 'Enter the email you asked the code for';
     if (code.length !== 6) errs.code = 'Enter the 6-digit code';
     if (pw.length < 8) errs.pw = 'Minimum 8 characters';
     if (pw !== confirm) errs.confirm = 'Passwords do not match';
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    if (!email) {
-      setErrors({ code: 'Start from the "Forgot password" page' });
-      return;
-    }
     setLoading(true);
     try {
-      await confirmPasswordReset({ email, code, newPassword: pw });
+      await confirmPasswordReset({ email: email.trim(), code, newPassword: pw });
       push('Password updated. Please log in.', 'success');
       navigate('/login');
     } catch (err) {
@@ -50,7 +50,22 @@ export default function ResetPassword() {
       footer={<><Link to="/login" className="text-brand-600 hover:text-brand-700 font-semibold">Back to log in</Link></>}
     >
       <form onSubmit={submit} noValidate>
-        <FormField label="6-digit code" error={errors.code} helper={`Sent to ${email || 'your email'}`}>
+        {!emailKnown && (
+          <FormField label="Email" error={errors.email}>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              invalid={!!errors.email}
+            />
+          </FormField>
+        )}
+        <FormField label="6-digit code" error={errors.code} helper={email ? `Sent to ${email}` : undefined}>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
