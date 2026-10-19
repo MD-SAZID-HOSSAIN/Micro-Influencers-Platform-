@@ -178,3 +178,19 @@ def test_brand_cannot_use_creator_endpoint(db, auth_client):
 
 def test_unauthenticated_gets_401(db):
     assert APIClient().get(ME).status_code == 401
+
+
+def test_creator_can_upload_and_delete_photo(creator, auth_client):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    client = auth_client(creator)
+    image = SimpleUploadedFile("avatar.png", b"\x89PNG\r\n\x1a\nfakeimagecontent", content_type="image/png")
+    response = client.post("/api/v1/creators/me/photo/", {"photo": image}, format="multipart")
+    assert response.status_code == 200
+    assert "/media/avatars/" in response.json()["photo_url"]
+    assert CreatorProfile.objects.get(user=creator).photo_url is not None
+
+    del_resp = client.delete("/api/v1/creators/me/photo/")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["photo_url"] is None
+    assert CreatorProfile.objects.get(user=creator).photo_url is None

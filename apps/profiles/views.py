@@ -5,10 +5,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser
 from rest_framework.generics import (
     DestroyAPIView,
+    GenericAPIView,
     ListCreateAPIView,
     RetrieveAPIView,
     RetrieveUpdateAPIView,
 )
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -101,12 +103,13 @@ class _ProfilePictureView(APIView):
 
     parser_classes = [MultiPartParser]
     serializer_class = None  # the profile serializer used for the response
+    field_name = "file"  # the form field the frontend uses; "file" is always accepted too
 
     def _upload(self, request):
         declared = int(request.META.get("CONTENT_LENGTH") or 0)
         if declared > settings.MEDIA_MAX_PHOTO_BYTES + 1024 * 1024:
             raise MediaTooLarge()  # refuse an oversized body before reading it all
-        upload = request.FILES.get("file")
+        upload = request.FILES.get(self.field_name) or request.FILES.get("file")
         if upload is None:
             raise ValidationError({"file": ["Choose a photo to upload."]})
         return upload
@@ -114,6 +117,9 @@ class _ProfilePictureView(APIView):
     def put(self, request):
         profile = set_picture(get_or_create_profile(request.user), self._upload(request))
         return Response(self.serializer_class(profile).data)
+
+    def post(self, request):
+        return self.put(request)  # same as PUT, for clients that upload with POST
 
     def delete(self, request):
         profile = clear_picture(get_or_create_profile(request.user))
@@ -125,10 +131,15 @@ class CreatorPhotoView(_ProfilePictureView):
 
     permission_classes = [IsCreator]
     serializer_class = CreatorProfileSerializer
+    field_name = "photo"
 
     @extend_schema(tags=["Profiles"], request=_UPLOAD_BODY, responses={200: CreatorProfileSerializer})
     def put(self, request):
         return super().put(request)
+
+    @extend_schema(exclude=True)
+    def post(self, request):
+        return super().post(request)
 
     @extend_schema(tags=["Profiles"], responses={200: CreatorProfileSerializer})
     def delete(self, request):
@@ -140,10 +151,15 @@ class BrandLogoView(_ProfilePictureView):
 
     permission_classes = [IsBrand]
     serializer_class = BrandProfileSerializer
+    field_name = "logo"
 
     @extend_schema(tags=["Profiles"], request=_UPLOAD_BODY, responses={200: BrandProfileSerializer})
     def put(self, request):
         return super().put(request)
+
+    @extend_schema(exclude=True)
+    def post(self, request):
+        return super().post(request)
 
     @extend_schema(tags=["Profiles"], responses={200: BrandProfileSerializer})
     def delete(self, request):

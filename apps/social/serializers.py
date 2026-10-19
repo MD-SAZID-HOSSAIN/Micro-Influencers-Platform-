@@ -59,3 +59,30 @@ class CompleteConnectSerializer(serializers.Serializer):
 
     state = serializers.CharField(max_length=2048)
     code = serializers.CharField(max_length=2048)
+
+
+class YouTubeDirectConnectSerializer(serializers.Serializer):
+    handle_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    followers = serializers.IntegerField(min_value=0, max_value=2_000_000_000, required=False, default=0)
+    engagement_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False, default=3.50
+    )
+
+
+class ChallengeCodeSerializer(serializers.Serializer):
+    platform = serializers.CharField()
+    challenge_code = serializers.CharField()
+    instructions = serializers.CharField()
+
+
+class DirectAccountAuthSerializer(serializers.Serializer):
+    handle = serializers.CharField(max_length=200)
+    verification_method = serializers.ChoiceField(
+        choices=["oauth", "direct_auth", "challenge"], default="direct_auth"
+    )
+    auth_code = serializers.CharField(max_length=2048, required=False, allow_blank=True, default="")
+    followers = serializers.IntegerField(min_value=0, max_value=2_000_000_000, required=False, default=0)
+    engagement_rate = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False, default=3.50
+    )
+

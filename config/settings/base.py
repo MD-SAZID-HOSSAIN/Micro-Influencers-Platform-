@@ -35,10 +35,7 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "accounts.User"
 
-# Uploaded campaign photos and videos. In development Django serves them from here; a deployed
-# server needs this folder on persistent storage, served by the web server or replaced by object storage.
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Upload size limits (photos for campaigns and profile pictures; videos for campaigns).
 MEDIA_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 MEDIA_MAX_VIDEO_BYTES = 50 * 1024 * 1024
 
@@ -182,6 +179,9 @@ LOGGING = {
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+
+MEDIA_URL = env("MEDIA_URL", default="/media/")
+MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))  # needs persistent storage when deployed
 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL

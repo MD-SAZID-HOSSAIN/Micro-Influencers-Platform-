@@ -13,11 +13,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='brandprofile',
             name='logo',
-            field=models.FileField(blank=True, max_length=200, upload_to='profiles/logos/%Y/%m/'),
+            field=models.FileField(blank=True, max_length=200, upload_to='logos/%Y/%m/'),
         ),
         migrations.AddField(
             model_name='creatorprofile',
             name='photo',
-            field=models.FileField(blank=True, max_length=200, upload_to='profiles/photos/%Y/%m/'),
+            field=models.FileField(blank=True, max_length=200, upload_to='avatars/%Y/%m/'),
         ),
     ]

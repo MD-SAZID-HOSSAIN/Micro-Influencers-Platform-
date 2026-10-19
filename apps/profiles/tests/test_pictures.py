@@ -51,7 +51,7 @@ def test_a_creator_can_upload_a_photo(creator, auth_client, media_root):
 
     assert response.status_code == 200
     url = response.json()["photo_url"]
-    assert url.startswith("/media/profiles/photos/") and url.endswith(".png")
+    assert url.startswith("/media/avatars/") and url.endswith(".png")
     assert "holiday" not in url
     assert stored(media_root, url).exists()
     assert CreatorProfile.objects.get(user=creator).photo_url == url
@@ -134,7 +134,7 @@ def test_the_photo_counts_towards_profile_completion(creator, auth_client):
 
 def test_a_brand_can_upload_replace_and_remove_a_logo(brand, auth_client, media_root, run_on_commit):
     first = put(auth_client, brand, LOGO).json()["logo_url"]
-    assert first.startswith("/media/profiles/logos/") and stored(media_root, first).exists()
+    assert first.startswith("/media/logos/") and stored(media_root, first).exists()
 
     with run_on_commit():
         second = put(auth_client, brand, LOGO, PNG, "l.png", "image/png").json()["logo_url"]

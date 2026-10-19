@@ -1789,6 +1789,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/PlatformStats'
           description: ''
+    delete:
+      operationId: creators_me_stats_destroy
+      description: Enter Unverified stats by hand for a platform (the fallback to
+        account connection).
+      parameters:
+      - in: path
+        name: platform
+        schema:
+          type: string
+        required: true
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -1908,6 +1925,92 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationSettings'
           description: ''
+  /api/v1/social/challenge/{platform}/:
+    get:
+      operationId: social_challenge_retrieve
+      description: Generate a temporary, unique verification challenge code to verify
+        account ownership.
+      parameters:
+      - in: path
+        name: platform
+        schema:
+          type: string
+        required: true
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeCode'
+          description: ''
+  /api/v1/social/direct-connect/{platform}/:
+    post:
+      operationId: social_direct_connect_create
+      description: Directly connect and verify ownership of a social account (OAuth
+        or Challenge verification).
+      parameters:
+      - in: path
+        name: platform
+        schema:
+          type: string
+        required: true
+      tags:
+      - Social
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectAccountAuth'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DirectAccountAuth'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DirectAccountAuth'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformStats'
+          description: ''
+  /api/v1/social/facebook/connect/:
+    get:
+      operationId: social_facebook_connect_retrieve
+      description: Start Meta / Facebook OAuth flow.
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationUrl'
+          description: ''
+  /api/v1/social/instagram/connect/:
+    get:
+      operationId: social_instagram_connect_retrieve
+      description: Start Meta / Instagram OAuth flow.
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationUrl'
+          description: ''
   /api/v1/social/youtube/:
     get:
       operationId: social_youtube_retrieve
@@ -1995,6 +2098,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthorizationUrl'
+          description: ''
+  /api/v1/social/youtube/direct-connect/:
+    post:
+      operationId: social_youtube_direct_connect_create
+      description: Directly link and verify a YouTube channel by handle or URL.
+      tags:
+      - Social
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/YouTubeDirectConnect'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/YouTubeDirectConnect'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/YouTubeDirectConnect'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YouTubeStatus'
           description: ''
   /api/v1/social/youtube/recent-content/:
     get:
@@ -2628,6 +2757,19 @@ components:
         * `draft` - Draft
         * `published` - Published
         * `closed` - Closed
+    ChallengeCode:
+      type: object
+      properties:
+        platform:
+          type: string
+        challenge_code:
+          type: string
+        instructions:
+          type: string
+      required:
+      - challenge_code
+      - instructions
+      - platform
     CompleteConnect:
       type: object
       description: 'What the frontend received from the callback redirect: pass both
@@ -3076,6 +3218,32 @@ components:
           type: string
       required:
       - detail
+    DirectAccountAuth:
+      type: object
+      properties:
+        handle:
+          type: string
+          maxLength: 200
+        verification_method:
+          allOf:
+          - $ref: '#/components/schemas/VerificationMethodEnum'
+          default: direct_auth
+        auth_code:
+          type: string
+          default: ''
+          maxLength: 2048
+        followers:
+          type: integer
+          maximum: 2000000000
+          minimum: 0
+          default: 0
+        engagement_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '3.50'
+      required:
+      - handle
     EmailVerify:
       type: object
       properties:
@@ -4114,6 +4282,16 @@ components:
       - mobile_number
       - role
       - username
+    VerificationMethodEnum:
+      enum:
+      - oauth
+      - direct_auth
+      - challenge
+      type: string
+      description: |-
+        * `oauth` - oauth
+        * `direct_auth` - direct_auth
+        * `challenge` - challenge
     Withdraw:
       type: object
       properties:
@@ -4128,6 +4306,22 @@ components:
       description: |-
         * `connected` - Connected
         * `needs_reconnect` - Needs reconnect
+    YouTubeDirectConnect:
+      type: object
+      properties:
+        handle_url:
+          type: string
+          maxLength: 500
+        followers:
+          type: integer
+          maximum: 2000000000
+          minimum: 0
+          default: 0
+        engagement_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '3.50'
     YouTubeStatus:
       type: object
       properties:
