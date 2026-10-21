@@ -20,6 +20,7 @@ import CreatorDashboard from './pages/creator/Dashboard';
 import CreatorProfile from './pages/creator/Profile';
 import EditCreatorProfile from './pages/creator/EditProfile';
 import ConnectedAccounts from './pages/creator/ConnectedAccounts';
+import BrandConnectedAccounts from './pages/brand/ConnectedAccounts';
 import CampaignDiscovery from './pages/creator/CampaignDiscovery';
 import CampaignDetail from './pages/creator/CampaignDetail';
 import MyApplications from './pages/creator/MyApplications';
@@ -71,7 +72,10 @@ function Protected({ role, children }: { role: 'creator' | 'brand'; children: JS
  */
 function ConnectionsRedirect() {
   const { search } = useLocation();
-  return <Navigate to={{ pathname: '/creator/accounts', search }} replace />;
+  const { user } = useAuth();
+  // Brands and creators finish the Google sign-in on their own accounts page.
+  const pathname = user?.role === 'brand' ? '/brand/accounts' : '/creator/accounts';
+  return <Navigate to={{ pathname, search }} replace />;
 }
 
 function AdminGuard({ children }: { children: JSX.Element }) {
@@ -133,6 +137,7 @@ export default function App() {
         <Route path="/brand/dashboard" element={<BrandDashboard />} />
         <Route path="/brand/profile" element={<BrandProfile />} />
         <Route path="/brand/profile/edit" element={<EditBrandProfile />} />
+        <Route path="/brand/accounts" element={<BrandConnectedAccounts />} />
         <Route path="/brand/creators" element={<CreatorDiscovery />} />
         <Route path="/brand/creators/:id" element={<CreatorPublicProfile />} />
         <Route path="/brand/campaigns" element={<CampaignList />} />

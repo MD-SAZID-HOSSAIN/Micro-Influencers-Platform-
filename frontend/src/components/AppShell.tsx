@@ -33,6 +33,7 @@ const brandNav: NavItem[] = [
   { to: '/brand/creators',  label: 'Find creators' },
   { to: '/brand/campaigns', label: 'Campaigns' },
   { to: '/brand/profile',   label: 'Company' },
+  { to: '/brand/accounts',  label: 'Accounts' },
 ];
 
 const creatorActions: QuickAction[] = [
@@ -209,12 +210,16 @@ export default function AppShell() {
         </div>
       </header>
 
-      {user && user.role === 'brand' && user.emailVerified === false && (
+      {user && user.emailVerified === false && (
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="container-page py-2.5 flex items-center justify-between gap-3 text-sm">
             <span className="text-amber-900 inline-flex items-center gap-2">
               <Mail className="w-4 h-4 text-amber-600" />
-              <span><strong>Verify your email</strong> to publish campaigns and accept proposals.</span>
+              {user.role === 'brand' ? (
+                <span><strong>Verify your email</strong> to publish campaigns and accept proposals.</span>
+              ) : (
+                <span><strong>Verify your email</strong> with the 6-digit code we sent you. To apply to campaigns you also need to connect YouTube.</span>
+              )}
             </span>
             <Link
               to="/verify-email"
@@ -222,6 +227,27 @@ export default function AppShell() {
               className="text-amber-900 hover:text-amber-700 font-semibold text-sm underline shrink-0"
             >
               Verify
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* A brand with a confirmed email still needs one connected platform before it can publish or accept. */}
+      {user && user.role === 'brand' && user.emailVerified !== false && user.platformConnected === false && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="container-page py-2.5 flex items-center justify-between gap-3 text-sm">
+            <span className="text-amber-900 inline-flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Connect a social account</strong> (YouTube, Instagram, TikTok or Facebook) to publish campaigns
+                and accept proposals.
+              </span>
+            </span>
+            <Link
+              to="/brand/accounts"
+              className="text-amber-900 hover:text-amber-700 font-semibold text-sm underline shrink-0"
+            >
+              Connect
             </Link>
           </div>
         </div>

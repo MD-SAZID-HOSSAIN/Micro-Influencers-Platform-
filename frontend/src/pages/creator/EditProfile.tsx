@@ -13,18 +13,24 @@ import {
   CheckCircle2, Image as ImageIcon,
 } from 'lucide-react';
 import { ProfilePictureEditor } from '../../components/ProfilePictureEditor';
+import { LocationPicker } from '../../components/LocationPicker';
+import { DEFAULT_COUNTRY } from '../../lib/places';
 import { useAuth } from '../../state/AuthContext';
 import { ChannelArt } from '../../components/ui';
 import type { CreatorProfile } from '../../types';
 import clsx from 'clsx';
 import { isApiError } from '../../api/client';
 
+/** A profile with no country yet starts on the default country; nothing is saved until the creator saves. */
+const withDefaultCountry = (c: CreatorProfile): CreatorProfile =>
+  c.country ? c : { ...c, country: DEFAULT_COUNTRY, location: [c.city, DEFAULT_COUNTRY].filter(Boolean).join(', ') };
+
 export default function EditCreatorProfile() {
   const { creator } = useStore();
   const { setAvatar } = useAuth();
   const navigate = useNavigate();
   const { push } = useToast();
-  const [form, setForm] = useState<CreatorProfile | null>(creator);
+  const [form, setForm] = useState<CreatorProfile | null>(creator ? withDefaultCountry(creator) : null);
   const [links, setLinks] = useState(creator?.portfolio ?? []);
   const [saving, setSaving] = useState(false);
 
@@ -33,7 +39,7 @@ export default function EditCreatorProfile() {
     if (!creator || !creator.id) {
       loadCreatorProfile().catch(() => undefined);
     } else {
-      setForm(creator);
+      setForm(withDefaultCountry(creator));
       setLinks(creator.portfolio);
     }
   }, [creator?.id]);
@@ -51,9 +57,13 @@ export default function EditCreatorProfile() {
 
   const dirty =
     JSON.stringify({ ...form, portfolio: links }) !==
-    JSON.stringify({ ...creator, portfolio: creator.portfolio });
+    JSON.stringify({ ...withDefaultCountry(creator), portfolio: creator.portfolio });
 
   const save = async () => {
+    if (!form.country || !(form.city ?? '').trim()) {
+      push('Choose your country and your city.', 'error');
+      return;
+    }
     setSaving(true);
     try {
       await updateCreator({
@@ -61,7 +71,8 @@ export default function EditCreatorProfile() {
         bio: form.bio,
         niche: form.niche,
         primaryPlatform: form.primaryPlatform,
-        location: form.location,
+        city: (form.city ?? '').trim(),
+        country: form.country,
         ratePerPost: form.ratePerPost,
         ratePerStory: form.ratePerStory,
         ratePerVideo: form.ratePerVideo,
@@ -78,7 +89,7 @@ export default function EditCreatorProfile() {
   };
 
   const reset = () => {
-    setForm(creator);
+    setForm(withDefaultCountry(creator));
     setLinks(creator.portfolio);
     push('Reverted unsaved changes', 'info');
   };
@@ -128,9 +139,15 @@ export default function EditCreatorProfile() {
             <FormField label="Full name" htmlFor="fullName" required>
               <Input id="fullName" value={form.fullName} onChange={(e) => set('fullName', e.target.value)} placeholder="Your display name" />
             </FormField>
-            <FormField label="Location" htmlFor="loc" required>
-              <Input id="loc" value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="City, Country" />
-            </FormField>
+            <LocationPicker
+              country={form.country ?? ''}
+              city={form.city ?? ''}
+              onChange={({ country, city }) =>
+                setForm((prev) =>
+                  prev ? { ...prev, country, city, location: [city, country].filter(Boolean).join(', ') } : prev,
+                )
+              }
+            />
             <FormField label="Niche" htmlFor="niche" required>
               <Select id="niche" value={form.niche} onChange={(e) => set('niche', e.target.value as any)}>
                 {NICHES.map((n) => <option key={n}>{n}</option>)}

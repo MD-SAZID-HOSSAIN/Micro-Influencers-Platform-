@@ -27,14 +27,11 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (ready && !user) {
       navigate('/login', { replace: true });
-    } else if (ready && user && user.role !== 'brand') {
-      // Only brands verify their email. Creators are verified by connecting YouTube.
-      navigate(user.role === 'creator' ? '/creator/dashboard' : '/', { replace: true });
     }
   }, [ready, user]);
 
   useEffect(() => {
-    if (!sendOnOpen || !ready || !user || user.role !== 'brand' || sentOnOpen.current) return;
+    if (!sendOnOpen || !ready || !user || sentOnOpen.current) return;
     sentOnOpen.current = true;
     // The flag lives in the browser's history entry, so it would survive a reload or going back to this
     // page and send another email each time. Drop it from this entry now that the request is made.

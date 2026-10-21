@@ -61,24 +61,42 @@ def test_a_verification_code_is_emailed_after_registration(db, run_on_commit):
     assert OneTimeCode.objects.filter(user__email="new@example.com", purpose="email_verification").count() == 1
 
 
-def test_a_creator_gets_no_verification_code_after_registration(db, run_on_commit):
-    response = register(APIClient(), run_on_commit, role="creator")
+@pytest.mark.parametrize("role", ["creator", "brand"])
+def test_both_roles_get_a_verification_code_after_registration(db, run_on_commit, role):
+    response = register(APIClient(), run_on_commit, role=role)
 
     assert response.status_code == 201
-    assert mail.outbox == []
-    assert not OneTimeCode.objects.filter(user__email="new@example.com", purpose="email_verification").exists()
+    assert len(mail.outbox) == 1 and mail.outbox[0].to == ["new@example.com"]
+    assert re.search(r"\b\d{6}\b", mail.outbox[0].body)
+    assert OneTimeCode.objects.filter(user__email="new@example.com", purpose="email_verification").count() == 1
 
 
-def test_creators_cannot_verify_or_resend_an_email_code(db, auth_client):
-    creator = UserFactory(role=Role.CREATOR)
-    client = auth_client(creator)
+def test_a_creator_can_verify_their_email_with_the_code(db, run_on_commit):
+    client = APIClient()
+    register(client, run_on_commit, role="creator")
+    token = client.post(LOGIN, {"identifier": "newuser", "password": DEFAULT_PASSWORD}, format="json").json()["access"]
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-    for url, body in ((RESEND, None), (VERIFY, {"code": "123456"})):
-        response = client.post(url, body, format="json")
+    response = client.post(VERIFY, {"code": last_code()}, format="json")
 
-        assert response.status_code == 403, url
-        assert error_code(response) == "email_verification_brands_only"
-    assert User.objects.get(pk=creator.pk).email_verified is False
+    assert response.status_code == 200
+    assert User.objects.get(username="newuser").email_verified is True
+
+
+def test_a_verified_email_does_not_let_a_creator_apply_without_youtube(db, auth_client):
+    """Creators are Verified by connecting YouTube; the email code is a separate check."""
+    from apps.campaigns.models import Campaign
+    from apps.campaigns.tests.factories import CampaignFactory
+
+    creator = UserFactory(role=Role.CREATOR, email_verified=True)
+    campaign = CampaignFactory(status=Campaign.Status.PUBLISHED)
+
+    response = auth_client(creator).post(
+        f"/api/v1/campaigns/{campaign.pk}/proposals/", {"cover_message": "Hello", "proposed_rate": "100"}, format="json"
+    )
+
+    assert response.status_code == 403
+    assert error_code(response) == "creator_youtube_required"
 
 
 def test_a_creator_can_still_reset_a_forgotten_password(db, run_on_commit):

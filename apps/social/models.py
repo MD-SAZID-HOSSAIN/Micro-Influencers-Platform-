@@ -52,3 +52,28 @@ class YouTubeConnection(models.Model):
 
     def __str__(self):
         return f"YouTubeConnection({self.creator_id}, {self.status})"
+
+
+class BrandSocialAccount(models.Model):
+    """A social account a brand has connected. One connected platform, of any kind, completes a brand's verification.
+
+    ``is_verified`` is True only when ownership was proven with Google sign-in (YouTube). A link the brand typed for
+    Instagram, TikTok or Facebook is stored with ``is_verified = False``: it counts as connected, but nothing proves it.
+    """
+
+    brand = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="social_accounts"
+    )
+    platform = models.CharField(max_length=20, choices=Platform.choices)
+    handle_url = models.URLField(max_length=500)
+    is_verified = models.BooleanField(default=False)
+    connected_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["brand", "platform"], name="uniq_brand_social_per_platform")
+        ]
+        ordering = ["platform"]
+
+    def __str__(self):
+        return f"BrandSocialAccount({self.brand_id}, {self.platform})"

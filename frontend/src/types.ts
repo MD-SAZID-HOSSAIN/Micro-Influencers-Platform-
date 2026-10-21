@@ -9,6 +9,8 @@ export type User = {
   mobile?: string;
   avatarUrl?: string;
   emailVerified?: boolean;
+  /** Brands only: true once at least one social platform is connected. Null/absent for creators. */
+  platformConnected?: boolean | null;
   emailNotificationsEnabled?: boolean;
 };
 
@@ -24,7 +26,10 @@ export type CreatorProfile = {
   bio: string;
   niche: Niche;
   primaryPlatform: Platform;
+  /** "City, Country" for display. The two parts below are what the profile form edits and saves. */
   location: string;
+  city?: string;
+  country?: string;
   ratePerPost: number;
   ratePerStory: number;
   ratePerVideo: number;

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, Users, Megaphone, ChevronRight, Mail, Inbox, Star, FilePen, CheckCircle2 } from 'lucide-react';
+import { Plus, ArrowRight, Users, Megaphone, ChevronRight, Mail, Inbox, Star, FilePen, CheckCircle2, Link2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandProfile, loadBrandCampaigns } from '../../state/Store';
 import { fetchBrandDashboard, type BrandDashboardData } from '../../api/endpoints';
@@ -72,6 +72,17 @@ export default function BrandDashboard() {
       to: '/verify-email',
       state: { email: user?.email, sendCode: true },
       cta: 'Verify email',
+    });
+  }
+  if (user?.platformConnected === false && !emailUnverified) {
+    attention.push({
+      key: 'platform',
+      tone: 'amber',
+      icon: <Link2 className="w-5 h-5" />,
+      title: 'Connect a social account to publish and accept',
+      text: 'Connect any one of YouTube, Instagram, TikTok or Facebook. It finishes verifying your brand.',
+      to: '/brand/accounts',
+      cta: 'Connect account',
     });
   }
   if (pending > 0 && busiest) {

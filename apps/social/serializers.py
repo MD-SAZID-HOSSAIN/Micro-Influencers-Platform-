@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.core.fields import OptionalUrlField
 
-from .models import PlatformStats, YouTubeConnection
+from .models import BrandSocialAccount, PlatformStats, YouTubeConnection
 
 
 class YouTubeConnectionSerializer(serializers.ModelSerializer):
@@ -86,3 +86,16 @@ class DirectAccountAuthSerializer(serializers.Serializer):
         max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False, default=3.50
     )
 
+
+
+class BrandSocialAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrandSocialAccount
+        fields = ["platform", "handle_url", "is_verified", "connected_at"]
+        read_only_fields = fields
+
+
+class BrandSocialLinkSerializer(serializers.Serializer):
+    """The link a brand types for Instagram, TikTok or Facebook."""
+
+    handle_url = serializers.CharField(max_length=500)

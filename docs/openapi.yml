@@ -1049,6 +1049,132 @@ paths:
               schema:
                 $ref: '#/components/schemas/BrandProfile'
           description: ''
+  /api/v1/brands/me/social/:
+    get:
+      operationId: brands_me_social_list
+      description: The platforms the signed-in brand has connected. One, of any kind,
+        completes its verification.
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrandSocialAccount'
+          description: ''
+  /api/v1/brands/me/social/{platform}/:
+    put:
+      operationId: brands_me_social_update
+      description: Add a typed link (Instagram, TikTok, Facebook) or remove any connected
+        platform.
+      parameters:
+      - in: path
+        name: platform
+        schema:
+          type: string
+        required: true
+      tags:
+      - Social
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandSocialLink'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BrandSocialLink'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BrandSocialLink'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandSocialAccount'
+          description: ''
+    delete:
+      operationId: brands_me_social_destroy
+      description: Add a typed link (Instagram, TikTok, Facebook) or remove any connected
+        platform.
+      parameters:
+      - in: path
+        name: platform
+        schema:
+          type: string
+        required: true
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/brands/me/social/youtube/complete/:
+    post:
+      operationId: brands_me_social_youtube_complete_create
+      description: Finish connecting YouTube for a brand. Send back the ``state``
+        and ``code`` the callback redirect carried.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Social
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CompleteConnect'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBrandSocialAccountList'
+          description: ''
+  /api/v1/brands/me/social/youtube/connect/:
+    get:
+      operationId: brands_me_social_youtube_connect_retrieve
+      description: 'Start the Google sign-in for a brand: returns the Google URL to
+        send the browser to.'
+      tags:
+      - Social
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizationUrl'
+          description: ''
   /api/v1/campaigns/:
     get:
       operationId: campaigns_list
@@ -2457,6 +2583,38 @@ components:
       - proposed_rate
       - status
       - withdrawal_reason
+    BrandSocialAccount:
+      type: object
+      properties:
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          readOnly: true
+        handle_url:
+          type: string
+          format: uri
+          readOnly: true
+        is_verified:
+          type: boolean
+          readOnly: true
+        connected_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - connected_at
+      - handle_url
+      - is_verified
+      - platform
+    BrandSocialLink:
+      type: object
+      description: The link a brand types for Instagram, TikTok or Facebook.
+      properties:
+        handle_url:
+          type: string
+          maxLength: 500
+      required:
+      - handle_url
     BrandSummary:
       type: object
       properties:
@@ -3617,6 +3775,29 @@ components:
         creators_needed:
           type: integer
           example: 3
+    PaginatedBrandSocialAccountList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrandSocialAccount'
     PaginatedCampaignCardList:
       type: object
       required:
@@ -4316,6 +4497,12 @@ components:
         email_verified:
           type: boolean
           readOnly: true
+        platform_connected:
+          type: boolean
+          nullable: true
+          readOnly: true
+          description: 'Brands only: whether at least one social platform is connected.
+            Null for everyone else.'
         avatar_url:
           type: string
           nullable: true
@@ -4328,6 +4515,7 @@ components:
       - full_name
       - id
       - mobile_number
+      - platform_connected
       - role
       - username
     VerificationMethodEnum:

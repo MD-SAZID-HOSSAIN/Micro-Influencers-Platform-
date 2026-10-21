@@ -34,6 +34,7 @@ class FakeYouTubeClient:
 
     def __init__(self):
         self.default_snapshot = snapshot()
+        self.channel_link_result: object = "https://www.youtube.com/@brandchannel"  # used by brand sign-in
         self.fetch_results: dict[str, object] = {}
         self.refresh_result: object = TokenSet("refreshed-at", None, 3600)
         self.exchange_result: object = TokenSet("exchanged-at", "exchanged-rt", 3600)
@@ -66,6 +67,9 @@ class FakeYouTubeClient:
     def fetch_channel(self, access_token):
         self.fetch_calls.append(access_token)
         return self._result(self.fetch_results.get(access_token, self.default_snapshot))
+
+    def fetch_channel_link(self, access_token):
+        return self._result(self.channel_link_result)
 
     def fetch_video_stats(self, video_ids, api_key):
         self.video_calls.append((list(video_ids), api_key))

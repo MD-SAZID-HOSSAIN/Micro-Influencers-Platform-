@@ -196,12 +196,20 @@ The user object (also returned by `GET /auth/me/`):
 - Code errors (all 400): `invalid_verification_code`, `verification_code_expired` (10 minutes),
   `verification_code_used`, `verification_code_locked` (5 wrong tries; ask for a new code).
 
-Only **brands** verify their email: for a creator, `POST /auth/email/verify/` and `/auth/email/resend/` return 403
-`email_verification_brands_only`, and registering as a creator sends no code (do not send creators to the verify
-page). A creator's email is used for password reset only.
+Both brands and creators receive the 6-digit code after registering, so send either role to the verify page. For a
+creator the email code is separate from YouTube: it confirms their address and enables notification emails, but
+applying still needs a connected YouTube channel.
 
 An unverified **brand** cannot publish a campaign or accept a proposal: those calls return 403 with code
-`brand_email_unverified`. Everything else works unverified (drafts, shortlisting, rejecting, browsing).
+`brand_email_unverified` (email not confirmed) or `brand_platform_required` (no connected platform; the email is
+checked first). Everything else works unverified (drafts, shortlisting, rejecting, browsing).
+
+A brand connects platforms with `GET /brands/me/social/` (list), `PUT /brands/me/social/{instagram|tiktok|facebook}/`
+with `{"handle_url"}` (a link on that platform; saved as `is_verified: false`), `DELETE /brands/me/social/{platform}/`,
+and YouTube through Google: `GET /brands/me/social/youtube/connect/`, then `POST /brands/me/social/youtube/complete/`
+with the `state` and `code` the callback redirect carries (the same `?youtube=confirm&code=...&state=...` redirect creators
+use; send brands to their own accounts page). `GET /auth/me/` returns `platform_connected` (true or false for brands,
+null for others): show a "connect a platform" banner while it is `false`.
 For everyone, verification also decides whether notification emails are sent (section 7.2). Show a
 "verify your email" banner while `email_verified` is `false`.
 

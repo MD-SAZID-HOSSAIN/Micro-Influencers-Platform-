@@ -11,7 +11,7 @@ from apps.accounts.models import Role, User
 from apps.campaigns.models import Campaign
 from apps.profiles.models import BrandProfile, CreatorProfile
 from apps.proposals.models import Proposal
-from apps.social.models import PlatformStats
+from apps.social.models import BrandSocialAccount, PlatformStats
 
 DEMO_PASSWORD = "DemoPass123!"
 
@@ -236,7 +236,7 @@ def test_the_verification_step_uses_a_handful_of_queries_however_many_creators_t
     PlatformStats.objects.filter(platform="youtube").delete()  # force it to create the missing rows
     User.objects.filter(role=Role.BRAND).update(email_verified=False)
 
-    with django_assert_max_num_queries(8):
+    with django_assert_max_num_queries(10):
         demo_data._apply_verification()
 
     for i in range(1, 41):
@@ -245,6 +245,7 @@ def test_the_verification_step_uses_a_handful_of_queries_however_many_creators_t
         ).exists()
         assert verified == (i % 5 != 0), i
     assert not User.objects.filter(role=Role.BRAND, email_verified=False).exists()
+    assert BrandSocialAccount.objects.count() == 3  # every demo brand has a connected platform
 
 
 def test_the_verification_step_gives_the_same_youtube_numbers_every_time(db, debug_on):
@@ -260,3 +261,13 @@ def test_the_verification_step_gives_the_same_youtube_numbers_every_time(db, deb
 
     second = dict(PlatformStats.objects.filter(platform="youtube").values_list("creator__username", "followers"))
     assert first == second and len(first) == 10  # 12 creators, minus demo_creator_005 and _010
+
+
+def test_seeding_again_gives_brands_that_lost_their_platform_a_connected_one(db, debug_on):
+    seed(creators=1, brands=2, campaigns=0)
+    BrandSocialAccount.objects.all().delete()
+
+    seed(creators=1, brands=2, campaigns=0)
+
+    assert BrandSocialAccount.objects.filter(brand__username__startswith="demo_brand_").count() == 2
+    assert not BrandSocialAccount.objects.filter(is_verified=True).exists()  # a typed link is never "Verified"

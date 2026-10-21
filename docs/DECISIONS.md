@@ -104,10 +104,18 @@ line of code, and the tests that pin them sit next to the code.
   (any platform, including a hand-typed YouTube entry) do not count, and the channel works for campaigns on
   any platform. Disconnecting YouTube marks the stats Unverified, so it removes the right to apply. A creator's
   email verification does not replace this.
-- **Only brands verify their email.** Registering as a creator sends no verification code, and
-  `POST /auth/email/verify/` and `/auth/email/resend/` answer 403 `email_verification_brands_only` for creators.
-  A creator's email is used for password reset only. Because notification emails go only to verified
-  addresses, creators get no notification emails (in-app only); this changes FR-24.
+- **A brand also needs one connected platform.** `publish_campaign` and `accept_proposal` check the email first
+  (`brand_email_unverified`), then that the brand has at least one `BrandSocialAccount` (`brand_platform_required`).
+  Any of YouTube, Instagram, TikTok or Facebook counts. YouTube is connected with Google sign-in (the brand's channel
+  link is read once and the Google access is given back in a background job; `is_verified = true`). Instagram, TikTok and Facebook
+  are a link the brand types, checked to be on that platform's website; nothing proves ownership (that needs Meta or
+  TikTok approval), so they are stored with `is_verified = false` ("Added") but still count as connected. Existing
+  email-verified brands must connect a platform before they can publish or accept again. Endpoints:
+  `GET /brands/me/social/`, `PUT|DELETE /brands/me/social/{platform}/`, `GET .../youtube/connect/`,
+  `POST .../youtube/complete/`. `/auth/me/` reports `platform_connected` for brands.
+- **Brands and creators both confirm their email with a 6-digit code** sent after sign-up (`POST /auth/email/verify/`,
+  `/auth/email/resend/`). For a creator this is a separate check from YouTube: it does not let them apply (only a
+  connected YouTube channel does), and it makes them eligible for notification emails (FR-24).
 - **Why this differs from the PRD:** FR-02, FR-10 and FR-24 say unverified users can use the platform and that
   unverified stats still count towards applying. The owner chose stricter rules to keep fake or throwaway
   accounts out of the marketplace.

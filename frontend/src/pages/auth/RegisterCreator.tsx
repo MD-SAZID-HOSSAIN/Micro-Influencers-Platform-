@@ -35,7 +35,7 @@ export default function RegisterCreator() {
         password: form.password,
         mobileNumber: form.mobile,
       });
-      // Creators are verified by connecting YouTube, not by email, so there is no verify step.
+      // Log in so the verify-email page can send and check the 6-digit code (those calls need a signed-in user).
       try {
         await login({ identifier: form.email, password: form.password });
       } catch {
@@ -43,8 +43,8 @@ export default function RegisterCreator() {
         navigate('/login');
         return;
       }
-      push(`Welcome, ${form.fullName.split(' ')[0]}! Connect YouTube to start applying to campaigns.`, 'success');
-      navigate('/creator/dashboard');
+      push(`Welcome, ${form.fullName.split(' ')[0]}! Check your inbox for the 6-digit code to verify your email.`, 'success');
+      navigate('/verify-email', { state: { email: form.email } });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'validation_error' && err.details && typeof err.details === 'object') {

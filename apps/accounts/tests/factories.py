@@ -29,6 +29,17 @@ class UserFactory(factory.django.DjangoModelFactory):
             self.save(update_fields=["password"])
 
     @factory.post_generation
+    def platform_connected(self, create, extracted, **kwargs):
+        """Brands start with one connected platform (so they can publish and accept); pass False for none."""
+        connected = extracted if extracted is not None else self.role == Role.BRAND
+        if create and connected:
+            from apps.social.models import BrandSocialAccount
+
+            BrandSocialAccount.objects.create(
+                brand=self, platform="instagram", handle_url=f"https://instagram.com/{self.username}"
+            )
+
+    @factory.post_generation
     def youtube_verified(self, create, extracted, **kwargs):
         if create and extracted:
             from apps.social.models import PlatformStats

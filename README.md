@@ -21,20 +21,282 @@ Useful documents:
 - Deployment: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - Build plan and report: [`plan.md`](plan.md), [`docs/BUILD_REPORT.md`](docs/BUILD_REPORT.md)
 
+## Contents
+
+Click a title to jump to that section. Every section ends with a "Back to contents" link.
+
+### Start here
+
+- **[The idea in one minute](#the-idea-in-one-minute)**: what the platform is, in four steps
+- **[Run the project](#run-the-project)**: copy-and-paste steps for Windows
+  - [Before you start (install once)](#before-you-start-install-once)
+  - [Step 1: Start the database](#step-1-start-the-database)
+  - [Step 2: Start the API](#step-2-start-the-api-terminal-1)
+  - [Step 3: Start the website](#step-3-start-the-website-terminal-2)
+  - [Step 4: Open the site](#step-4-open-the-site)
+  - [Next time you start it](#next-time-you-start-it)
+  - [Check that it works](#check-that-it-works)
+  - [If it does not start](#if-it-does-not-start)
+  - [No Docker (your own PostgreSQL)](#no-docker-your-own-postgresql)
+- **[Demo data](#demo-data)**: example accounts to log in with
+
+### What it does
+
+- **[Features](#features)**: everything the platform does
+  - [For everyone](#for-everyone): sign-up, login, forgot password, notifications
+  - [For creators](#for-creators): profile, YouTube, finding work, applying
+  - [For brands](#for-brands): verification, finding creators, campaigns, proposals, reviews
+  - [Notifications and email](#notifications-and-email)
+  - [For admins](#for-admins)
+  - [Behind the scenes](#behind-the-scenes): security, limits, background jobs
+  - [What it does not do (on purpose)](#what-it-does-not-do-on-purpose)
+- **[Who can do what](#who-can-do-what)**: the verification rules for brands and creators
+
+### Set it up
+
+- **[Requirements](#requirements)**: what to install
+- **[Email](#email)**: where codes go, and how to send real emails
+- **[Admin accounts](#admin-accounts)**: how to make an admin
+- **[Photos and videos](#photos-and-videos)**: pictures and campaign media
+- **[Connecting YouTube (Google sign-in)](#connecting-youtube-google-sign-in)**: Google setup
+- **[Configuration](#configuration)**: every setting in `.env`
+
+### For developers
+
+- **[Tests](#tests)**: how to run the tests
+- **[Background workers](#background-workers)**: emails, daily YouTube refresh, closing campaigns
+- **[How the API behaves](#how-the-api-behaves)**: login, errors, lists, limits
+- **[Project layout](#project-layout)**: what each folder holds
+- **[Working on this repository](#working-on-this-repository)**
+
+### Help
+
+- **[Troubleshooting](#troubleshooting)**: common problems and fixes
+- **[Known issues](#known-issues)**: things that are not finished
+
+[↑ Back to contents](#contents)
+
+## Features
+
+This is everything the platform does today, grouped by who uses it. Words in **bold** are the names you will see in the
+website.
+
+### The idea in one minute
+
+There are two kinds of people. **Creators** are small influencers (roughly 1,000 to 100,000 followers). **Brands** are
+businesses that want creators to promote them.
+
+1. A brand writes a **campaign** (a job post) with a budget and a deadline.
+2. Creators find it and send a **proposal** (an application).
+3. The brand looks at the proposals and **shortlists**, **accepts** or **rejects** each one.
+4. After the work, the creator sends links to what they posted, the brand marks the job **completed**, and leaves a
+   **review**.
+
+There is no payment and no chat inside the platform. It only handles finding each other and the proposal steps.
+
+### For everyone
+
+| Feature | What it does |
+|---|---|
+| **Sign up** | Choose Creator or Brand first, then fill in name, email, username, password (8+ characters) and mobile number. The role cannot be changed later. |
+| **Log in and out** | Use your email or your username. The website sends you to the creator or brand home page. Logging out ends the session. |
+| **Forgot password** | Enter your email and a 6-digit code is sent. The code works once, for 10 minutes, and stops after 5 wrong tries. A new password signs you out of every device. The reply is the same whether or not the email exists, so nobody can find out who has an account. |
+| **Email check** | After sign-up a 6-digit code is emailed to confirm the address. You can use the site before confirming, but some actions need it (see "Who can do what"). |
+| **Notifications** | A bell with a number badge, a list of recent events, and "mark as read" or "mark all as read". See "Notifications and email" below. |
+| **Notification emails** | The same events can also be emailed. Each person can switch this off in **Notification settings**. Only confirmed email addresses receive them. |
+| **Privacy and Terms pages** | Public pages that explain what data is kept and the house rules. |
+| **Phone and desktop** | The website works on both. Pictures that are missing or fail to load show the person's initials instead. |
+
+### For creators
+
+**1. Profile**
+- **Photo, bio, niche** (Fitness, Tech, Beauty, Food, Travel or Other), **primary platform**, **country and city**
+  (picked from lists, Bangladesh first), and **rates** per post, per story and per video.
+- **Profile completion** shows how much of the profile is filled in.
+- **Portfolio**: up to 10 links to past work, each with a short caption. You can pick items from your recent YouTube
+  videos.
+- **Public profile**: logged-in brands can see all of this, plus your stats and reviews. Nobody who is logged out can.
+
+**2. Connecting YouTube (this makes you Verified)**
+- Press **Connect YouTube** and sign in with Google. Only read-only access is asked for.
+- The platform then reads your channel link, subscriber count, an engagement rate worked out from recent videos, and
+  your recent videos. These show on your profile with a **Verified** badge and the time they were last updated.
+- Stats refresh by themselves every day. You can also press **Refresh** (once every 15 minutes).
+- If Google access ends, you get a "please reconnect" notification. Your last numbers stay visible, marked **outdated**.
+- **Disconnect** deletes the stored access and gives it back at Google. Your last numbers stay but become Unverified.
+- You can also type stats by hand for YouTube, Instagram, TikTok or Facebook. These are always shown as
+  **Unverified**. Only YouTube can be proven, because Instagram, TikTok and Facebook do not allow this without
+  special approval from them.
+
+**3. Finding work**
+- **Find work** lists published campaigns. Filter by keyword, niche, platform, budget range and deadline.
+- Every card shows brand, category, budget per creator, platform, deadline and how many creators are needed.
+- An **Eligible** or **Check fit** tag compares the campaign's platform and minimum followers with your stats. It is
+  only a hint. It never stops you from applying.
+- The campaign page shows the full details and any photos or video. It says "Brand has selected all creators" when the
+  places are full.
+
+**4. Applying and tracking**
+- **Apply now** opens a form: cover message, your rate, up to 3 portfolio links (filled in from your profile), and an
+  experience note. **You cannot apply until a YouTube channel is connected.**
+- One live proposal per campaign. A sent proposal cannot be edited.
+- **My proposals** lists every application with its status: Pending, Shortlisted, Accepted, Rejected or Withdrawn.
+- You can **withdraw** a Pending, Shortlisted or Accepted proposal. Withdrawing an accepted one needs a short reason
+  (up to 300 characters) and frees the place for someone else. You can apply again after withdrawing, but only while
+  the campaign is still open. A rejected proposal cannot be sent again.
+
+**5. After you are accepted**
+- Add **deliverables**: the link to each post you published, the platform, and an optional note. You can change them
+  until the brand marks the work completed.
+
+**6. Home page (dashboard)**
+- One clear **next step** (for example "Connect YouTube", "Finish your profile" or "Find your next campaign").
+- Numbers: proposals sent, waiting for a reply, accepted, and success rate.
+- Active collaborations, your latest proposals, new campaigns that might fit, and the state of your profile and YouTube.
+
+### For brands
+
+**1. Company profile**
+- Company name, industry, website, "about" text and a **logo**. Logged-in creators can see it on your campaigns.
+
+**2. Two steps to be fully verified**
+- **Confirm your email** with the 6-digit code.
+- **Connect one platform** on **Accounts**: YouTube, Instagram, TikTok or Facebook. Any one is enough.
+  - **YouTube** is connected with Google sign-in. The platform reads the channel link once, then gives the Google access
+    back. It is tagged **Verified**.
+  - **Instagram, TikTok and Facebook** are links you type. The platform checks they are on that site, but cannot prove
+    you own them. They are tagged **Added**.
+- Until both steps are done, a brand can still browse, save drafts, shortlist and reject. It **cannot publish a
+  campaign or accept a proposal**.
+
+**3. Finding creators**
+- **Find creators** is a searchable directory of creator profiles. Filters: name or username, niche, platform,
+  followers (from and to), engagement rate, location, rate range, **Verified accounts only**, and minimum rating.
+- Sort by followers, engagement, rate or rating. Results come in pages.
+- A creator's page shows their profile, rates, stats with the Verified badge and last update time, portfolio and
+  reviews.
+
+**4. Campaigns**
+- Fields: title, description, niche, platform, **budget per creator**, **deadline**, deliverables (for example
+  "2 posts, 1 reel"), **creators needed** (1 to 20), and an optional **minimum followers**.
+- You can attach **up to 2 photos or 1 video** while it is a draft (photos: JPG, PNG, WebP up to 5 MB; video: MP4 or
+  WebM up to 50 MB).
+- Life of a campaign:
+
+  | Step | What you can do |
+  |---|---|
+  | **Draft** | Edit everything or delete it. Creators cannot see it. |
+  | **Published** | Creators can see and apply. It can no longer be edited or deleted, only closed. |
+  | **Closed** | No new applications. You can still answer proposals already received. A closed campaign is never reopened. |
+
+- A campaign **closes by itself** when its deadline passes (checked every 5 minutes), and you are told. It does **not**
+  close just because all the places are filled.
+
+**5. Handling proposals**
+- Each campaign has a list of proposals, newest first, that you can filter by status. Withdrawn ones are hidden unless
+  you ask for them. A counter shows, for example, "2 of 3 creators accepted".
+- Each proposal shows the creator, niche, platform, followers, engagement, their rate, cover message, links, experience
+  note, status (and the reason if an accepted creator withdrew) and a link to their full profile.
+- Actions: **Shortlist**, **Accept** or **Reject**. The creator is notified each time.
+  - You cannot undo Accept or Reject. An accepted place opens up again only if the creator withdraws.
+  - **Accepted can never be more than "creators needed"**, even if two accepts happen at the same moment. When full you
+    see "All creators for this campaign have already been selected." Shortlist and Reject still work.
+  - Pressing Accept twice is harmless.
+  - These actions still work after the campaign is closed.
+
+**6. After the work**
+- See each accepted creator's **deliverables** on the campaign page.
+- Mark each collaboration **Completed**. This is final and is tracked for each creator separately.
+- Leave a **review**: 1 to 5 stars and an optional note (up to 500 characters). One review per completed job. Reviews
+  cannot be edited. The creator's average rating and review count update by themselves and show on their profile, in the
+  directory and on proposals.
+
+**7. Campaign statistics**
+- **Views**: how many creators opened the campaign.
+- **Proposal funnel**: received, shortlisted, accepted, rejected and withdrawn.
+- **Accepted compared with needed**, the **average rate creators asked for compared with your budget**, and the
+  **acceptance rate**.
+- **Content performance**: views, likes, comments and engagement for each deliverable on YouTube. This needs a YouTube
+  API key on the server. Without one it shows "not available".
+
+**8. Home page (dashboard)**
+- A **"What needs your attention"** list: confirm your email, connect a platform, proposals waiting for a decision,
+  shortlisted creators and drafts not yet published.
+- Numbers: live campaigns, new proposals, shortlisted and accepted. Below them, your campaigns with a progress bar and
+  a "new" tag where proposals are waiting.
+
+### Notifications and email
+
+| Who | Gets told when |
+|---|---|
+| **Creator** | A proposal is shortlisted, accepted or rejected. YouTube access needs to be reconnected (once per problem, not every day). |
+| **Brand** | A new proposal arrives. A creator withdraws (if they were accepted, it says a place opened). A campaign closes at its deadline. |
+
+- Every notification appears in the website first. The email copy is extra.
+- Each email has a subject naming the event, a short message and one button that opens the right page in the app. It
+  never includes rates, proposal text or stats.
+- Emails are sent in the background and retried if they fail. A failed email never blocks what you were doing.
+- Password-reset and verification codes are always sent, even when notification emails are off.
+- Suspended accounts get no emails.
+
+### For admins
+
+Admins cannot sign up. They are created with a command (see "Admin accounts") and log in at a separate page.
+
+| Area | What an admin can do |
+|---|---|
+| **Overview** | Total users, sign-ups over time, campaigns by status, total proposals. |
+| **Users** | Search and filter users. **Suspend** (the person cannot log in), **reactivate**, or **delete**. Admins cannot suspend or delete themselves. |
+| **Moderation** | **Close** any campaign and **remove** a review (the rating is recalculated). |
+| **Audit log** | Every action above needs a written reason and is saved with who did it, what, and when. |
+
+### Behind the scenes
+
+- **Security**: passwords are stored as strong hashes. Login sessions last 24 hours. Google access tokens are stored
+  encrypted and never sent to the website. Sign-in with Google is protected against forgery. Every page except the
+  home, login, sign-up, password-reset, Terms and Privacy pages needs a login. People can only change their own data.
+- **Limits**: sign-up 5 a minute, login 10 a minute, password reset 5 an hour, resend code 5 an hour and at least 60
+  seconds apart.
+- **Reliability**: if YouTube is down, the last numbers stay with their "last updated" time. A failure in an outside
+  service never breaks the rest of the platform.
+- **Background jobs**: daily YouTube refresh (03:00 UTC), daily refresh of video statistics (04:00 UTC), closing
+  campaigns past their deadline (every 5 minutes), and sending emails.
+- **Demo data**: one command fills the site with example creators, brands, campaigns and proposals.
+- **API docs**: a web page at `/api/docs/` lists every request the server understands, and the same list is saved in
+  `docs/openapi.yml`.
+
+### What it does not do (on purpose)
+
+- No payments and no chat or negotiation. The proposal is a simple status flow.
+- No push notifications, email digests or marketing emails.
+- A user cannot delete their own account yet. They must contact the team, and an admin does it.
+- Creators cannot review brands.
+- Instagram, TikTok and Facebook cannot be verified, only typed in.
+- While the Google app is in "Testing" mode, only the listed test users can connect YouTube, and Google asks them to
+  reconnect about once a week.
+
+[↑ Back to contents](#contents)
+
 ## Who can do what
 
-| | Verified how | Can do only after verification |
+| | Checks | Can do only after verification |
 |---|---|---|
-| **Brand** | **Email**: a 6-digit code emailed after sign-up | Publish a campaign, accept a proposal |
-| **Creator** | **YouTube**: connect a channel with Google sign-in (Verified stats) | Apply to a campaign |
+| **Brand** | **Email** (a 6-digit code emailed after sign-up) and **one connected platform**: any of YouTube, Instagram, TikTok or Facebook | Publish a campaign, accept a proposal |
+| **Creator** | **Email** (a 6-digit code emailed after sign-up) and **YouTube** (connect a channel with Google sign-in: Verified stats) | Apply to a campaign (needs YouTube; the email code confirms the address) |
 
 - Unverified accounts can still log in, browse, edit their profile and (brands) save drafts, shortlist and reject.
-- Only **brands** verify their email. For a creator, the verify and resend endpoints answer 403
-  `email_verification_brands_only` and no code is sent at sign-up. A creator's email is used to reset a
-  forgotten password, nothing else (so creators receive no notification emails; they see updates in the app).
+- **Everyone** confirms their email with the 6-digit code sent after sign-up (brands and creators). A creator is
+  only *Verified* once a YouTube channel is connected, and **cannot apply until then**, whether or not the email is
+  confirmed. A verified email also means the user receives notification emails.
 - **Forgot password** works for every account, verified or not.
-- The errors are 403 `brand_email_unverified` and 403 `creator_youtube_required`.
+- **A brand is fully verified only with both**: a confirmed email *and* at least one connected platform. YouTube is
+  connected with Google sign-in (proven, tagged *Verified*). Instagram, TikTok and Facebook are a link the brand types
+  (checked to be on that platform's website, but **not proven**, so tagged *Added*). Removing the last platform blocks
+  the brand again. Brands manage this on **Connected accounts** (`/brand/accounts`).
+- The errors are 403 `brand_email_unverified`, 403 `brand_platform_required` and 403 `creator_youtube_required`.
 - This is stricter than the PRD. See "Verification gates" in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
+[↑ Back to contents](#contents)
 
 ## Requirements
 
@@ -45,68 +307,154 @@ Useful documents:
 The test suite needs a real PostgreSQL, because the "accepted never exceeds Creators Needed" guarantee relies on
 row locks that SQLite does not have.
 
+[↑ Back to contents](#contents)
+
 ## Run the project
 
-Run the API and the website in two terminals.
+These steps are for **Windows** and start with the project already on your computer. The project is two programs that run
+side by side: the **API** (the server, port 8000) and the **website** (port 5173). You start each one in its own terminal
+window. The default settings in `.env.example` work as they are, so you do not need to edit anything.
 
-### First-time setup
+**How to open a terminal in the project folder:** open the project folder in File Explorer (the folder that contains
+`manage.py`), click the address bar at the top, type `cmd` and press Enter.
 
-**Terminal 1: backend** (repository root)
+### Before you start (install once)
 
-```bash
+| You need | Why | Check it |
+|---|---|---|
+| **Python 3.12 or newer** | runs the API | `python --version` |
+| **Node 20 or newer** | runs the website | `node --version` |
+| **Docker Desktop** | runs the database (PostgreSQL) and Redis for you | `docker --version` |
+
+No Docker? Use [No Docker](#no-docker-your-own-postgresql) instead of Step 1.
+
+### Step 1: Start the database
+
+Open **Docker Desktop** and wait until it says it is running. Then, in a terminal in the project folder:
+
+```powershell
+docker compose up -d db redis
+```
+
+### Step 2: Start the API (Terminal 1)
+
+Copy the whole block and paste it into a terminal opened in the project folder:
+
+```powershell
 python -m venv .venv
-source .venv/bin/activate              # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements/dev.txt
-cp .env.example .env                   # Windows: copy .env.example .env
-docker compose up -d db redis          # PostgreSQL + Redis (start Docker Desktop first)
+copy .env.example .env
 python manage.py migrate
-python manage.py seed_demo             # optional demo data (see below)
+python manage.py seed_demo
 python manage.py runserver
 ```
 
-**Terminal 2: frontend**
+It is working when you see `Starting development server at http://127.0.0.1:8000/`. **Leave this window open.**
+(`seed_demo` fills the site with example creators, brands and campaigns so there is something to look at.)
 
-```bash
+### Step 3: Start the website (Terminal 2)
+
+Open a **second** terminal in the project folder and paste:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**. In development the website calls `/api/v1` on its own address and Vite
-forwards it to Django, so no CORS setup is needed.
+It is working when you see `Local: http://localhost:5173/`. **Leave this window open too.**
 
-### Every time after that
+### Step 4: Open the site
 
-1. Start Docker Desktop (if you use it).
-2. Terminal 1, from the repository root: activate the virtual environment, run `docker compose up -d db redis`,
-   then `python manage.py runserver`.
-3. Terminal 2: `cd frontend`, then `npm run dev`.
-4. Open http://localhost:5173. Stop either server with `Ctrl + C`.
+Go to **http://localhost:5173** and log in with the demo accounts (password for all of them: `DemoPass123!`):
 
-### Without Docker
+| Log in as | What you see |
+|---|---|
+| `demo_brand_01` | A brand with campaigns and proposals |
+| `demo_creator_001` | A creator who can apply to campaigns |
+| `demo_creator_005` | A creator who has not connected YouTube yet |
 
-- **PostgreSQL:** install version 16, create a database, and set `DATABASE_URL` in `.env`. The default in
-  `.env.example` is `postgres://postgres:postgres@localhost:5432/microinfluencers`.
-- **Redis:** install Redis 7 (Linux and macOS packages, WSL on Windows, or a Redis-compatible server such as
-  Memurai) and keep `REDIS_URL` pointing at it.
-- **No Redis at all:** everything works except two things. Rate limiting is skipped (the API logs a warning and
-  lets the request through), and **connecting YouTube answers 503**, because its one-time sign-in token is kept in
-  the shared cache. To run without it, create an untracked settings file `config/settings/local.py`:
+You can also click **Create an account** and sign up. Verification codes appear in the API window (Terminal 1), because
+emails are printed there while you test. To make an admin account, see [Admin accounts](#admin-accounts).
 
-  ```python
-  from .dev import *  # noqa: F401,F403
+### Next time you start it
 
-  CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-  ```
+The first-time setup is done. Next time you only need these. Open Docker Desktop first.
 
-  and set `DJANGO_SETTINGS_MODULE=config.settings.local` in `.env`. Do not commit that file, and use it only
-  with a single `runserver` process.
+**Terminal 1**, in the project folder:
 
-### Check it works
+```powershell
+docker compose up -d db redis
+.venv\Scripts\activate
+python manage.py runserver
+```
 
-- `GET http://localhost:8000/api/v1/health/` returns `{"status": "ok", "database": "ok"}`.
-- `http://localhost:8000/api/docs/` shows the API reference.
-- `http://localhost:8000/` itself shows "Not Found": port 8000 is the API only, the website is on 5173.
+**Terminal 2:**
+
+```powershell
+cd frontend
+npm run dev
+```
+
+To stop, press `Ctrl + C` in each window. To stop the database too, run `docker compose stop`.
+
+### Check that it works
+
+| Open this | You should see |
+|---|---|
+| http://localhost:5173 | The CollabNest website |
+| http://localhost:8000/api/v1/health/ | `{"status": "ok", "database": "ok"}` |
+| http://localhost:8000/api/docs/ | The list of everything the API can do |
+
+(`http://localhost:8000/` on its own shows "Not Found". That is normal: port 8000 is only the API.)
+
+### If it does not start
+
+| What you see | What to do |
+|---|---|
+| `docker: ... daemon is not running` or "cannot connect" | Open Docker Desktop and wait until it says it is running, then run the command again. |
+| `python` is not found | Try `py -3.12 -m venv .venv` instead of `python -m venv .venv`. |
+| PowerShell says running scripts is disabled | Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then the `.venv\Scripts\activate` line again. |
+| The health page says the database is not OK | The database is not running. Run `docker compose up -d db redis` (or start PostgreSQL). |
+| "port already in use" | Something else uses port 8000 or 5173. Close it, or stop the old copy of this project with `Ctrl + C`. |
+| `.env` is missing | Run the copy line again: `copy .env.example .env`. |
+
+More fixes are in [Troubleshooting](#troubleshooting).
+
+### No Docker (your own PostgreSQL)
+
+Use this if you cannot install Docker. Do these **instead of Step 1**, then follow Steps 2 to 4 as written.
+
+1. **Install PostgreSQL 16** and remember the password you choose for the `postgres` user.
+2. **Create the database.** In a terminal:
+
+   ```powershell
+   & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE microinfluencers;"
+   ```
+
+3. **Match the password.** In the `.env` file (created in Step 2), the line `DATABASE_URL` must use your password:
+   `DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/microinfluencers`. If your password is `postgres`,
+   leave it as it is.
+4. **Redis.** Either install Redis 7 (through WSL, or a Redis-compatible server such as Memurai), or run
+   **without Redis**. Without it the site works except for two things: rate limiting is skipped, and
+   **Connect YouTube** does not work. To run without it, create a file `config\settings\local.py` with exactly this:
+
+   ```python
+   from .dev import *  # noqa: F401,F403
+
+   CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+   ```
+
+   then change this line in `.env` to:
+
+   ```
+   DJANGO_SETTINGS_MODULE=config.settings.local
+   ```
+
+   Do not commit that file. Use it only while running a single API window.
+
+[↑ Back to contents](#contents)
 
 ## Demo data
 
@@ -120,6 +468,8 @@ Log in as `demo_creator_001` or `demo_brand_01` with password **`DemoPass123!`**
 - Every demo creator has a verified YouTube channel, except each fifth one (`demo_creator_005`, `010`, ...). Use
   those to see the "connect YouTube to apply" state.
 - Demo accounts use fake `@demo.test` addresses. Do not point a real email provider at them (see "Email").
+
+[↑ Back to contents](#contents)
 
 ## Email
 
@@ -140,6 +490,8 @@ in a background task that retries with growing delays. A failed send never break
 - In development, background jobs run inside the request (`CELERY_TASK_ALWAYS_EAGER`), so a failing mail server can
   make a request slow while it retries.
 
+[↑ Back to contents](#contents)
+
 ## Tests
 
 ```bash
@@ -151,6 +503,8 @@ cd frontend && npx tsc --noEmit    # type-check the website
 Tests use `config.settings.test` (set in `pytest.ini`) and read `DATABASE_URL`: point it at any PostgreSQL where the
 user may create databases. Email is captured in memory and background tasks run immediately, so the tests need
 no Redis and no mail server. `tests_e2e/test_full_lifecycle.py` is a separate script that needs a running server.
+
+[↑ Back to contents](#contents)
 
 ## Background workers
 
@@ -164,6 +518,8 @@ celery -A config beat -l info                 # the scheduler; run exactly ONE i
 
 Scheduled jobs (UTC): every creator's YouTube stats refresh at 03:00, published-video statistics refresh at 04:00,
 and campaigns whose application deadline has passed are closed every 5 minutes.
+
+[↑ Back to contents](#contents)
 
 ## Admin accounts
 
@@ -184,6 +540,8 @@ admin area has an overview, a user list (search, suspend, reactivate, delete) an
 page rejects admin accounts, and ordinary accounts cannot use the admin login. Every admin action needs a written
 reason and is recorded in `GET /api/v1/admin/actions/`.
 
+[↑ Back to contents](#contents)
+
 ## Photos and videos
 
 - **Campaigns:** while a campaign is a **draft**, its brand can attach **up to 2 photos or 1 video** (never both).
@@ -197,6 +555,8 @@ reason and is recorded in `GET /api/v1/admin/actions/`.
 - The server decides what a file is by reading its first bytes, not its name, and stores it under a random name.
   Files are saved in `media/` (ignored by git) and served by Django in development only. Leave `MEDIA_ROOT` empty
   to use that folder. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for production storage.
+
+[↑ Back to contents](#contents)
 
 ## Connecting YouTube (Google sign-in)
 
@@ -231,6 +591,8 @@ YouTube stats Unverified, which also removes their right to apply.
 reconnect about once a week. The creator gets a "reconnect" notification and their last known stats stay visible,
 marked as outdated. Publishing the app (Google verification) removes the limit.
 
+[↑ Back to contents](#contents)
+
 ## Configuration
 
 All configuration comes from environment variables; nothing secret is stored in the repository. Copy
@@ -263,6 +625,8 @@ Settings modules: `config.settings.dev` (local), `config.settings.test` (pytest)
 Celery start in production mode unless `DJANGO_SETTINGS_MODULE` says otherwise, so a server that forgets the
 variable fails to start instead of running in debug mode. The `.env` you copy already selects development.
 
+[↑ Back to contents](#contents)
+
 ## How the API behaves
 
 - **Auth:** `POST /api/v1/auth/login/` with `{"identifier", "password"}` (email or username), then send
@@ -274,12 +638,14 @@ variable fails to start instead of running in debug mode. The `.env` you copy al
 - **Rate limits:** register 5/min, login 10/min, password reset 5/hour, email verify 20/hour, email resend 5/hour
   (and a 60-second wait between codes).
 
+[↑ Back to contents](#contents)
+
 ## Project layout
 
 ```
 config/             settings (base / dev / test / prod), URLs, Celery
 apps/core/          shared plumbing: error format, pagination, permissions, email queue, demo data
-apps/accounts/      users, registration, login, password reset, email verification (brands)
+apps/accounts/      users, registration, login, password reset, email verification
 apps/profiles/      creator and brand profiles, portfolio, creator directory
 apps/social/        platform stats, YouTube sign-in and sync
 apps/campaigns/     campaigns, their lifecycle, media and creator-facing discovery
@@ -295,6 +661,8 @@ tests_e2e/          a standalone end-to-end script
 
 Business rules live in each app's `services.py`; views stay thin.
 
+[↑ Back to contents](#contents)
+
 ## Troubleshooting
 
 | Problem | Cause and fix |
@@ -304,10 +672,13 @@ Business rules live in each app's `services.py`; views stay thin.
 | Connecting YouTube returns 503 or an empty link | Redis is not reachable (see "Without Docker"), or the Google variables are empty. |
 | After Google sign-in the browser lands on a dead page | `FRONTEND_URL` is wrong. Use `http://localhost:5173` in development. |
 | No email arrives | With the console backend, read the code in the backend terminal. With SMTP, check the sender is verified at the provider. Brevo needs its SMTP login, not your account email; Resend without a verified domain only delivers to your own address. |
+| A brand cannot publish or accept (403 `brand_platform_required`) | Connect one platform on **Connected accounts** (YouTube, Instagram, TikTok or Facebook). |
 | A brand cannot publish or accept (403 `brand_email_unverified`) | Verify the email with the code (shown in the backend terminal in development). |
 | A creator cannot apply (403 `creator_youtube_required`) | Connect YouTube. Manually typed stats do not count. |
 | Uploaded pictures are missing | They live in `media/`. If you set `MEDIA_ROOT` yourself, keep the same folder between runs. |
 | Tests cannot create a database | `DATABASE_URL` must name a PostgreSQL user that may create databases. |
+
+[↑ Back to contents](#contents)
 
 ## Known issues
 
@@ -315,6 +686,8 @@ Business rules live in each app's `services.py`; views stay thin.
   mark stats as Verified from a handle and follower count the caller supplies, with no proof of ownership. They
   bypass the rule that only a real YouTube connection verifies a creator, and the website does not use them.
   Remove or protect them before any real use.
+
+[↑ Back to contents](#contents)
 
 ## Working on this repository
 
@@ -324,3 +697,5 @@ Work on a feature branch and open a pull request into `main`. When you change an
 ```bash
 python manage.py spectacular --file docs/openapi.yml
 ```
+
+[↑ Back to contents](#contents)

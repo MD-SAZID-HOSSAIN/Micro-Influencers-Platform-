@@ -158,20 +158,20 @@ export const updateCreator = async (
     bio: string;
     niche: Niche;
     primaryPlatform: Platform;
-    location: string;
+    city: string;
+    country: string;
     ratePerPost: number;
     ratePerStory: number;
     ratePerVideo: number;
   }>,
 ): Promise<CreatorProfile | null> => {
-  const cityCountry = patch.location?.split(',').map((s) => s.trim()) ?? [];
   const updated = await api.updateCreatorMe({
     fullName: patch.fullName,
     bio: patch.bio,
     niche: patch.niche,
     primaryPlatform: patch.primaryPlatform,
-    city: cityCountry[0],
-    country: cityCountry[1],
+    city: patch.city,
+    country: patch.country,
     ratePerPost: patch.ratePerPost,
     ratePerStory: patch.ratePerStory,
     ratePerVideo: patch.ratePerVideo,

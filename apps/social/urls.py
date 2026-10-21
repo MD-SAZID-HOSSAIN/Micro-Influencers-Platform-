@@ -1,5 +1,11 @@
 from django.urls import path
 
+from .brand_views import (
+    BrandSocialAccountView,
+    BrandSocialListView,
+    BrandYouTubeCompleteView,
+    BrandYouTubeConnectView,
+)
 from .views import (
     DirectAccountConnectView,
     FacebookConnectView,
@@ -32,6 +38,10 @@ urlpatterns = [
     path("social/facebook/connect/", FacebookConnectView.as_view(), name="facebook-connect"),
     path("social/challenge/<str:platform>/", SocialChallengeView.as_view(), name="social-challenge"),
     path("social/direct-connect/<str:platform>/", DirectAccountConnectView.as_view(), name="social-direct-connect"),
+    path("brands/me/social/", BrandSocialListView.as_view(), name="brand-social"),
+    path("brands/me/social/youtube/connect/", BrandYouTubeConnectView.as_view(), name="brand-youtube-connect"),
+    path("brands/me/social/youtube/complete/", BrandYouTubeCompleteView.as_view(), name="brand-youtube-complete"),
+    path("brands/me/social/<str:platform>/", BrandSocialAccountView.as_view(), name="brand-social-account"),
     path("creators/me/stats/", MyStatsListView.as_view(), name="creator-stats"),
     path(
         "creators/me/stats/<str:platform>/",

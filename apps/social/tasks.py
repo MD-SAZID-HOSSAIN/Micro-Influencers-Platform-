@@ -1,7 +1,10 @@
+import logging
+
 from celery import shared_task
 from django.conf import settings
 
 from . import services
+from .crypto import decrypt
 from .models import YouTubeConnection
 from .youtube_client import TransientApiError
 
@@ -19,6 +22,20 @@ def sync_connection_task(connection_id: int) -> None:
     if connection is None:  # disconnected between scheduling and running
         return
     services.sync_connection(connection)
+
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task
+def revoke_token_task(encrypted_token: str, user_id: int) -> None:
+    """Give a Google grant back at Google, away from the request that asked for it. Never raises."""
+    try:
+        token = decrypt(encrypted_token)
+    except Exception:  # noqa: BLE001 - an unreadable token cannot be revoked; there is nothing to retry
+        logger.warning("A queued YouTube revoke for user %s had an unreadable token and was dropped", user_id)
+        return
+    services.revoke_token_quietly(token, user_id)
 
 
 @shared_task

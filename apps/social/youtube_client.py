@@ -192,6 +192,21 @@ class YouTubeClient:
             ],
         )
 
+    def fetch_channel_link(self, access_token: str) -> str:
+        """The link to the signed-in account's channel, and nothing else (used to prove a brand owns one).
+
+        Unlike ``fetch_channel`` it ignores subscriber counts and videos, so a channel that hides its audience
+        still works.
+        """
+        channels = self._api_get("channels", access_token, part="snippet", mine="true").get("items", [])
+        if not channels:
+            raise ChannelNotFound()
+        channel = channels[0]
+        custom_url = channel.get("snippet", {}).get("customUrl")
+        if custom_url:
+            return f"https://www.youtube.com/{custom_url}"
+        return f"https://www.youtube.com/channel/{channel['id']}"
+
     def fetch_video_stats(self, video_ids: list[str], api_key: str) -> dict[str, VideoStats]:
         """Public statistics for up to 50 videos, using the server's API key (no creator login needed).
 

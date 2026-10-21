@@ -250,6 +250,9 @@ _CONNECT_MESSAGES = {
     "no_refresh_token": (
         "Google did not allow us to keep the connection. Please connect again and accept every requested permission."
     ),
+    "no_channel": (
+        "That Google account has no YouTube channel. Sign in with an account that has one, or connect another platform."
+    ),
 }
 
 
@@ -285,15 +288,12 @@ def read_state(state: str) -> dict:
     return payload
 
 
-def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
-    """Finish the OAuth flow for the logged-in creator: store encrypted tokens, queue the first sync.
+def claim_state(user: User, state: str) -> None:
+    """Check that ``state`` was issued to THIS user and use up its one-time nonce; raise ``ConnectError`` otherwise.
 
-    The ``state`` must have been issued to THIS creator. Google's redirect carries no login, so
-    without this check one creator could send another person their own connect link, and the
-    person's channel would end up shown as Verified on the first creator's profile.
+    Google's redirect carries no login, so without this check one person could send another their own connect
+    link and have their channel attached to the wrong account. Shared by creators and brands.
     """
-    from . import tasks
-
     payload = read_state(state)
     if payload["uid"] != user.id:
         raise ConnectError("invalid_state")  # checked before the nonce is claimed: a wrong person cannot burn it
@@ -304,6 +304,18 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
         raise ServiceUnavailable()  # nothing was used up: Google's code is untouched, so the user can retry
     if not claimed:
         raise ConnectError("invalid_state")
+
+
+def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
+    """Finish the OAuth flow for the logged-in creator: store encrypted tokens, queue the first sync.
+
+    The ``state`` must have been issued to THIS creator. Google's redirect carries no login, so
+    without this check one creator could send another person their own connect link, and the
+    person's channel would end up shown as Verified on the first creator's profile.
+    """
+    from . import tasks
+
+    claim_state(user, state)
 
     try:
         tokens = get_youtube_client().exchange_code(code)
@@ -336,12 +348,35 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
     return connection
 
 
-def _revoke_quietly(token: str, creator_id: int) -> None:
-    """Best effort: a Google outage must never stop someone disconnecting, so problems are only logged."""
+def revoke_token_quietly(token: str, user_id: int) -> None:
+    """Give a Google grant back. Best effort: a Google outage must never stop a disconnect or a connect."""
     try:
         get_youtube_client().revoke_token(token)
-    except Exception as exc:  # noqa: BLE001 - this runs after the disconnect is saved; nothing may escape
-        logger.warning("Could not revoke the YouTube grant for creator %s at Google: %s", creator_id, exc)
+    except Exception as exc:  # noqa: BLE001 - this runs after the work is saved; nothing may escape
+        logger.warning("Could not revoke the YouTube grant for user %s at Google: %s", user_id, exc)
+
+
+def schedule_token_revoke(token: str, user_id: int) -> None:
+    """Give a Google grant back in the background, so nobody waits for Google's answer.
+
+    Runs once the current database work is saved. The token travels to the job encrypted, so it is never
+    plain text in the queue. If the job cannot be queued (broker down, no encryption key) the grant is given
+    back right away instead, so it is never left behind.
+    """
+    from . import tasks
+
+    try:
+        encrypted = encrypt(token)
+    except Exception:  # noqa: BLE001 - without an encryption key nothing safe can be queued
+        logger.warning("Could not encrypt a YouTube token for the background revoke; revoking it now")
+        transaction.on_commit(lambda: revoke_token_quietly(token, user_id))
+        return
+
+    def run() -> None:
+        if not enqueue(tasks.revoke_token_task, encrypted, user_id):
+            revoke_token_quietly(token, user_id)
+
+    transaction.on_commit(run)
 
 
 def disconnect(user: User) -> None:
@@ -361,7 +396,7 @@ def disconnect(user: User) -> None:
         YouTubeConnection.objects.filter(creator=user).delete()
         PlatformStats.objects.filter(creator=user, platform="youtube").update(is_verified=False)
         if refresh_token:
-            transaction.on_commit(lambda: _revoke_quietly(refresh_token, user.id))
+            schedule_token_revoke(refresh_token, user.id)
 
 
 def connection_status(user: User) -> dict:

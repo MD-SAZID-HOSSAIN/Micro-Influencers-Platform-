@@ -16,7 +16,7 @@ from apps.campaigns.models import Campaign
 from apps.core.choices import Niche, Platform
 from apps.profiles.models import BrandProfile, CreatorProfile, PortfolioItem
 from apps.proposals.models import Proposal
-from apps.social.models import PlatformStats
+from apps.social.models import BrandSocialAccount, PlatformStats
 
 DEMO_PASSWORD = "DemoPass123!"
 CREATOR_PREFIX = "demo_creator_"
@@ -213,11 +213,25 @@ def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
 def _apply_verification() -> None:
     """Make the demo accounts follow the verification rules (and repair data seeded before them).
 
-    Brands need a verified email to publish and accept. Creators need a connected YouTube channel
+    Brands need a verified email and one connected platform to publish and accept (demo brands get an Instagram
+    link). Creators need a connected YouTube channel
     (Verified stats) to apply: every fifth demo creator (005, 010, ...) is left without one, so the
     blocked state can be tried. Safe to repeat.
     """
     User.objects.filter(username__startswith=BRAND_PREFIX, email_verified=False).update(email_verified=True)
+    brands = list(User.objects.filter(username__startswith=BRAND_PREFIX).values_list("id", "username"))
+    connected = set(
+        BrandSocialAccount.objects.filter(brand_id__in=[brand_id for brand_id, _ in brands]).values_list(
+            "brand_id", flat=True
+        )
+    )
+    BrandSocialAccount.objects.bulk_create(
+        [
+            BrandSocialAccount(brand_id=brand_id, platform="instagram", handle_url=f"https://instagram.com/{username}")
+            for brand_id, username in brands
+            if brand_id not in connected
+        ]
+    )
 
     now = timezone.now()
     numbers = {

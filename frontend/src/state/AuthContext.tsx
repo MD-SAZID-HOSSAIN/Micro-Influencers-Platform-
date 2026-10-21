@@ -18,6 +18,8 @@ type AuthCtx = {
   clearSession: () => void;
   /** Show a new profile picture in the header straight after an upload or removal. */
   setAvatar: (url: string | undefined) => void;
+  /** Reload the signed-in user from the server (for example after a brand connects a platform). */
+  refreshUser: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx | undefined>(undefined);
@@ -134,6 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((u) => (u ? { ...u, avatarUrl: url } : u));
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await api.fetchMe());
+    } catch {
+      // keep what we have; the next page load tries again
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -156,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         clearSession,
         setAvatar,
+        refreshUser,
       }}
     >
       {children}

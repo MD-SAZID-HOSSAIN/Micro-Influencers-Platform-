@@ -46,6 +46,7 @@ type ApiUser = {
   role: Role;
   mobile_number: string;
   email_verified: boolean;
+  platform_connected?: boolean | null;
   email_notifications_enabled?: boolean;
   avatar_url?: string | null;
 };
@@ -59,6 +60,7 @@ export const mapUser = (u: ApiUser): User => ({
   mobile: u.mobile_number || undefined,
   avatarUrl: resolveAssetUrl(u.avatar_url),
   emailVerified: u.email_verified,
+  platformConnected: u.platform_connected,
   emailNotificationsEnabled: u.email_notifications_enabled,
 });
 
@@ -210,6 +212,8 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
     niche: nicheFromBackend(p.niche),
     primaryPlatform: platformFromBackend(p.primary_platform),
     location: [p.city, p.country].filter(Boolean).join(', '),
+    city: p.city,
+    country: p.country,
     ratePerPost: numFrom(p.rate_post),
     ratePerStory: numFrom(p.rate_story),
     ratePerVideo: numFrom(p.rate_video),
@@ -1184,6 +1188,53 @@ export const fetchBrandDashboard = async (): Promise<BrandDashboardData> => {
     })),
   };
 };
+
+// ----- Brand connected platforms ---------------------------------------------
+
+export type BrandSocialPlatform = 'youtube' | 'instagram' | 'tiktok' | 'facebook';
+
+export type BrandSocialAccount = {
+  platform: BrandSocialPlatform;
+  handleUrl: string;
+  /** True only for YouTube connected with Google sign-in. A typed link is "added", never verified. */
+  isVerified: boolean;
+  connectedAt: string;
+};
+
+type ApiBrandSocial = { platform: BrandSocialPlatform; handle_url: string; is_verified: boolean; connected_at: string };
+
+const mapBrandSocial = (a: ApiBrandSocial): BrandSocialAccount => ({
+  platform: a.platform,
+  handleUrl: a.handle_url,
+  isVerified: a.is_verified,
+  connectedAt: a.connected_at,
+});
+
+export const fetchBrandSocial = async (): Promise<BrandSocialAccount[]> =>
+  (await request<ApiBrandSocial[]>('brands/me/social/')).map(mapBrandSocial);
+
+/** Save the link typed for Instagram, TikTok or Facebook. YouTube uses Google sign-in instead. */
+export const saveBrandSocialLink = async (platform: BrandSocialPlatform, handleUrl: string): Promise<BrandSocialAccount> =>
+  mapBrandSocial(
+    await request<ApiBrandSocial>(`brands/me/social/${platform}/`, { method: 'PUT', body: { handle_url: handleUrl } }),
+  );
+
+export const removeBrandSocial = async (platform: BrandSocialPlatform): Promise<void> => {
+  await request(`brands/me/social/${platform}/`, { method: 'DELETE' });
+};
+
+export const startBrandYouTubeConnect = async (): Promise<string> => {
+  const data = await request<{ authorization_url: string }>('brands/me/social/youtube/connect/');
+  return data.authorization_url;
+};
+
+export const completeBrandYouTubeConnect = async (input: { code: string; state: string }): Promise<BrandSocialAccount[]> =>
+  (
+    await request<ApiBrandSocial[]>('brands/me/social/youtube/complete/', {
+      method: 'POST',
+      body: { code: input.code, state: input.state },
+    })
+  ).map(mapBrandSocial);
 
 // ----- Campaign analytics (FR-23) ------------------------------------------
 
