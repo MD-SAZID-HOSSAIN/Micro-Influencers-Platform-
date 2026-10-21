@@ -25,6 +25,7 @@ export default function EditCampaign() {
     deliverables: c.deliverables,
     creatorsNeeded: c.creatorsNeeded,
     minFollowers: c.minFollowers,
+    allowWithdrawal: c.allowWithdrawal !== false,
   } : null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -44,6 +45,7 @@ export default function EditCampaign() {
         deliverables: c.deliverables,
         creatorsNeeded: c.creatorsNeeded,
         minFollowers: c.minFollowers,
+        allowWithdrawal: c.allowWithdrawal !== false,
       });
     }
   }, [c?.id]);

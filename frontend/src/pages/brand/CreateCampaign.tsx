@@ -25,6 +25,7 @@ const blank: CampaignFormValues = {
   deliverables: '',
   creatorsNeeded: 1,
   minFollowers: undefined,
+  allowWithdrawal: true,
 };
 
 export default function CreateCampaign() {

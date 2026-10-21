@@ -5,6 +5,18 @@
  * rejected with a 400 when saved or used as a filter.
  */
 
+/**
+ * Every creator and brand page has the person's username in its address:
+ * '/creator/dashboard' becomes '/creator/imran/dashboard'. Other addresses are returned as they are.
+ */
+export const withUsername = (path: string, username: string): string => {
+  const m = /^\/(creator|brand)(\/.*)?$/.exec(path);
+  return m ? `/${m[1]}/${encodeURIComponent(username)}${m[2] ?? ''}` : path;
+};
+
+export const accountsPath = (role: 'creator' | 'brand', username: string): string =>
+  withUsername(`/${role}/accounts`, username);
+
 export const NICHES = ['Beauty', 'Fitness', 'Food', 'Tech', 'Travel', 'Other'] as const;
 
 export const PLATFORMS = ['YouTube', 'Instagram', 'TikTok', 'Facebook'] as const;

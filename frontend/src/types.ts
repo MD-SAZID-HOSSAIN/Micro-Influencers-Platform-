@@ -11,12 +11,27 @@ export type User = {
   emailVerified?: boolean;
   /** Brands only: true once at least one social platform is connected. Null/absent for creators. */
   platformConnected?: boolean | null;
+  /** Brands only: "pending" means a typed link is waiting for an admin. */
+  platformStatus?: 'verified' | 'pending' | 'none' | null;
   emailNotificationsEnabled?: boolean;
 };
 
 export type Niche = 'Beauty' | 'Fitness' | 'Food' | 'Tech' | 'Travel' | 'Other';
 
 export type Platform = 'YouTube' | 'Instagram' | 'TikTok' | 'Facebook';
+
+/** One platform's audience numbers: from Google (YouTube, Verified) or typed by the creator (Unverified). */
+export type PlatformStatEntry = {
+  platform: Platform;
+  handleUrl?: string;
+  followers: number;
+  engagementRate: number;
+  isVerified: boolean;
+  /** Instagram, TikTok and Facebook: pending until an admin checks them, then approved or rejected. */
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewNote?: string;
+  lastSyncedAt?: string;
+};
 
 export type CreatorProfile = {
   id: string;
@@ -30,6 +45,8 @@ export type CreatorProfile = {
   location: string;
   city?: string;
   country?: string;
+  /** Stats for every platform the creator has (YouTube connected, the others typed by hand). */
+  stats?: PlatformStatEntry[];
   ratePerPost: number;
   ratePerStory: number;
   ratePerVideo: number;
@@ -51,6 +68,10 @@ export type ConnectedAccount = {
   status: 'connected' | 'expired' | 'revoked';
   /** Set when the last sync could not verify the channel (the stats shown are then out of date). */
   problem?: 'subscribers_hidden' | 'no_channel';
+  /** Connected, but with fewer subscribers than the minimum, so not Verified and cannot apply. */
+  belowMinimum?: boolean;
+  followers?: number;
+  minimumFollowers?: number;
 };
 
 export type PortfolioLink = {
@@ -89,6 +110,8 @@ export type Campaign = {
   deliverables: string;
   creatorsNeeded: number;
   minFollowers?: number;
+  /** The brand's choice: may creators withdraw after applying? Missing means yes. Fixed once published. */
+  allowWithdrawal?: boolean;
   status: CampaignStatus;
   /** Only present on a brand's own campaigns; the creator-facing card payload does not carry it. */
   createdAt?: string;
@@ -159,4 +182,6 @@ export type MyProposal = Proposal & {
   brandName: string;
   brandId: string;
   campaignStatus: CampaignStatus;
+  /** False when the brand turned withdrawing off for this campaign. */
+  allowWithdrawal: boolean;
 };

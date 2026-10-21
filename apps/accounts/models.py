@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import F
 from django.db.models.functions import Lower
 
 
@@ -16,6 +17,13 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role.choices)
     # Bumped on logout and password reset; JWTs carrying an older value are rejected.
     token_version = models.PositiveIntegerField(default=0)
+
+    def set_password(self, raw_password):
+        """Changing a password also ends every login made with the old one (so an old or stolen login stops working)."""
+        super().set_password(raw_password)
+        if self.pk is not None:  # saved straight away, so it holds even when the caller saves only some fields
+            type(self).objects.filter(pk=self.pk).update(token_version=F("token_version") + 1)
+            self.token_version = (self.token_version or 0) + 1
     # Logging in never requires a verified email; only notification emails do.
     email_verified = models.BooleanField(default=False)
     email_notifications_enabled = models.BooleanField(default=True)

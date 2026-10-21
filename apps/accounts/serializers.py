@@ -27,7 +27,10 @@ class UserSerializer(serializers.ModelSerializer):
         help_text="The creator's photo or the brand's logo, if they have one."
     )
     platform_connected = serializers.SerializerMethodField(
-        help_text="Brands only: whether at least one social platform is connected. Null for everyone else."
+        help_text="Brands only: whether at least one platform is verified (YouTube, or a link an admin approved). Null for everyone else."
+    )
+    platform_status = serializers.SerializerMethodField(
+        help_text="Brands only: verified, pending (a link waits for an admin) or none. Null for everyone else."
     )
 
     class Meta:
@@ -41,6 +44,7 @@ class UserSerializer(serializers.ModelSerializer):
             "mobile_number",
             "email_verified",
             "platform_connected",
+            "platform_status",
             "avatar_url",
         ]
         read_only_fields = fields
@@ -51,6 +55,13 @@ class UserSerializer(serializers.ModelSerializer):
         from .verification import brand_has_platform
 
         return brand_has_platform(user)
+
+    def get_platform_status(self, user) -> str | None:
+        if user.role != Role.BRAND:
+            return None
+        from .verification import brand_platform_status
+
+        return brand_platform_status(user)
 
     def get_avatar_url(self, user) -> str | None:
         try:

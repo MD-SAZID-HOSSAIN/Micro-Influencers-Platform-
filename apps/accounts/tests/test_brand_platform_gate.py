@@ -1,7 +1,8 @@
-"""A brand is fully verified only with a confirmed email AND at least one connected platform.
+"""A brand is fully verified only with a confirmed email AND one verified platform.
 
-Any one of YouTube, Instagram, TikTok or Facebook counts. Until then the brand cannot publish a campaign or
-accept a proposal; saving drafts, shortlisting and rejecting stay open.
+A verified platform is YouTube proven by Google sign-in, or an Instagram, TikTok or Facebook link an admin approved.
+A typed link that is still waiting for an admin does not count. Until the brand is verified it cannot publish a
+campaign or accept a proposal; saving drafts, shortlisting and rejecting stay open.
 """
 import pytest
 
@@ -25,9 +26,14 @@ def brand_without_platform(db):
     return UserFactory(role=Role.BRAND, email_verified=True, platform_connected=False)
 
 
-def connect(brand, platform="instagram", verified=False):
+def connect(brand, platform="instagram", verified=True):
+    """A verified platform by default. verified=False is a typed link still waiting for an admin."""
     return BrandSocialAccount.objects.create(
-        brand=brand, platform=platform, handle_url=f"https://{platform}.com/acme", is_verified=verified
+        brand=brand,
+        platform=platform,
+        handle_url=f"https://{platform}.com/acme",
+        is_verified=verified,
+        review_status="approved" if verified else "pending",
     )
 
 
@@ -62,8 +68,8 @@ def test_a_brand_with_a_verified_email_but_no_platform_cannot_accept(brand_witho
 
 
 @pytest.mark.parametrize("platform", ["youtube", "instagram", "tiktok", "facebook"])
-def test_any_one_connected_platform_is_enough(brand_without_platform, auth_client, platform):
-    connect(brand_without_platform, platform, verified=(platform == "youtube"))
+def test_any_one_verified_platform_is_enough(brand_without_platform, auth_client, platform):
+    connect(brand_without_platform, platform)
     draft = CampaignFactory(brand=brand_without_platform)
 
     response = publish(auth_client, brand_without_platform, draft)
@@ -73,13 +79,24 @@ def test_any_one_connected_platform_is_enough(brand_without_platform, auth_clien
     assert draft.status == Campaign.Status.PUBLISHED
 
 
-def test_a_typed_link_counts_as_connected_even_though_it_is_not_verified(brand_without_platform, auth_client):
-    account = connect(brand_without_platform, "tiktok", verified=False)
+def test_a_typed_link_waiting_for_an_admin_does_not_count(brand_without_platform, auth_client):
+    connect(brand_without_platform, "tiktok", verified=False)
+    draft = CampaignFactory(brand=brand_without_platform)
     campaign = CampaignFactory(brand=brand_without_platform, status=Campaign.Status.PUBLISHED, creators_needed=2)
     proposal = ProposalFactory(campaign=campaign, status=Proposal.Status.PENDING)
 
-    assert account.is_verified is False
-    assert accept(auth_client, brand_without_platform, proposal).status_code == 200
+    for response in (publish(auth_client, brand_without_platform, draft), accept(auth_client, brand_without_platform, proposal)):
+        assert response.status_code == 403 and error_code(response) == "brand_platform_required"
+
+
+def test_a_rejected_link_does_not_count(brand_without_platform, auth_client):
+    account = connect(brand_without_platform, "facebook", verified=False)
+    BrandSocialAccount.objects.filter(pk=account.pk).update(review_status="rejected", review_note="Not your page.")
+    draft = CampaignFactory(brand=brand_without_platform)
+
+    response = publish(auth_client, brand_without_platform, draft)
+
+    assert response.status_code == 403 and error_code(response) == "brand_platform_required"
 
 
 def test_the_email_is_checked_before_the_platform(db, auth_client):
@@ -91,7 +108,7 @@ def test_the_email_is_checked_before_the_platform(db, auth_client):
     assert response.status_code == 403 and error_code(response) == "brand_email_unverified"
 
 
-def test_a_connected_platform_does_not_replace_the_email_code(db, auth_client):
+def test_a_verified_platform_does_not_replace_the_email_code(db, auth_client):
     brand = UserFactory(role=Role.BRAND, email_verified=False, platform_connected=False)
     connect(brand, "instagram")
     draft = CampaignFactory(brand=brand)
@@ -124,14 +141,20 @@ def test_drafts_shortlist_and_reject_stay_open_without_a_platform(brand_without_
 
 def test_the_me_payload_says_whether_a_brand_has_a_platform(brand_without_platform, auth_client):
     client = auth_client(brand_without_platform)
-    assert client.get("/api/v1/auth/me/").json()["platform_connected"] is False
+    me = client.get("/api/v1/auth/me/").json()
+    assert (me["platform_connected"], me["platform_status"]) == (False, "none")
 
-    connect(brand_without_platform)
+    connect(brand_without_platform, "instagram", verified=False)
+    me = client.get("/api/v1/auth/me/").json()
+    assert (me["platform_connected"], me["platform_status"]) == (False, "pending")
 
-    assert client.get("/api/v1/auth/me/").json()["platform_connected"] is True
+    connect(brand_without_platform, "youtube")
+    me = client.get("/api/v1/auth/me/").json()
+    assert (me["platform_connected"], me["platform_status"]) == (True, "verified")
 
 
 def test_the_me_payload_has_no_platform_flag_for_creators(db, auth_client):
     creator = UserFactory(role=Role.CREATOR)
 
-    assert auth_client(creator).get("/api/v1/auth/me/").json()["platform_connected"] is None
+    me = auth_client(creator).get("/api/v1/auth/me/").json()
+    assert me["platform_connected"] is None and me["platform_status"] is None

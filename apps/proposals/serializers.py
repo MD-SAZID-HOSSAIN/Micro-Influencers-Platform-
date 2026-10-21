@@ -18,10 +18,9 @@ MAX_WITHDRAWAL_REASON = 300
 
 
 class ProposalSubmitSerializer(serializers.Serializer):
+    """What a creator sends. There is no rate: the brand set it on the campaign, and nobody can negotiate it."""
+
     cover_message = SafeCharField(max_length=3000)
-    proposed_rate = serializers.DecimalField(
-        max_digits=10, decimal_places=2, min_value=Decimal("0.01")
-    )
     portfolio_links = serializers.ListField(
         child=serializers.CharField(max_length=500, validators=[validate_safe_url]),
         max_length=MAX_PORTFOLIO_LINKS,
@@ -29,6 +28,13 @@ class ProposalSubmitSerializer(serializers.Serializer):
         default=list,
     )
     experience_note = SafeCharField(max_length=2000, allow_blank=True, required=False, default="")
+
+    def validate(self, attrs):
+        if "proposed_rate" in getattr(self, "initial_data", {}):
+            raise serializers.ValidationError(
+                {"proposed_rate": ["The rate is set by the brand and cannot be negotiated. Remove this field."]}
+            )
+        return attrs
 
 
 class WithdrawSerializer(serializers.Serializer):
@@ -141,6 +147,7 @@ class MyProposalCampaignSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
     status = serializers.ChoiceField(choices=Campaign.Status.choices)
+    allow_withdrawal = serializers.BooleanField()
     brand = MyProposalBrandSerializer()
 
 
@@ -171,6 +178,7 @@ class MyProposalSerializer(serializers.ModelSerializer):
             "id": campaign.id,
             "title": campaign.title,
             "status": campaign.status,
+            "allow_withdrawal": campaign.allow_withdrawal,
             "brand": {"id": brand["id"], "name": brand["name"]},
         }
 

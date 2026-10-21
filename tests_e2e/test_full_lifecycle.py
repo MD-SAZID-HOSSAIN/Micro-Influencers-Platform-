@@ -190,7 +190,6 @@ record("FR-12: Campaign Detail View", status == 200 and data.get("id") == camp_i
 # 1. Creator Submits Proposal
 status, data = api(f"/campaigns/{camp_id}/proposals/", "POST", {
     "cover_message": "I have an active tech channel eager to showcase your ANC tech.",
-    "proposed_rate": "450.00",
     "portfolio_links": ["https://youtube.com/watch?v=dQw4w9WgXcQ"],
     "experience_note": "5 years testing pro audio gear"
 }, token=c_token)
@@ -200,7 +199,6 @@ record("FR-13: Proposal Submission (Creator -> Campaign)", status == 201 and pro
 # 2. Duplicate Proposal Prevented
 status, data = api(f"/campaigns/{camp_id}/proposals/", "POST", {
     "cover_message": "Second attempt",
-    "proposed_rate": "450.00",
     "portfolio_links": [],
     "experience_note": ""
 }, token=c_token)

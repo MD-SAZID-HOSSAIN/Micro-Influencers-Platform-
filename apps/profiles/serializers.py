@@ -1,9 +1,10 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.core.choices import Niche, Platform
 from apps.core.fields import OptionalUrlField, SafeCharField
 from apps.core.validators import validate_safe_url
-from apps.social.serializers import PlatformStatsSerializer
+from apps.social.serializers import PlatformStatsSerializer, PublicPlatformStatsSerializer
 
 from .images import discard_upload
 from .models import BrandProfile, CreatorProfile, PortfolioItem
@@ -131,7 +132,7 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="user_id", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
-    stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
+    stats = serializers.SerializerMethodField()
     portfolio = PortfolioItemSerializer(source="user.portfolio_items", many=True, read_only=True)
     rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True, read_only=True)
     rating_count = serializers.IntegerField(read_only=True)
@@ -157,3 +158,9 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
             "rating_count",
         ]
         read_only_fields = fields
+
+    @extend_schema_field(PublicPlatformStatsSerializer(many=True))
+    def get_stats(self, profile):
+        """Instagram, TikTok and Facebook numbers appear only after an admin approved them."""
+        visible = [row for row in profile.user.platform_stats.all() if row.is_public]
+        return PublicPlatformStatsSerializer(visible, many=True).data

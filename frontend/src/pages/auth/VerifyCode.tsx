@@ -139,6 +139,10 @@ export default function VerifyCode() {
             </button>
           )}
         </div>
+        <div className="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-900 leading-relaxed">
+          <strong>Cannot find the email?</strong> Look in your <strong>Spam</strong> or <strong>Junk</strong> folder. If it is
+          there, press <strong>Not spam</strong>. The code can take a minute to arrive.
+        </div>
       </form>
     </AuthShell>
   );

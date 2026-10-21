@@ -100,6 +100,7 @@ def test_item_shape_is_status_only(creator, auth_client):
             "id": campaign.id,
             "title": "Summer launch",
             "status": "published",
+            "allow_withdrawal": True,
             "brand": {"id": brand.id, "name": "Acme Foods"},
         },
     }

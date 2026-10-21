@@ -120,19 +120,11 @@ export default function CampaignAnalytics() {
             <div className="font-display text-xl text-ink-900 mt-1">{currency(m.budgetPerCreator)}</div>
           </div>
           <div className="rounded-md border border-ink-200 p-4">
-            <div className="eyebrow">Average proposed rate</div>
+            <div className="eyebrow">Total if every spot is filled</div>
             <div className="font-display text-xl text-ink-900 mt-1">
-              {m.avgProposedRate !== null ? currency(m.avgProposedRate) : '—'}
+              {currency(m.budgetPerCreator * m.acceptedVsNeeded.needed)}
             </div>
-            {m.avgProposedRate !== null && (
-              <div className="text-xs text-ink-500 mt-0.5">
-                {m.avgProposedRate > m.budgetPerCreator
-                  ? 'Higher than budget'
-                  : m.avgProposedRate < m.budgetPerCreator
-                    ? 'Below budget'
-                    : 'Matches budget'}
-              </div>
-            )}
+            <div className="text-xs text-ink-500 mt-0.5">The rate is fixed. Creators cannot negotiate it.</div>
           </div>
         </div>
       </section>

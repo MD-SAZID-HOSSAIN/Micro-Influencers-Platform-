@@ -23,6 +23,11 @@ export default function ApplicationDetail() {
   const { push } = useToast();
   const { proposals, campaigns } = useStore();
   const proposal = proposals.find((p) => p.id === id) as MyProposal | undefined;
+  // Opening this page directly (a link, or a reload) starts with an empty list, so load it once.
+  const [loaded, setLoaded] = useState(proposals.length > 0);
+  useEffect(() => {
+    loadMyProposals().catch(() => undefined).finally(() => setLoaded(true));
+  }, []);
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [reasonModal, setReasonModal] = useState(false);
   const [reason, setReason] = useState('');
@@ -52,12 +57,14 @@ export default function ApplicationDetail() {
   if (!proposal) {
     return (
       <div className="container-page py-6 sm:py-8">
-        <div className="card p-6">Proposal not found.</div>
+        <div className="card p-6">{loaded ? 'Proposal not found.' : 'Loading…'}</div>
       </div>
     );
   }
   const campaign = campaigns.find((c) => c.id === proposal.campaignId);
-  const canWithdraw = ['pending', 'shortlisted', 'accepted'].includes(proposal.status);
+  const isActive = ['pending', 'shortlisted', 'accepted'].includes(proposal.status);
+  // The brand can turn withdrawing off when it posts a campaign.
+  const canWithdraw = isActive && proposal.allowWithdrawal !== false;
   const isCompleted = !!proposal.completedAt;
   const canEditDeliverables = proposal.status === 'accepted' && !isCompleted;
 
@@ -122,7 +129,7 @@ export default function ApplicationDetail() {
             <div className="text-xs text-ink-500">{campaign?.brandName ?? proposal.brandName}</div>
             <h1 className="text-xl font-bold text-ink-900">{campaign?.title ?? proposal.campaignTitle}</h1>
             <div className="text-xs text-ink-500 mt-1">
-              Submitted {fmtRelativeTime(proposal.submittedAt)} · Proposed {currency(proposal.proposedRate)}
+              Submitted {fmtRelativeTime(proposal.submittedAt)} · Rate {currency(proposal.proposedRate)}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -249,6 +256,12 @@ export default function ApplicationDetail() {
       {isCompleted && (
         <div className="card p-4 bg-emerald-50 border-emerald-200 text-sm text-emerald-800">
           The brand has marked this collaboration as Completed. Deliverables are now read-only.
+        </div>
+      )}
+
+      {isActive && !canWithdraw && !isCompleted && (
+        <div className="card p-4 text-sm text-ink-700 bg-mist-100/60">
+          <strong>Withdrawing is not allowed.</strong> The brand chose not to let creators withdraw from this campaign.
         </div>
       )}
 

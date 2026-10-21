@@ -311,7 +311,9 @@ def test_reviews_list_access_rules(db, auth_client):
 
 def test_stats_still_drive_the_other_card_fields(db, auth_client):
     creator = rated_creator([5])
-    PlatformStats.objects.create(creator=creator, platform="instagram", followers=10, engagement_rate="1.00")
+    PlatformStats.objects.create(
+        creator=creator, platform="instagram", followers=10, engagement_rate="1.00", is_verified=True
+    )
     CreatorProfile.objects.filter(user=creator).update(primary_platform="instagram")
 
     card = next(

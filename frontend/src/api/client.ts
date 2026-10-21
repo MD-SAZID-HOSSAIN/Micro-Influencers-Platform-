@@ -47,9 +47,12 @@ export const resolveAssetUrl = (url: string | null | undefined): string | undefi
   return new URL(url, new URL(getBaseUrl(), window.location.origin)).toString();
 };
 
+/** Every login is remembered between visits, until the person logs out. */
+export const storageFor = (_session: Session): Storage => localStorage;
+
 export const getToken = (session: Session = 'user'): string | null => {
   try {
-    return localStorage.getItem(STORAGE_KEYS.token[session]);
+    return storageFor(session).getItem(STORAGE_KEYS.token[session]);
   } catch {
     return null;
   }
@@ -57,8 +60,8 @@ export const getToken = (session: Session = 'user'): string | null => {
 
 export const setToken = (token: string | null, session: Session = 'user') => {
   try {
-    if (token) localStorage.setItem(STORAGE_KEYS.token[session], token);
-    else localStorage.removeItem(STORAGE_KEYS.token[session]);
+    if (token) storageFor(session).setItem(STORAGE_KEYS.token[session], token);
+    else storageFor(session).removeItem(STORAGE_KEYS.token[session]);
   } catch {}
 };
 

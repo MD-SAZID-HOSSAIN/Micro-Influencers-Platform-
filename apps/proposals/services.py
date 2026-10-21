@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
@@ -7,7 +5,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from apps.accounts.models import User
 from apps.accounts.verification import require_verified_brand, require_verified_creator
 from apps.campaigns.models import Campaign
-from apps.core.exceptions import Conflict
+from apps.core.exceptions import Conflict, DomainError
 from apps.notifications.models import Kind
 from apps.notifications.services import notify
 
@@ -35,6 +33,12 @@ class InvalidTransition(Conflict):
     default_detail = "This change is not allowed for the proposal's current status."
 
 
+class WithdrawalNotAllowed(DomainError):
+    status_code = 403
+    default_code = "withdrawal_not_allowed"
+    default_detail = "The brand does not allow creators to withdraw from this campaign."
+
+
 class AlreadyCompleted(Conflict):
     default_code = "already_completed"
     default_detail = "This collaboration is completed and can no longer be withdrawn."
@@ -45,11 +49,12 @@ def submit_proposal(
     creator: User,
     campaign_id: int,
     cover_message: str,
-    proposed_rate: Decimal,
     portfolio_links: list[str],
     experience_note: str,
 ) -> Proposal:
-    """Apply to a campaign. Only creators with a connected YouTube channel may apply.
+    """Apply to a campaign. Only a verified creator (confirmed email, YouTube channel) may apply.
+
+    There is no negotiation: the proposal's rate is the budget per creator the brand set on the campaign.
 
     The campaign row is locked so simultaneous submits are handled one at a time; the
     partial unique constraint is the backstop. The deadline is checked here as well as by
@@ -83,7 +88,7 @@ def submit_proposal(
                     campaign=campaign,
                     creator=creator,
                     cover_message=cover_message,
-                    proposed_rate=proposed_rate,
+                    proposed_rate=campaign.budget,  # fixed by the brand, never chosen by the creator
                     portfolio_links=portfolio_links,
                     experience_note=experience_note,
                 )
@@ -103,6 +108,8 @@ def submit_proposal(
 def withdraw_proposal(*, creator: User, proposal_id: int, reason: str | None) -> Proposal:
     """Withdraw an active proposal. Withdrawing an Accepted one needs a reason and frees its slot.
 
+    A campaign whose brand turned withdrawing off (``allow_withdrawal = False``) refuses every withdrawal.
+
     Locks the campaign first and the proposal second, the same order as accepting, so the two
     can never deadlock.
     """
@@ -117,6 +124,8 @@ def withdraw_proposal(*, creator: User, proposal_id: int, reason: str | None) ->
     with transaction.atomic():
         campaign = Campaign.objects.select_for_update().get(pk=campaign_id)
         proposal = Proposal.objects.select_for_update().get(pk=proposal_id)
+        if not campaign.allow_withdrawal:
+            raise WithdrawalNotAllowed()  # the brand chose "no withdrawing" when it posted the campaign
         if proposal.completed_at is not None:
             raise AlreadyCompleted()  # completion is final
         if proposal.status not in ACTIVE_STATUSES:

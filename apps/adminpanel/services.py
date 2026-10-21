@@ -14,6 +14,7 @@ from apps.core.exceptions import Conflict
 from apps.proposals.models import Proposal
 from apps.reviews.models import Review
 from apps.reviews.services import recalculate_rating
+from apps.social.models import BrandSocialAccount, PlatformStats
 
 from .models import AdminActionLog
 
@@ -117,6 +118,86 @@ def remove_review(*, admin: User, review_id: int, reason: str) -> None:
         _log(admin, "review.remove", "review", review.pk, f"by {review.brand.username}", reason)
         review.delete()
         recalculate_rating(creator_id)
+
+
+def _typed_stats(stats_id: int) -> PlatformStats:
+    """Only Instagram, TikTok and Facebook numbers are reviewed: YouTube is proven by Google sign-in."""
+    stats = (
+        PlatformStats.objects.select_for_update(of=("self",))
+        .select_related("creator")
+        .filter(pk=stats_id)
+        .exclude(platform="youtube")
+        .first()
+    )
+    if stats is None:
+        raise NotFound("Platform stats not found.")
+    return stats
+
+
+def approve_platform_stats(*, admin: User, stats_id: int, reason: str = "") -> PlatformStats:
+    """Mark a creator's typed numbers Verified: from now on they show on the creator's profile."""
+    with transaction.atomic():
+        stats = _typed_stats(stats_id)
+        stats.is_verified = True
+        stats.review_status = PlatformStats.Review.APPROVED
+        stats.review_note = ""
+        stats.save(update_fields=["is_verified", "review_status", "review_note", "updated_at"])
+        label = f"{stats.creator.username} {stats.platform}"
+        _log(admin, "stats.approve", "platform_stats", stats.pk, label, reason or "Checked the profile link.")
+    return stats
+
+
+def reject_platform_stats(*, admin: User, stats_id: int, reason: str) -> PlatformStats:
+    """Turn typed numbers down (or take back an approval). They are hidden and the creator sees the reason."""
+    with transaction.atomic():
+        stats = _typed_stats(stats_id)
+        stats.is_verified = False
+        stats.review_status = PlatformStats.Review.REJECTED
+        stats.review_note = reason
+        stats.save(update_fields=["is_verified", "review_status", "review_note", "updated_at"])
+        label = f"{stats.creator.username} {stats.platform}"
+        _log(admin, "stats.reject", "platform_stats", stats.pk, label, reason)
+    return stats
+
+
+def _typed_brand_platform(account_id: int) -> BrandSocialAccount:
+    """Only typed Instagram, TikTok and Facebook links are reviewed: YouTube is proven by Google sign-in."""
+    account = (
+        BrandSocialAccount.objects.select_for_update(of=("self",))
+        .select_related("brand")
+        .filter(pk=account_id)
+        .exclude(platform="youtube")
+        .first()
+    )
+    if account is None:
+        raise NotFound("Brand platform not found.")
+    return account
+
+
+def approve_brand_platform(*, admin: User, account_id: int, reason: str = "") -> BrandSocialAccount:
+    """The link is the brand's official page: it now counts towards verifying the brand."""
+    with transaction.atomic():
+        account = _typed_brand_platform(account_id)
+        account.is_verified = True
+        account.review_status = BrandSocialAccount.Review.APPROVED
+        account.review_note = ""
+        account.save(update_fields=["is_verified", "review_status", "review_note"])
+        label = f"{account.brand.username} {account.platform}"
+        _log(admin, "brand_platform.approve", "brand_platform", account.pk, label, reason or "Checked the page.")
+    return account
+
+
+def reject_brand_platform(*, admin: User, account_id: int, reason: str) -> BrandSocialAccount:
+    """Turn a link down (or take back an approval). The brand sees the reason."""
+    with transaction.atomic():
+        account = _typed_brand_platform(account_id)
+        account.is_verified = False
+        account.review_status = BrandSocialAccount.Review.REJECTED
+        account.review_note = reason
+        account.save(update_fields=["is_verified", "review_status", "review_note"])
+        label = f"{account.brand.username} {account.platform}"
+        _log(admin, "brand_platform.reject", "brand_platform", account.pk, label, reason)
+    return account
 
 
 def overview() -> dict:

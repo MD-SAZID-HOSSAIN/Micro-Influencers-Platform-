@@ -8,7 +8,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      host: true,
+      // Only this computer can open the site while developing. Anyone on the same Wi-Fi could otherwise reach the
+      // login pages (the admin one too). To test from a phone, start with VITE_HOST=true.
+      host: env.VITE_HOST === 'true' ? true : 'localhost',
       port: 5173,
       proxy: {
         // Uploaded pictures are served from /media/ by the same Django server.

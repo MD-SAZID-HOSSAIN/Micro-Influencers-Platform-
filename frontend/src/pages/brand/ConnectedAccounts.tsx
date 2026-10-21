@@ -22,6 +22,12 @@ const PLATFORMS: { key: BrandSocialPlatform; label: Platform; example?: string }
   { key: 'facebook', label: 'Facebook', example: 'https://facebook.com/yourbrand' },
 ];
 
+const STATUS_TAG = {
+  pending: { label: 'Waiting for admin', tone: 'tag-amber' },
+  approved: { label: 'Verified', tone: 'tag-brand' },
+  rejected: { label: 'Rejected', tone: 'tag-rose' },
+} as const;
+
 const GOOGLE_FAILURES: Record<string, string> = {
   access_denied: 'You declined access on Google.',
   invalid_state: 'That sign-in link expired or was started from another account. Try connecting again.',
@@ -125,7 +131,7 @@ export default function BrandConnectedAccounts() {
       await saveBrandSocialLink(platform, (links[platform] ?? '').trim());
       setLinks((l) => ({ ...l, [platform]: '' }));
       await Promise.all([reload(), refreshUser()]);
-      push('Platform connected.', 'success');
+      push('Link saved. An admin will check it. You can publish once it is approved.', 'success');
     } catch (err) {
       const detail = isApiError(err) ? (err.details as { handle_url?: string[] } | null)?.handle_url?.[0] : undefined;
       setErrors((e) => ({ ...e, [platform]: detail ?? (isApiError(err) ? err.message : 'Could not save that link.') }));
@@ -144,9 +150,10 @@ export default function BrandConnectedAccounts() {
     }
   };
 
-  const connectedCount = accounts?.length ?? 0;
+  const verifiedCount = accounts?.filter((a) => a.isVerified).length ?? 0;
+  const pendingCount = accounts?.filter((a) => a.reviewStatus === 'pending').length ?? 0;
   const emailDone = user?.emailVerified !== false;
-  const fullyVerified = emailDone && connectedCount > 0;
+  const fullyVerified = emailDone && verifiedCount > 0;
 
   return (
     <div className="container-page py-6 sm:py-8">
@@ -154,7 +161,7 @@ export default function BrandConnectedAccounts() {
         <PageHeader
           eyebrow="Account"
           title="Connected accounts"
-          description="Connect any one of YouTube, Instagram, TikTok or Facebook to finish verifying your brand."
+          description="Connect YouTube with Google, or add your official Instagram, TikTok or Facebook link. An admin checks the link before it counts."
         />
 
         <section className="card p-5 sm:p-6">
@@ -172,10 +179,12 @@ export default function BrandConnectedAccounts() {
                 </>
               )}
             </Step>
-            <Step done={connectedCount > 0} title="Connect one platform">
-              {connectedCount > 0
-                ? `${connectedCount} connected. One is enough; add more if you like.`
-                : 'Connect YouTube, Instagram, TikTok or Facebook below.'}
+            <Step done={verifiedCount > 0} title="One verified platform">
+              {verifiedCount > 0
+                ? `${verifiedCount} verified. One is enough; add more if you like.`
+                : pendingCount > 0
+                  ? 'Your link is waiting for an admin to check it.'
+                  : 'Connect YouTube with Google, or add your official Instagram, TikTok or Facebook link below. An admin approves the link.'}
             </Step>
           </ul>
           <p className="text-xs text-ink-500 mt-5">
@@ -199,13 +208,13 @@ export default function BrandConnectedAccounts() {
                     <div className="min-w-0">
                       <h3 className="text-sm font-semibold text-ink-900">{label}</h3>
                       <p className="text-xs text-ink-500 mt-0.5">
-                        {key === 'youtube' ? 'Google sign-in · proves you own the channel' : 'Link you type · not checked by us'}
+                        {key === 'youtube' ? 'Google sign-in · proves you own the channel' : 'Official page link · an admin checks it'}
                       </p>
                     </div>
                   </div>
                   {account && (
-                    <span className={account.isVerified ? 'tag tag-brand shrink-0' : 'tag tag-amber shrink-0'}>
-                      <CheckCircle2 className="w-3 h-3" /> {account.isVerified ? 'Verified' : 'Added'}
+                    <span className={'tag shrink-0 ' + STATUS_TAG[account.reviewStatus].tone}>
+                      <CheckCircle2 className="w-3 h-3" /> {STATUS_TAG[account.reviewStatus].label}
                     </span>
                   )}
                 </div>
@@ -224,7 +233,16 @@ export default function BrandConnectedAccounts() {
                       <Trash2 className="w-4 h-4 text-rose-600" /> Remove
                     </Button>
                   </div>
-                ) : key === 'youtube' ? (
+                ) : null}
+                {account?.reviewStatus === 'pending' && (
+                  <p className="mt-2 text-xs text-ink-500">Waiting for an admin. It does not count until it is approved.</p>
+                )}
+                {account?.reviewStatus === 'rejected' && (
+                  <p className="mt-2 text-xs text-rose-700">
+                    Admin said: “{account.reviewNote}” Remove it and add the correct link.
+                  </p>
+                )}
+                {!account && (key === 'youtube' ? (
                   <Button onClick={connectYouTube} disabled={busy} className="mt-4 w-full sm:w-auto">
                     {busy ? 'Opening Google…' : 'Connect YouTube'} <ArrowUpRight className="w-3.5 h-3.5" />
                   </Button>
@@ -254,7 +272,7 @@ export default function BrandConnectedAccounts() {
                       {busy ? 'Saving…' : `Connect ${label}`}
                     </Button>
                   </form>
-                )}
+                ))}
               </article>
             );
           })}
@@ -268,8 +286,8 @@ export default function BrandConnectedAccounts() {
           }}
           title="Remove this platform?"
           description={
-            connectedCount <= 1
-              ? 'This is your only connected platform. Without one you cannot publish campaigns or accept proposals until you connect another.'
+            verifiedCount <= 1
+              ? 'Without a verified platform you cannot publish campaigns or accept proposals until you connect another.'
               : 'You can connect it again at any time.'
           }
           confirmLabel="Remove"

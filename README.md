@@ -121,12 +121,23 @@ There is no payment and no chat inside the platform. It only handles finding eac
 - Press **Connect YouTube** and sign in with Google. Only read-only access is asked for.
 - The platform then reads your channel link, subscriber count, an engagement rate worked out from recent videos, and
   your recent videos. These show on your profile with a **Verified** badge and the time they were last updated.
+- **You need at least 1,000 subscribers** to be Verified. A smaller channel stays connected but is **not Verified** and
+  cannot apply, and the website tells you how many subscribers you have and how many you need. The channel is checked
+  again every day (and when you press Refresh), so you become Verified once you pass the minimum, and lose it if you drop
+  below. The minimum is the setting `MIN_CREATOR_FOLLOWERS`.
 - Stats refresh by themselves every day. You can also press **Refresh** (once every 15 minutes).
 - If Google access ends, you get a "please reconnect" notification. Your last numbers stay visible, marked **outdated**.
 - **Disconnect** deletes the stored access and gives it back at Google. Your last numbers stay but become Unverified.
-- You can also type stats by hand for YouTube, Instagram, TikTok or Facebook. These are always shown as
-  **Unverified**. Only YouTube can be proven, because Instagram, TikTok and Facebook do not allow this without
-  special approval from them.
+- **Instagram, TikTok and Facebook:** on **Accounts**, each one has a small form. Type your followers, your engagement
+  rate (0 to 100) and your profile link (it must be a page on that website), then press Add. You can Edit or Remove it
+  later.
+  - The numbers are **Waiting for admin** at first, and **only you can see them**. An admin opens your link and checks
+    them.
+  - When the admin **approves**, they are **Verified** and show on your profile. If the admin **rejects**, you see the
+    reason; fix the details and save to send them again.
+  - Changing the numbers later sends them back to the admin.
+  - They never count towards being a Verified creator or applying to campaigns. Only a confirmed email and a connected
+    YouTube channel do.
 
 **3. Finding work**
 - **Find work** lists published campaigns. Filter by keyword, niche, platform, budget range and deadline.
@@ -137,13 +148,19 @@ There is no payment and no chat inside the platform. It only handles finding eac
   places are full.
 
 **4. Applying and tracking**
-- **Apply now** opens a form: cover message, your rate, up to 3 portfolio links (filled in from your profile), and an
-  experience note. **You cannot apply until a YouTube channel is connected.**
+- **Apply now** opens a form: cover message, up to 3 portfolio links (filled in from your profile), and an experience
+  note. **There is no price to type and no negotiation:** every creator gets the fixed rate the brand set on the
+  campaign (its *budget per creator*), and the form shows it. **You cannot apply until your email is confirmed and a
+  YouTube channel is connected with at least 1,000 subscribers.**
 - One live proposal per campaign. A sent proposal cannot be edited.
 - **My proposals** lists every application with its status: Pending, Shortlisted, Accepted, Rejected or Withdrawn.
-- You can **withdraw** a Pending, Shortlisted or Accepted proposal. Withdrawing an accepted one needs a short reason
-  (up to 300 characters) and frees the place for someone else. You can apply again after withdrawing, but only while
-  the campaign is still open. A rejected proposal cannot be sent again.
+- **Can you withdraw?** Each brand decides this when it posts the campaign, and the campaign page shows it as
+  **Withdrawing: Allowed / Not allowed** before you apply (the apply form also warns you).
+  - **Allowed:** you can withdraw a Pending, Shortlisted or Accepted proposal. Withdrawing an accepted one needs a short
+    reason (up to 300 characters) and frees the place for someone else. You can apply again after withdrawing, but only
+    while the campaign is still open.
+  - **Not allowed:** once you apply you cannot take the proposal back. The Withdraw button is replaced by a note.
+  - A rejected proposal cannot be sent again.
 
 **5. After you are accepted**
 - Add **deliverables**: the link to each post you published, the platform, and an optional note. You can change them
@@ -161,11 +178,12 @@ There is no payment and no chat inside the platform. It only handles finding eac
 
 **2. Two steps to be fully verified**
 - **Confirm your email** with the 6-digit code.
-- **Connect one platform** on **Accounts**: YouTube, Instagram, TikTok or Facebook. Any one is enough.
+- **Get one platform verified** on **Accounts**. Any one is enough.
   - **YouTube** is connected with Google sign-in. The platform reads the channel link once, then gives the Google access
-    back. It is tagged **Verified**.
-  - **Instagram, TikTok and Facebook** are links you type. The platform checks they are on that site, but cannot prove
-    you own them. They are tagged **Added**.
+    back. It is tagged **Verified** at once.
+  - **Instagram, TikTok and Facebook** are your official page link. The platform checks it is on that site, then an
+    **admin opens it and approves or rejects it**. It shows **Waiting for admin**, then **Verified**, or **Rejected**
+    with the admin's reason (remove it and add the correct link). A waiting link does not count.
 - Until both steps are done, a brand can still browse, save drafts, shortlist and reject. It **cannot publish a
   campaign or accept a proposal**.
 
@@ -181,6 +199,10 @@ There is no payment and no chat inside the platform. It only handles finding eac
   "2 posts, 1 reel"), **creators needed** (1 to 20), and an optional **minimum followers**.
 - You can attach **up to 2 photos or 1 video** while it is a draft (photos: JPG, PNG, WebP up to 5 MB; video: MP4 or
   WebM up to 50 MB).
+- **Can creators withdraw?** When you post a campaign you choose one of two options: **Creators can withdraw** (the
+  default) or **Creators cannot withdraw** (a creator who applied cannot take the proposal back, so you get a firm
+  commitment). Creators see your choice before they apply. It is part of the draft, so it **cannot be changed after you
+  publish**.
 - Life of a campaign:
 
   | Step | What you can do |
@@ -214,8 +236,8 @@ There is no payment and no chat inside the platform. It only handles finding eac
 **7. Campaign statistics**
 - **Views**: how many creators opened the campaign.
 - **Proposal funnel**: received, shortlisted, accepted, rejected and withdrawn.
-- **Accepted compared with needed**, the **average rate creators asked for compared with your budget**, and the
-  **acceptance rate**.
+- **Accepted compared with needed**, the **total if every spot is filled** (the rate is fixed, so creators cannot
+  negotiate it), and the **acceptance rate**.
 - **Content performance**: views, likes, comments and engagement for each deliverable on YouTube. This needs a YouTube
   API key on the server. Without one it shows "not available".
 
@@ -247,16 +269,17 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
 |---|---|
 | **Overview** | Total users, sign-ups over time, campaigns by status, total proposals. |
 | **Users** | Search and filter users. **Suspend** (the person cannot log in), **reactivate**, or **delete**. Admins cannot suspend or delete themselves. |
+| **Platform reviews** | Two lists, **Creator numbers** and **Brand links**, each with Waiting, Approved and Rejected tabs. Open the link, then **Approve** (a creator's numbers become Verified and show on their profile; a brand's link lets the brand publish and accept) or **Reject** with a reason (they see it). |
 | **Moderation** | **Close** any campaign and **remove** a review (the rating is recalculated). |
-| **Audit log** | Every action above needs a written reason and is saved with who did it, what, and when. |
+| **Audit log** | Every action above is saved with who did it, what, and when. All of them need a written reason, except approving something in Platform reviews. |
 
 ### Behind the scenes
 
-- **Security**: passwords are stored as strong hashes. Login sessions last 24 hours. Google access tokens are stored
+- **Security**: passwords are stored as strong hashes. Login sessions last 24 hours (an admin stays logged in until they log out). Google access tokens are stored
   encrypted and never sent to the website. Sign-in with Google is protected against forgery. Every page except the
   home, login, sign-up, password-reset, Terms and Privacy pages needs a login. People can only change their own data.
-- **Limits**: sign-up 5 a minute, login 10 a minute, password reset 5 an hour, resend code 5 an hour and at least 60
-  seconds apart.
+- **Limits**: sign-up 5 a minute, login 10 a minute, admin login 5 a minute, password reset 5 an hour, resend code 5 an
+  hour and at least 60 seconds apart.
 - **Reliability**: if YouTube is down, the last numbers stay with their "last updated" time. A failure in an outside
   service never breaks the rest of the platform.
 - **Background jobs**: daily YouTube refresh (03:00 UTC), daily refresh of video statistics (04:00 UTC), closing
@@ -271,7 +294,8 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
 - No push notifications, email digests or marketing emails.
 - A user cannot delete their own account yet. They must contact the team, and an admin does it.
 - Creators cannot review brands.
-- Instagram, TikTok and Facebook cannot be verified, only typed in.
+- Instagram, TikTok and Facebook are not connected automatically. Creators type the numbers and an admin checks the
+  link by hand before they show on the profile.
 - While the Google app is in "Testing" mode, only the listed test users can connect YouTube, and Google asks them to
   reconnect about once a week.
 
@@ -281,19 +305,24 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
 
 | | Checks | Can do only after verification |
 |---|---|---|
-| **Brand** | **Email** (a 6-digit code emailed after sign-up) and **one connected platform**: any of YouTube, Instagram, TikTok or Facebook | Publish a campaign, accept a proposal |
-| **Creator** | **Email** (a 6-digit code emailed after sign-up) and **YouTube** (connect a channel with Google sign-in: Verified stats) | Apply to a campaign (needs YouTube; the email code confirms the address) |
+| **Brand** | **Email** (a 6-digit code emailed after sign-up) and **one verified platform**: YouTube (Google sign-in), or an Instagram, TikTok or Facebook link **an admin approved** | Publish a campaign, accept a proposal |
+| **Creator** | **Email** (a 6-digit code emailed after sign-up) **and** **YouTube** (connect a channel with Google sign-in, with **at least 1,000 subscribers**: Verified stats) | Apply to a campaign (needs both) |
 
 - Unverified accounts can still log in, browse, edit their profile and (brands) save drafts, shortlist and reject.
-- **Everyone** confirms their email with the 6-digit code sent after sign-up (brands and creators). A creator is
-  only *Verified* once a YouTube channel is connected, and **cannot apply until then**, whether or not the email is
-  confirmed. A verified email also means the user receives notification emails.
+- **Everyone** confirms their email with the 6-digit code sent after sign-up (brands and creators). The same address
+  is used to reset a forgotten password and for notification emails. A creator is only *Verified* with a confirmed
+  email **and** a connected YouTube channel with **at least 1,000 subscribers** (the setting `MIN_CREATOR_FOLLOWERS`),
+  and **cannot apply until both are true**.
 - **Forgot password** works for every account, verified or not.
-- **A brand is fully verified only with both**: a confirmed email *and* at least one connected platform. YouTube is
-  connected with Google sign-in (proven, tagged *Verified*). Instagram, TikTok and Facebook are a link the brand types
-  (checked to be on that platform's website, but **not proven**, so tagged *Added*). Removing the last platform blocks
-  the brand again. Brands manage this on **Connected accounts** (`/brand/accounts`).
-- The errors are 403 `brand_email_unverified`, 403 `brand_platform_required` and 403 `creator_youtube_required`.
+- **A brand is fully verified only with both**: a confirmed email *and* one verified platform. YouTube is connected with
+  Google sign-in (proven, *Verified* at once). Instagram, TikTok and Facebook are the brand's official page link; it
+  counts only after an **admin approves it** (Admin, Platform reviews, Brand links). Waiting and rejected links do not
+  count. Removing the last verified platform blocks the brand again. Brands manage this on **Connected accounts**
+  (`/brand/<your username>/accounts`).
+- The errors are 403 `brand_email_unverified`, 403 `brand_platform_required` (no verified platform; a link waiting for
+  an admin does not count), 403 `creator_email_unverified`, 403 `creator_youtube_required` (no YouTube connected) and
+  403 `creator_followers_too_low` (connected, but under the minimum; the message says how many
+  subscribers the channel has and how many are needed).
 - This is stricter than the PRD. See "Verification gates" in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 [↑ Back to contents](#contents)
@@ -464,10 +493,13 @@ verification flags), and gives the same data every time. Options: `--creators`, 
 
 Log in as `demo_creator_001` or `demo_brand_01` with password **`DemoPass123!`**.
 
-- Every demo brand has a verified email.
+- Every demo brand and creator has a verified email, and every demo brand has an approved Instagram link, so they are
+  fully verified.
 - Every demo creator has a verified YouTube channel, except each fifth one (`demo_creator_005`, `010`, ...). Use
   those to see the "connect YouTube to apply" state.
-- Demo accounts use fake `@demo.test` addresses. Do not point a real email provider at them (see "Email").
+- Every fourth demo campaign does not let creators withdraw, so you can see both choices.
+- Demo accounts use fake `@demo.test` addresses, so notification emails are switched off for them. Do not point a real
+  email provider at them (see "Email").
 
 [↑ Back to contents](#contents)
 
@@ -489,6 +521,25 @@ in a background task that retries with growing delays. A failed send never break
   domain, Resend delivers only to the address you signed up with. Never commit keys.
 - In development, background jobs run inside the request (`CELERY_TASK_ALWAYS_EAGER`), so a failing mail server can
   make a request slow while it retries.
+
+**Emails landing in Spam.** The provider accepting a message does not mean the inbox accepts it. If the sender
+(`DEFAULT_FROM_EMAIL`) is a Gmail, Outlook or Yahoo address but the mail goes out through Brevo or Resend, the inbox
+provider cannot prove the mail is really from that address, so it puts it in Spam or drops it. No code can fix this;
+the sender has to be proven. In order of how well it works:
+
+1. **Best (for real users): your own domain.** In the provider (Brevo: *Senders, domains & dedicated IPs, Domains*), add
+   the domain and copy the DNS records it shows (SPF, DKIM and DMARC) into the domain's DNS settings, then send from an
+   address on that domain, for example `CollabNest <no-reply@yourdomain.com>`. A domain costs a few dollars a year.
+2. **Good for a test project without a domain: send through Gmail itself.** Gmail then signs the mail, so it reaches
+   Gmail inboxes. Turn on 2-step verification on the Google account, create an **App password**, and set
+   `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=True`, `EMAIL_HOST_USER=<your gmail address>`,
+   `EMAIL_HOST_PASSWORD=<the app password>` and `DEFAULT_FROM_EMAIL=CollabNest <your gmail address>`. Gmail allows about
+   500 mails a day this way, which is enough for a test, not for a launch.
+3. **Always:** use a display name in `DEFAULT_FROM_EMAIL` (`CollabNest <address>`), keep the emails short and plain (they
+   are), and ask people to check Spam and press **Not spam**. The verify and reset pages already say this.
+
+To see what happened to one email, open the provider's logs (Brevo: *Transactional, Logs*): they show delivered,
+blocked or bounced.
 
 [↑ Back to contents](#contents)
 
@@ -530,15 +581,23 @@ active and the database running:
 python manage.py create_admin --email you@example.com --username admin
 ```
 
-The password (8 characters or more) is prompted for twice and is never accepted as an argument.
+The password is prompted for twice and is never accepted as an argument. The command refuses a weak password: at least 12 characters, not a common one such as `12345678`, not only digits, and
+not like the username or email. The admin can delete accounts, so choose a long password that you use nowhere else. To
+change an admin's password later:
 
-**Local development admin** used in this project's local setup: username `admin`, password `12345678`. These are
-throwaway credentials; on any shared or deployed server use a strong password instead.
+```bash
+.venv\Scripts\python.exe manage.py changepassword admin
+```
+
+An admin **stays logged in** until they press **Log out** (the login does not expire, and it is remembered after the
+browser closes). Logging out, or changing the admin's password, ends every login made before. To make admin logins
+expire, set `ADMIN_TOKEN_MINUTES` to a number of minutes.
 
 Admins sign in at **http://localhost:5173/admin/login** (through the API: `POST /api/v1/admin/auth/login/`). The
-admin area has an overview, a user list (search, suspend, reactivate, delete) and an audit log. The public login
-page rejects admin accounts, and ordinary accounts cannot use the admin login. Every admin action needs a written
-reason and is recorded in `GET /api/v1/admin/actions/`.
+admin area has an overview, a user list (search, suspend, reactivate, delete), platform reviews (approve or reject
+creators' typed Instagram, TikTok and Facebook numbers and brands' typed links) and an audit log. The public login
+page rejects admin accounts, and ordinary accounts cannot use the admin login. Every admin action is recorded in
+`GET /api/v1/admin/actions/`; all need a written reason except approving something in Platform reviews.
 
 [↑ Back to contents](#contents)
 
@@ -560,8 +619,8 @@ reason and is recorded in `GET /api/v1/admin/actions/`.
 
 ## Connecting YouTube (Google sign-in)
 
-Only YouTube connects through OAuth. Instagram, TikTok and Facebook are manual entry and always labelled
-Unverified (see the PRD for why). Connecting YouTube is also what makes a creator Verified.
+Only YouTube connects through OAuth. Instagram, TikTok and Facebook are typed by the creator and become Verified only
+after an admin approves them (see the PRD for why they cannot be connected). Connecting YouTube is also what makes a creator Verified.
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create a project and enable the
    **YouTube Data API v3**.
@@ -614,6 +673,8 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `SECURE_HSTS_PRELOAD` | Production only, default `false`. Needs the option above; very hard to undo. |
 | `OAUTH_ENCRYPTION_KEY` | Fernet key that encrypts stored YouTube tokens. Required in production. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth client (see above). |
+| `MIN_CREATOR_FOLLOWERS` | Subscribers a creator's YouTube channel needs to be Verified and apply to campaigns. Default `1000`. |
+| `ADMIN_TOKEN_MINUTES` | Minutes an admin login lasts. Default `0` = the admin stays logged in until Log out or a password change (everyone else: 24 hours). |
 | `YOUTUBE_API_KEY` | Optional server key for public video statistics. Without it, content performance shows `not_available`. |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Email delivery: console in development, SMTP for real email. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
@@ -630,13 +691,13 @@ variable fails to start instead of running in debug mode. The `.env` you copy al
 ## How the API behaves
 
 - **Auth:** `POST /api/v1/auth/login/` with `{"identifier", "password"}` (email or username), then send
-  `Authorization: Bearer <token>`. Tokens last 24 hours. Logging out or resetting a password signs the user out
-  everywhere.
+  `Authorization: Bearer <token>`. Tokens last 24 hours (an admin's does not expire unless `ADMIN_TOKEN_MINUTES` is set). Logging out, resetting or
+  changing a password signs the user out everywhere.
 - **Errors:** always `{"error": {"code", "message", "details"}}`. Branch on `code`.
 - **Lists:** `count`, `next`, `previous`, `results`; `?page=` and `?page_size=` (max 50).
 - **Roles:** creators and brands see different endpoints; the wrong role gets 403 and another account's data is 404.
-- **Rate limits:** register 5/min, login 10/min, password reset 5/hour, email verify 20/hour, email resend 5/hour
-  (and a 60-second wait between codes).
+- **Rate limits:** register 5/min, login 10/min, admin login 5/min, password reset 5/hour, email verify 20/hour, email
+  resend 5/hour (and a 60-second wait between codes).
 
 [↑ Back to contents](#contents)
 
@@ -671,10 +732,12 @@ Business rules live in each app's `services.py`; views stay thin.
 | "Invalid line" warnings when the backend starts | `.env` has a blank line containing a space, or was saved with a byte-order mark. Save it as plain UTF-8 and remove blank-space lines. |
 | Connecting YouTube returns 503 or an empty link | Redis is not reachable (see "Without Docker"), or the Google variables are empty. |
 | After Google sign-in the browser lands on a dead page | `FRONTEND_URL` is wrong. Use `http://localhost:5173` in development. |
-| No email arrives | With the console backend, read the code in the backend terminal. With SMTP, check the sender is verified at the provider. Brevo needs its SMTP login, not your account email; Resend without a verified domain only delivers to your own address. |
-| A brand cannot publish or accept (403 `brand_platform_required`) | Connect one platform on **Connected accounts** (YouTube, Instagram, TikTok or Facebook). |
+| No email arrives (or it is in Spam) | See "Emails landing in Spam" in the email section. With the console backend, read the code in the backend terminal. With SMTP, check the sender is verified at the provider. Brevo needs its SMTP login, not your account email; Resend without a verified domain only delivers to your own address. |
+| A brand cannot publish or accept (403 `brand_platform_required`) | Connect YouTube on **Connected accounts**, or add an Instagram, TikTok or Facebook link and wait for an admin to approve it (Admin, Platform reviews, Brand links). |
 | A brand cannot publish or accept (403 `brand_email_unverified`) | Verify the email with the code (shown in the backend terminal in development). |
 | A creator cannot apply (403 `creator_youtube_required`) | Connect YouTube. Manually typed stats do not count. |
+| A creator cannot apply (403 `creator_email_unverified`) | Confirm the email with the 6-digit code. |
+| A creator cannot apply (403 `creator_followers_too_low`) | The channel has fewer subscribers than `MIN_CREATOR_FOLLOWERS` (1,000 by default). It becomes Verified at the next daily sync after it grows, or when the creator presses Refresh. |
 | Uploaded pictures are missing | They live in `media/`. If you set `MEDIA_ROOT` yourself, keep the same folder between runs. |
 | Tests cannot create a database | `DATABASE_URL` must name a PostgreSQL user that may create databases. |
 
@@ -682,10 +745,8 @@ Business rules live in each app's `services.py`; views stay thin.
 
 ## Known issues
 
-- The endpoints `POST /api/v1/social/youtube/direct-connect/` and `POST /api/v1/social/direct-connect/<platform>/`
-  mark stats as Verified from a handle and follower count the caller supplies, with no proof of ownership. They
-  bypass the rule that only a real YouTube connection verifies a creator, and the website does not use them.
-  Remove or protect them before any real use.
+- No known issues right now. An admin approves Instagram, TikTok and Facebook links and numbers by hand (see "Who can do
+  what"), by design. Nobody is notified when an admin approves or rejects; they see the status on their Accounts page.
 
 [↑ Back to contents](#contents)
 

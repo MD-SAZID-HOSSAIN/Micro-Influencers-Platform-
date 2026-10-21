@@ -1,13 +1,14 @@
 from getpass import getpass
 
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import validate_email
 
 from apps.accounts.models import Role, User
 
-MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH = 12  # an admin can delete accounts, so the bar is higher than for ordinary users
 
 
 class Command(BaseCommand):
@@ -42,6 +43,11 @@ class Command(BaseCommand):
             raise CommandError(f"The password must be at least {MIN_PASSWORD_LENGTH} characters.")
         if password != getpass("Password (again): "):
             raise CommandError("The passwords do not match.")
+        candidate = User(username=username, email=email, full_name=options["full_name"] or username)
+        try:
+            validate_password(password, user=candidate)  # not a common password, not only digits, not like the name
+        except ValidationError as exc:
+            raise CommandError(" ".join(exc.messages))
 
         User.objects.create_user(
             username=username,

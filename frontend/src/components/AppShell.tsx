@@ -7,6 +7,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useAuth } from '../state/AuthContext';
+import { withUsername } from '../lib/shared';
 import {
   useStore, markAllNotificationsRead, markNotificationRead, loadNotifications,
 } from '../state/Store';
@@ -113,11 +114,13 @@ export default function AppShell() {
 
   if (!user) return null;
 
-  const nav = user.role === 'creator' ? creatorNav : brandNav;
-  const quickActions = quickActionsByRole[user.role];
+  // The username is part of every address, so the menu links carry it (and the active link is found).
+  const mine = (to: string) => withUsername(to, user.username);
+  const nav = (user.role === 'creator' ? creatorNav : brandNav).map((item) => ({ ...item, to: mine(item.to) }));
+  const quickActions = quickActionsByRole[user.role].map((a) => ({ ...a, to: mine(a.to) }));
   const primaryAction = user.role === 'brand'
-    ? { to: '/brand/campaigns/create', label: 'New campaign', icon: Plus }
-    : { to: '/creator/campaigns', label: 'Find work', icon: Compass };
+    ? { to: mine('/brand/campaigns/create'), label: 'New campaign', icon: Plus }
+    : { to: mine('/creator/campaigns'), label: 'Find work', icon: Compass };
 
   return (
     <div className="min-h-screen bg-mist-100 flex flex-col">
@@ -218,7 +221,7 @@ export default function AppShell() {
               {user.role === 'brand' ? (
                 <span><strong>Verify your email</strong> to publish campaigns and accept proposals.</span>
               ) : (
-                <span><strong>Verify your email</strong> with the 6-digit code we sent you. To apply to campaigns you also need to connect YouTube.</span>
+                <span><strong>Verify your email</strong> with the 6-digit code we sent you. To apply to campaigns you also need a connected YouTube channel with enough subscribers.</span>
               )}
             </span>
             <Link
@@ -232,22 +235,29 @@ export default function AppShell() {
         </div>
       )}
 
-      {/* A brand with a confirmed email still needs one connected platform before it can publish or accept. */}
+      {/* A brand with a confirmed email still needs one verified platform before it can publish or accept. */}
       {user && user.role === 'brand' && user.emailVerified !== false && user.platformConnected === false && (
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="container-page py-2.5 flex items-center justify-between gap-3 text-sm">
             <span className="text-amber-900 inline-flex items-center gap-2">
               <Link2 className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                <strong>Connect a social account</strong> (YouTube, Instagram, TikTok or Facebook) to publish campaigns
-                and accept proposals.
-              </span>
+              {user.platformStatus === 'pending' ? (
+                <span>
+                  <strong>An admin is checking your link.</strong> You can publish campaigns and accept proposals once it is
+                  approved.
+                </span>
+              ) : (
+                <span>
+                  <strong>Connect YouTube</strong>, or add your Instagram, TikTok or Facebook link for an admin to approve,
+                  to publish campaigns and accept proposals.
+                </span>
+              )}
             </span>
             <Link
               to="/brand/accounts"
               className="text-amber-900 hover:text-amber-700 font-semibold text-sm underline shrink-0"
             >
-              Connect
+              {user.platformStatus === 'pending' ? 'See status' : 'Connect'}
             </Link>
           </div>
         </div>

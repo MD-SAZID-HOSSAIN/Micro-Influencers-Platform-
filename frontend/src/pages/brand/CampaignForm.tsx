@@ -120,6 +120,43 @@ export function CampaignForm({
           />
         </FormField>
       </section>
+
+      <section className="card p-5 sm:p-6">
+        <SectionHeader
+          eyebrow="03"
+          title="Can creators withdraw?"
+          description="Choose one. Creators see your choice before they apply, and it cannot be changed after you publish."
+        />
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Can creators withdraw?">
+          {[
+            { value: true, title: 'Creators can withdraw', text: 'A creator who applied can take their proposal back, even after you accepted it (they must give a reason).' },
+            { value: false, title: 'Creators cannot withdraw', text: 'Once a creator applies, they cannot take the proposal back. Use this when you need a firm commitment.' },
+          ].map((o) => {
+            const selected = (values.allowWithdrawal !== false) === o.value;
+            return (
+              <label
+                key={String(o.value)}
+                className={
+                  'flex gap-3 p-4 rounded-md border cursor-pointer transition-colors ' +
+                  (selected ? 'border-brand-500 bg-brand-50/60' : 'border-ink-200 hover:bg-mist-100/60')
+                }
+              >
+                <input
+                  type="radio"
+                  name="allowWithdrawal"
+                  className="mt-1 shrink-0"
+                  checked={selected}
+                  onChange={() => set('allowWithdrawal', o.value)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-ink-900">{o.title}</span>
+                  <span className="block text-xs text-ink-500 mt-0.5">{o.text}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

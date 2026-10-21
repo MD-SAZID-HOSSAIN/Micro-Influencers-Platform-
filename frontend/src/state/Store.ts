@@ -109,9 +109,12 @@ export const loadCreatorProfile = () =>
           id: 'yt',
           platform: 'YouTube',
           handle: 'YouTube channel',
-          verified: !yt.needsReconnect,
+          verified: !yt.needsReconnect && !yt.belowMinimum,
           lastSyncedAt: yt.lastSyncedAt ?? new Date().toISOString(),
           status: yt.needsReconnect ? 'expired' : 'connected',
+          belowMinimum: yt.belowMinimum,
+          followers: yt.followers ?? undefined,
+          minimumFollowers: yt.minimumFollowers,
           problem:
             yt.lastError === 'subscribers_hidden' || yt.lastError === 'no_channel'
               ? yt.lastError
@@ -243,6 +246,7 @@ export const addCampaign = async (c: {
   deliverables: string;
   creatorsNeeded: number;
   minFollowers?: number;
+  allowWithdrawal?: boolean;
 }): Promise<Campaign> => {
   const created = await api.createCampaign({
     title: c.title,
@@ -254,6 +258,7 @@ export const addCampaign = async (c: {
     deliverables: c.deliverables,
     creatorsNeeded: c.creatorsNeeded,
     minFollowers: c.minFollowers,
+    allowWithdrawal: c.allowWithdrawal,
   });
   setState({ campaigns: [created, ...state.campaigns] });
   return created;
@@ -271,6 +276,7 @@ export const updateCampaign = async (
     deliverables: string;
     creatorsNeeded: number;
     minFollowers?: number;
+    allowWithdrawal?: boolean;
   }>,
 ): Promise<Campaign | null> => {
   const idNum = Number(id);
@@ -284,6 +290,7 @@ export const updateCampaign = async (
     deliverables: patch.deliverables,
     creatorsNeeded: patch.creatorsNeeded,
     minFollowers: patch.minFollowers,
+    allowWithdrawal: patch.allowWithdrawal,
   });
   setState({ campaigns: state.campaigns.map((c) => (c.id === id ? updated : c)) });
   return updated;
@@ -315,7 +322,6 @@ export const addProposal = async (
   campaignId: string,
   data: {
     coverMessage: string;
-    proposedRate: number;
     portfolio: PortfolioLink[];
     relevantExperience: string;
   },
@@ -323,7 +329,6 @@ export const addProposal = async (
   await api.submitProposal({
     campaignId,
     coverMessage: data.coverMessage,
-    proposedRate: data.proposedRate,
     portfolioLinks: data.portfolio,
     experienceNote: data.relevantExperience,
   });
@@ -476,9 +481,12 @@ export const updateConnectedAccount = async (
         id: 'yt',
         platform: 'YouTube',
         handle: 'YouTube channel',
-        verified: !yt.needsReconnect,
+        verified: !yt.needsReconnect && !yt.belowMinimum,
         lastSyncedAt: yt.lastSyncedAt ?? new Date().toISOString(),
         status: yt.needsReconnect ? 'expired' : 'connected',
+        belowMinimum: yt.belowMinimum,
+        followers: yt.followers ?? undefined,
+        minimumFollowers: yt.minimumFollowers,
       };
       setState({ connectedAccounts: [acc] });
     } else {

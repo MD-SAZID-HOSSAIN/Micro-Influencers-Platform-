@@ -41,6 +41,10 @@ class CampaignSerializer(serializers.ModelSerializer):
         min_value=1, max_value=MAX_CREATORS_NEEDED, default=1
     )
     min_followers = serializers.IntegerField(min_value=0, allow_null=True, required=False)
+    allow_withdrawal = serializers.BooleanField(
+        default=True,
+        help_text="True: creators may withdraw their proposal. False: once they apply, they cannot withdraw.",
+    )
     media = CampaignMediaSerializer(many=True, read_only=True)
 
     class Meta:
@@ -56,6 +60,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             "deliverables",
             "creators_needed",
             "min_followers",
+            "allow_withdrawal",
             "media",
             "status",
             "published_at",
@@ -132,6 +137,7 @@ class CampaignDetailSerializer(CampaignCardSerializer):
             "description",
             "deliverables",
             "min_followers",
+            "allow_withdrawal",
             "media",
             "status",
             "accepted_count",
@@ -194,7 +200,6 @@ class CampaignMetricsSerializer(serializers.Serializer):
     views = serializers.IntegerField(help_text="Times creators opened this campaign.")
     funnel = FunnelSerializer()
     accepted_vs_needed = AcceptedVsNeededSerializer()
-    avg_proposed_rate = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
     budget_per_creator = serializers.DecimalField(max_digits=10, decimal_places=2)
     acceptance_rate = serializers.FloatField(
         allow_null=True,

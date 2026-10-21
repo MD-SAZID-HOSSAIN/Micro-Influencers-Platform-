@@ -114,6 +114,7 @@ export default function CampaignDetail() {
           { label: 'Deadline', value: fmtDate(campaign.applicationDeadline) },
           { label: 'Creators', value: String(campaign.creatorsNeeded), hint: 'needed' },
           { label: 'Min followers', value: campaign.minFollowers?.toLocaleString() ?? '—' },
+          { label: 'Withdrawing', value: campaign.allowWithdrawal === false ? 'Not allowed' : 'Allowed', hint: 'after you apply' },
         ]}
       />
 
@@ -185,6 +186,8 @@ export default function CampaignDetail() {
             navigate(`/creator/applications/${newId}`);
           }}
           campaignId={campaign.id}
+          budget={campaign.budgetPerCreator}
+          allowWithdrawal={campaign.allowWithdrawal !== false}
           applying={applying}
           setApplying={setApplying}
         />
@@ -203,26 +206,29 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 function ApplyModal({
-  onClose, onSubmitted, campaignId, applying, setApplying,
+  onClose, onSubmitted, campaignId, budget, allowWithdrawal, applying, setApplying,
 }: {
   onClose: () => void;
   onSubmitted: (proposalId: string) => void;
   campaignId: string;
+  /** The brand's fixed rate for each creator. The creator cannot change it. */
+  budget: number;
+  /** False when the brand does not let creators withdraw after applying. */
+  allowWithdrawal: boolean;
   applying: boolean;
   setApplying: (b: boolean) => void;
 }) {
   const { creator } = useStore();
   const [cover, setCover] = useState('');
-  const [rate, setRate] = useState(creator?.ratePerPost ?? 1000);
   const [experience, setExperience] = useState('');
   const [links, setLinks] = useState((creator?.portfolio ?? []).slice(0, 3).map((p) => ({ ...p })));
   const [error, setError] = useState('');
 
-  const valid = cover.length >= 30 && rate > 0;
+  const valid = cover.length >= 30;
 
   const submit = async () => {
     if (!valid) {
-      setError('Cover message must be at least 30 characters and proposed rate must be > 0.');
+      setError('Your cover message must be at least 30 characters.');
       return;
     }
     setApplying(true);
@@ -230,7 +236,6 @@ function ApplyModal({
     try {
       const p = await addProposal(campaignId, {
         coverMessage: cover,
-        proposedRate: rate,
         portfolio: links.filter((l) => l.url).slice(0, 3),
         relevantExperience: experience,
       });
@@ -261,14 +266,24 @@ function ApplyModal({
       <FormField label="Cover message" helper={`${cover.length}/3000 · at least 30 characters`}>
         <Textarea rows={5} maxLength={3000} value={cover} onChange={(e) => setCover(e.target.value)} placeholder="Tell the brand why you’re a fit…" />
       </FormField>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Proposed rate (USD)">
-          <Input type="number" min={1} value={rate} onChange={(e) => setRate(Number(e.target.value))} />
-        </FormField>
-        <FormField label="Relevant experience" helper="Optional, up to 2000 chars">
-          <Input value={experience} onChange={(e) => setExperience(e.target.value)} maxLength={2000} placeholder="e.g. 3 beverage collabs in 2024" />
-        </FormField>
+      <div className="rounded-md border border-ink-200 bg-mist-100/60 p-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-semibold text-ink-900">Fixed rate</span>
+          <span className="font-mono font-semibold text-ink-900">{currency(budget)}</span>
+        </div>
+        <p className="text-xs text-ink-500 mt-1">
+          The brand set this rate for every creator. It cannot be negotiated or changed, so there is nothing to type here.
+        </p>
       </div>
+      {!allowWithdrawal && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <strong>You cannot withdraw.</strong> This brand does not allow creators to take a proposal back once it is
+          sent. Only apply if you can do the work.
+        </div>
+      )}
+      <FormField label="Relevant experience" helper="Optional, up to 2000 chars">
+        <Input value={experience} onChange={(e) => setExperience(e.target.value)} maxLength={2000} placeholder="e.g. 3 beverage collabs in 2024" />
+      </FormField>
       <FormField label="Portfolio links" helper="Up to 3 · pre-filled from your profile">
         {links.map((l, i) => (
           <div key={l.id} className="flex gap-2 mb-2">

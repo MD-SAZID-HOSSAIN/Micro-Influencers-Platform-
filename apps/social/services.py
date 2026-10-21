@@ -18,6 +18,7 @@ from apps.notifications.models import Kind
 from apps.notifications.services import notify
 
 from .crypto import decrypt, encrypt
+from .links import clean_profile_link
 from .models import PlatformStats, YouTubeConnection
 from .youtube_client import (
     ChannelNotFound,
@@ -49,10 +50,17 @@ def set_manual_stats(
     engagement_rate: Decimal,
     handle_url: str | None = None,
 ) -> PlatformStats:
-    """Create or update Unverified stats entered by hand; refuses to overwrite Verified ones."""
+    """Create or update stats entered by hand; refuses to overwrite Verified YouTube ones.
+
+    Instagram, TikTok and Facebook need a link an admin can check. Every save, including an edit, goes back to
+    "pending": the numbers are Unverified and hidden from the public profile until an admin approves them.
+    """
     existing = PlatformStats.objects.filter(creator=creator, platform=platform).first()
     if existing is not None and existing.is_verified and platform == "youtube":
         raise StatsVerified()
+    typed = platform != "youtube"
+    if typed:
+        handle_url = clean_profile_link(platform, handle_url)
     stats, _ = PlatformStats.objects.update_or_create(
         creator=creator,
         platform=platform,
@@ -61,6 +69,8 @@ def set_manual_stats(
             "engagement_rate": engagement_rate,
             "handle_url": handle_url,
             "is_verified": False,
+            "review_status": PlatformStats.Review.PENDING if typed else PlatformStats.Review.APPROVED,
+            "review_note": "",
             "is_outdated": False,
             "last_synced_at": timezone.now(),
         },
@@ -99,7 +109,7 @@ def _usable_access_token(connection: YouTubeConnection, client) -> str:
 
 
 def apply_snapshot(connection: YouTubeConnection, snapshot: ChannelSnapshot) -> PlatformStats:
-    """Store a fresh channel snapshot as the creator's Verified YouTube stats."""
+    """Store a fresh channel snapshot. It is Verified only if the channel meets MIN_CREATOR_FOLLOWERS."""
     stats, _ = PlatformStats.objects.update_or_create(
         creator_id=connection.creator_id,
         platform="youtube",
@@ -107,7 +117,8 @@ def apply_snapshot(connection: YouTubeConnection, snapshot: ChannelSnapshot) -> 
             "handle_url": snapshot.handle_url,
             "followers": snapshot.subscribers,
             "engagement_rate": snapshot.engagement_rate,
-            "is_verified": True,
+            # Real proof of the channel, but only a channel big enough counts as Verified.
+            "is_verified": snapshot.subscribers >= settings.MIN_CREATOR_FOLLOWERS,
             "is_outdated": False,
             "last_synced_at": timezone.now(),
         },
@@ -151,44 +162,6 @@ def _flag_unusable_channel(connection: YouTubeConnection, reason: str) -> None:
     connection.save(update_fields=["last_error"])
 
 
-# A channel linked by handle (no Google sign-in) keeps these placeholders instead of real tokens.
-DIRECT_ACCESS_TOKEN = "direct-token"
-DIRECT_REFRESH_TOKEN = "direct-refresh"
-
-
-def is_direct_connection(connection: YouTubeConnection) -> bool:
-    """True when the channel was linked by handle, so there is no Google grant to use or refresh."""
-    stored = connection.access_token_enc or ""
-    if stored.startswith(DIRECT_ACCESS_TOKEN):  # plain fallback used when no encryption key is configured
-        return True
-    try:
-        return decrypt(stored) == DIRECT_ACCESS_TOKEN
-    except Exception:  # noqa: BLE001 - a real, unreadable token is not a placeholder
-        return False
-
-
-def refresh_direct_channel(connection: YouTubeConnection) -> None:
-    """Refresh a channel linked by handle from its public page.
-
-    Google is never involved, so a failure here leaves the last stats as they were and does not
-    flag the connection as needing a reconnect.
-    """
-    from . import youtube_public
-
-    stats = PlatformStats.objects.filter(creator_id=connection.creator_id, platform="youtube").first()
-    if stats is None or not stats.handle_url:
-        return
-    live = youtube_public.fetch_public_channel(stats.handle_url)
-    if not live.get("success"):
-        logger.info("Could not read the public page of creator %s's linked channel", connection.creator_id)
-        return
-    stats.followers = live["subscribers"]
-    stats.handle_url = live["canonical_url"]
-    stats.is_outdated = False
-    stats.last_synced_at = timezone.now()
-    stats.save(update_fields=["followers", "handle_url", "is_outdated", "last_synced_at", "updated_at"])
-
-
 def sync_connection(connection: YouTubeConnection) -> None:
     """Pull fresh stats for one connection.
 
@@ -196,9 +169,6 @@ def sync_connection(connection: YouTubeConnection) -> None:
     last known stats. Transient errors propagate so the Celery task can retry them.
     """
     if connection.status != YouTubeConnection.Status.CONNECTED:
-        return
-    if is_direct_connection(connection):
-        refresh_direct_channel(connection)
         return
     client = get_youtube_client()
     try:
@@ -412,4 +382,8 @@ def connection_status(user: User) -> dict:
         "last_synced_at": stats.last_synced_at if stats else None,
         "is_outdated": bool(stats and stats.is_outdated),
         "last_error": (connection.last_error or None) if connection else None,
+        # So the website can say why a connected channel is not Verified.
+        "followers": stats.followers if stats else None,
+        "minimum_followers": settings.MIN_CREATOR_FOLLOWERS,
+        "below_minimum": bool(connection and stats and stats.followers < settings.MIN_CREATOR_FOLLOWERS),
     }

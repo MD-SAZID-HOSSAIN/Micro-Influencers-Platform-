@@ -57,7 +57,7 @@ export default function MyApplications() {
     if (myProposals.length > 0) {
       return `${acceptedTotal} accepted out of ${myProposals.length} sent`;
     }
-    return 'Track every application. Withdraw if you change your mind.';
+    return 'Track every application. You can withdraw unless the brand turned that off for the campaign.';
   })();
 
   return (

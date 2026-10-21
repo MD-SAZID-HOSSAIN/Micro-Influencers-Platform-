@@ -22,6 +22,11 @@ class YouTubeStatusSerializer(serializers.Serializer):
     last_synced_at = serializers.DateTimeField(allow_null=True)
     is_outdated = serializers.BooleanField()
     last_error = serializers.CharField(allow_null=True)
+    followers = serializers.IntegerField(allow_null=True, help_text="Subscribers at the last sync, if any.")
+    minimum_followers = serializers.IntegerField(help_text="Subscribers needed to be Verified and apply.")
+    below_minimum = serializers.BooleanField(
+        help_text="True when a channel is connected but has fewer subscribers than the minimum."
+    )
 
 
 class AuthorizationUrlSerializer(serializers.Serializer):
@@ -48,10 +53,20 @@ class PlatformStatsSerializer(serializers.ModelSerializer):
             "followers",
             "engagement_rate",
             "is_verified",
+            "review_status",
+            "review_note",
             "is_outdated",
             "last_synced_at",
         ]
-        read_only_fields = ["platform", "is_verified", "is_outdated", "last_synced_at"]
+        read_only_fields = ["platform", "is_verified", "review_status", "review_note", "is_outdated", "last_synced_at"]
+
+
+class PublicPlatformStatsSerializer(PlatformStatsSerializer):
+    """What brands see: no review details."""
+
+    class Meta(PlatformStatsSerializer.Meta):
+        fields = [f for f in PlatformStatsSerializer.Meta.fields if f not in ("review_status", "review_note")]
+        read_only_fields = fields
 
 
 class CompleteConnectSerializer(serializers.Serializer):
@@ -61,37 +76,10 @@ class CompleteConnectSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=2048)
 
 
-class YouTubeDirectConnectSerializer(serializers.Serializer):
-    handle_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
-    followers = serializers.IntegerField(min_value=0, max_value=2_000_000_000, required=False, default=0)
-    engagement_rate = serializers.DecimalField(
-        max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False, default=3.50
-    )
-
-
-class ChallengeCodeSerializer(serializers.Serializer):
-    platform = serializers.CharField()
-    challenge_code = serializers.CharField()
-    instructions = serializers.CharField()
-
-
-class DirectAccountAuthSerializer(serializers.Serializer):
-    handle = serializers.CharField(max_length=200)
-    verification_method = serializers.ChoiceField(
-        choices=["oauth", "direct_auth", "challenge"], default="direct_auth"
-    )
-    auth_code = serializers.CharField(max_length=2048, required=False, allow_blank=True, default="")
-    followers = serializers.IntegerField(min_value=0, max_value=2_000_000_000, required=False, default=0)
-    engagement_rate = serializers.DecimalField(
-        max_digits=5, decimal_places=2, min_value=0, max_value=100, required=False, default=3.50
-    )
-
-
-
 class BrandSocialAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = BrandSocialAccount
-        fields = ["platform", "handle_url", "is_verified", "connected_at"]
+        fields = ["platform", "handle_url", "is_verified", "review_status", "review_note", "connected_at"]
         read_only_fields = fields
 
 

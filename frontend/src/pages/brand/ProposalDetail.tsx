@@ -155,7 +155,7 @@ export default function BrandProposalDetail() {
               </Link>
               <div className="text-xs text-ink-500 mt-0.5">{campaign?.title ?? 'Campaign'}</div>
               <div className="text-xs text-ink-500 mt-0.5">
-                Proposed {currency(proposal.proposedRate)} · {fmtRelativeTime(proposal.submittedAt)}
+                Rate {currency(proposal.proposedRate)} · {fmtRelativeTime(proposal.submittedAt)}
               </div>
             </div>
           </div>

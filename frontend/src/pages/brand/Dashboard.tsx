@@ -79,10 +79,12 @@ export default function BrandDashboard() {
       key: 'platform',
       tone: 'amber',
       icon: <Link2 className="w-5 h-5" />,
-      title: 'Connect a social account to publish and accept',
-      text: 'Connect any one of YouTube, Instagram, TikTok or Facebook. It finishes verifying your brand.',
+      title: user.platformStatus === 'pending' ? 'An admin is checking your link' : 'Connect a platform to publish and accept',
+      text: user.platformStatus === 'pending'
+        ? 'You can publish campaigns and accept proposals once an admin approves your Instagram, TikTok or Facebook link.'
+        : 'Connect YouTube with Google, or add your Instagram, TikTok or Facebook link for an admin to approve.',
       to: '/brand/accounts',
-      cta: 'Connect account',
+      cta: user.platformStatus === 'pending' ? 'See status' : 'Connect account',
     });
   }
   if (pending > 0 && busiest) {

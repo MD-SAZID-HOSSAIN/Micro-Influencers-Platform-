@@ -270,4 +270,14 @@ def test_seeding_again_gives_brands_that_lost_their_platform_a_connected_one(db,
     seed(creators=1, brands=2, campaigns=0)
 
     assert BrandSocialAccount.objects.filter(brand__username__startswith="demo_brand_").count() == 2
-    assert not BrandSocialAccount.objects.filter(is_verified=True).exists()  # a typed link is never "Verified"
+    # the demo link counts as already approved by an admin, so the demo brand is fully verified
+    assert BrandSocialAccount.objects.filter(is_verified=True, review_status="approved").count() == 2
+
+
+def test_demo_users_have_a_verified_email_and_no_notification_emails(db, debug_on):
+    seed(creators=3, brands=2, campaigns=0)
+
+    demo = User.objects.filter(username__startswith="demo_")
+    assert demo.count() == 5
+    assert not demo.exclude(email_verified=True).exists()  # a creator needs this (and YouTube) to apply
+    assert not demo.exclude(email_notifications_enabled=False).exists()  # their @demo.test addresses do not exist

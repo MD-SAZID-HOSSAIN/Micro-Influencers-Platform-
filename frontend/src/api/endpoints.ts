@@ -47,6 +47,7 @@ type ApiUser = {
   mobile_number: string;
   email_verified: boolean;
   platform_connected?: boolean | null;
+  platform_status?: 'verified' | 'pending' | 'none' | null;
   email_notifications_enabled?: boolean;
   avatar_url?: string | null;
 };
@@ -61,6 +62,7 @@ export const mapUser = (u: ApiUser): User => ({
   avatarUrl: resolveAssetUrl(u.avatar_url),
   emailVerified: u.email_verified,
   platformConnected: u.platform_connected,
+  platformStatus: u.platform_status,
   emailNotificationsEnabled: u.email_notifications_enabled,
 });
 
@@ -89,8 +91,8 @@ export async function register(input: RegisterInput) {
   return mapUser(data);
 }
 
-export async function logout() {
-  await request('auth/logout/', { method: 'POST' });
+export async function logout(session?: 'user' | 'admin') {
+  await request('auth/logout/', { method: 'POST', session });
 }
 
 export async function fetchMe(): Promise<User> {
@@ -188,6 +190,8 @@ type ApiCreatorMe = {
     followers: number | null;
     engagement_rate: string | null;
     is_verified: boolean;
+    review_status?: 'pending' | 'approved' | 'rejected';
+    review_note?: string;
     is_outdated: boolean;
     last_synced_at: string | null;
   }>;
@@ -201,8 +205,12 @@ const numFrom = (v: string | null | undefined): number => {
 
 export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
   const yt = p.stats.find((s) => s.platform === 'youtube');
-  const followers = yt?.followers ?? 0;
-  const engagement = yt ? numFrom(yt.engagement_rate) : 0;
+  // The headline numbers are the primary platform's (as in the creator directory); YouTube if there are none.
+  // Typed Instagram/TikTok/Facebook numbers count here only once an admin approved them, as brands see them.
+  const isPublic = (s: { platform: string; is_verified: boolean }) => s.platform === 'youtube' || s.is_verified;
+  const primary = p.stats.find((s) => s.platform === p.primary_platform && isPublic(s)) ?? yt;
+  const followers = primary?.followers ?? 0;
+  const engagement = primary ? numFrom(primary.engagement_rate) : 0;
   return {
     id: String(p.id),
     fullName: p.full_name,
@@ -214,6 +222,16 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
     location: [p.city, p.country].filter(Boolean).join(', '),
     city: p.city,
     country: p.country,
+    stats: p.stats.map((s) => ({
+      platform: platformFromBackend(s.platform),
+      handleUrl: s.handle_url ?? undefined,
+      followers: s.followers ?? 0,
+      engagementRate: numFrom(s.engagement_rate),
+      isVerified: s.is_verified,
+      reviewStatus: s.review_status ?? 'approved',
+      reviewNote: s.review_note || undefined,
+      lastSyncedAt: s.last_synced_at ?? undefined,
+    })),
     ratePerPost: numFrom(p.rate_post),
     ratePerStory: numFrom(p.rate_story),
     ratePerVideo: numFrom(p.rate_video),
@@ -487,6 +505,7 @@ type ApiCampaign = {
   deliverables: string;
   creators_needed: number;
   min_followers: number | null;
+  allow_withdrawal?: boolean;
   status: CampaignStatus;
   published_at: string | null;
   closed_at: string | null;
@@ -519,6 +538,7 @@ type ApiCampaignDetail = ApiCampaignCard & {
   description: string;
   deliverables: string;
   min_followers: number | null;
+  allow_withdrawal?: boolean;
   status: CampaignStatus;
   accepted_count: number;
   all_creators_selected: boolean;
@@ -550,6 +570,7 @@ export const mapCampaignDetail = (c: ApiCampaignDetail): Campaign => ({
   description: c.description,
   deliverables: c.deliverables,
   minFollowers: c.min_followers ?? undefined,
+  allowWithdrawal: c.allow_withdrawal !== false,
   status: c.status,
   media: (c.media ?? []).map(mapMedia),
 });
@@ -567,6 +588,7 @@ export const mapBrandCampaign = (c: ApiCampaign): Campaign => ({
   deliverables: c.deliverables,
   creatorsNeeded: c.creators_needed,
   minFollowers: c.min_followers ?? undefined,
+  allowWithdrawal: c.allow_withdrawal !== false,
   status: c.status,
   createdAt: c.created_at,
   media: (c.media ?? []).map(mapMedia),
@@ -633,6 +655,7 @@ export type CreateCampaignInput = {
   deliverables: string;
   creatorsNeeded: number;
   minFollowers?: number;
+  allowWithdrawal?: boolean;
 };
 
 export const createCampaign = async (input: CreateCampaignInput): Promise<Campaign> => {
@@ -647,6 +670,7 @@ export const createCampaign = async (input: CreateCampaignInput): Promise<Campai
     creators_needed: input.creatorsNeeded,
   };
   if (input.minFollowers !== undefined) body.min_followers = input.minFollowers;
+  if (input.allowWithdrawal !== undefined) body.allow_withdrawal = input.allowWithdrawal;
   const data = await request<ApiCampaign>('brand/campaigns/', { method: 'POST', body });
   return mapBrandCampaign(data);
 };
@@ -665,6 +689,7 @@ export const updateCampaign = async (
   if (patch.deliverables !== undefined) body.deliverables = patch.deliverables;
   if (patch.creatorsNeeded !== undefined) body.creators_needed = patch.creatorsNeeded;
   if (patch.minFollowers !== undefined) body.min_followers = patch.minFollowers;
+  if (patch.allowWithdrawal !== undefined) body.allow_withdrawal = patch.allowWithdrawal;
   const data = await request<ApiCampaign>('brand/campaigns/' + id + '/', { method: 'PATCH', body });
   return mapBrandCampaign(data);
 };
@@ -745,7 +770,13 @@ type ApiMyProposal = {
   created_at: string;
   completed_at: string | null;
   withdrawal_reason: string | null;
-  campaign: { id: number; title: string; status: CampaignStatus; brand: { id: number; name: string } };
+  campaign: {
+    id: number;
+    title: string;
+    status: CampaignStatus;
+    allow_withdrawal?: boolean;
+    brand: { id: number; name: string };
+  };
 };
 
 const proposalPortfolioFrom = (links: string[]): PortfolioLink[] =>
@@ -775,6 +806,7 @@ export const mapMyProposal = (p: ApiMyProposal): MyProposal => ({
   brandName: p.campaign.brand.name,
   brandId: String(p.campaign.brand.id),
   campaignStatus: p.campaign.status,
+  allowWithdrawal: p.campaign.allow_withdrawal !== false,
 });
 
 export const mapBrandProposal = (p: ApiBrandProposal): Proposal => ({
@@ -823,7 +855,6 @@ export const listBrandCampaignProposals = async (
 export const submitProposal = async (input: {
   campaignId: string | number;
   coverMessage: string;
-  proposedRate: number;
   portfolioLinks: PortfolioLink[];
   experienceNote: string;
 }): Promise<Proposal> => {
@@ -831,7 +862,6 @@ export const submitProposal = async (input: {
     method: 'POST',
     body: {
       cover_message: input.coverMessage,
-      proposed_rate: input.proposedRate,
       portfolio_links: proposalPortfolioTo(input.portfolioLinks),
       experience_note: input.experienceNote,
     },
@@ -982,6 +1012,10 @@ export type YouTubeStatus = {
   lastSyncedAt: string | null;
   /** Why the last sync could not verify the channel, e.g. 'subscribers_hidden' or 'no_channel'. */
   lastError: string | null;
+  /** Subscribers at the last sync, the number needed to be Verified, and whether the channel is under it. */
+  followers: number | null;
+  minimumFollowers: number;
+  belowMinimum: boolean;
 };
 
 export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
@@ -992,6 +1026,9 @@ export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
     connected_at: string | null;
     last_synced_at: string | null;
     last_error?: string | null;
+    followers?: number | null;
+    minimum_followers?: number;
+    below_minimum?: boolean;
   }>('social/youtube/');
   return {
     connected: data.connected,
@@ -1000,7 +1037,31 @@ export const fetchYouTubeStatus = async (): Promise<YouTubeStatus> => {
     connectedAt: data.connected_at,
     lastSyncedAt: data.last_synced_at,
     lastError: data.last_error ?? null,
+    followers: data.followers ?? null,
+    minimumFollowers: data.minimum_followers ?? 1000,
+    belowMinimum: data.below_minimum ?? false,
   };
+};
+
+/**
+ * Instagram, TikTok and Facebook cannot be connected automatically, so a creator types their numbers.
+ * They are always saved as Unverified. The link is optional.
+ */
+export type ManualStatsInput = { handleUrl: string; followers: number; engagementRate: number };
+
+export const saveManualStats = async (platform: Platform, input: ManualStatsInput): Promise<void> => {
+  await request(`creators/me/stats/${platformToBackend(platform)}/`, {
+    method: 'PUT',
+    body: {
+      handle_url: input.handleUrl.trim() || null,
+      followers: input.followers,
+      engagement_rate: String(input.engagementRate),
+    },
+  });
+};
+
+export const removeManualStats = async (platform: Platform): Promise<void> => {
+  await request(`creators/me/stats/${platformToBackend(platform)}/`, { method: 'DELETE' });
 };
 
 export const startYouTubeConnect = async (): Promise<string> => {
@@ -1066,7 +1127,16 @@ export const updateNotificationSettings = async (
 
 export type CreatorDashboardData = {
   profileCompletion: number;
-  youtube: { connected: boolean; status: ConnectedAccount['status'] | null; needsReconnect: boolean; lastSyncedAt: string | null; isOutdated: boolean };
+  youtube: {
+    connected: boolean;
+    status: ConnectedAccount['status'] | null;
+    needsReconnect: boolean;
+    lastSyncedAt: string | null;
+    isOutdated: boolean;
+    followers: number | null;
+    minimumFollowers: number;
+    belowMinimum: boolean;
+  };
   availableCampaigns: Campaign[];
   /** Counts over every proposal (the `applications` list below is only the newest few). */
   pendingCount: number;
@@ -1084,6 +1154,9 @@ type ApiCreatorDashboard = {
     needs_reconnect: boolean;
     last_synced_at: string | null;
     is_outdated: boolean;
+    followers?: number | null;
+    minimum_followers?: number;
+    below_minimum?: boolean;
   };
   available_campaigns: ApiCampaignCard[];
   pending_count?: number;
@@ -1103,6 +1176,9 @@ export const fetchCreatorDashboard = async (): Promise<CreatorDashboardData> => 
       needsReconnect: data.youtube.needs_reconnect,
       lastSyncedAt: data.youtube.last_synced_at,
       isOutdated: data.youtube.is_outdated,
+      followers: data.youtube.followers ?? null,
+      minimumFollowers: data.youtube.minimum_followers ?? 1000,
+      belowMinimum: data.youtube.below_minimum ?? false,
     },
     availableCampaigns: data.available_campaigns.map(mapCampaignCard),
     pendingCount: data.pending_count ?? data.applications.filter((p) => p.status === 'pending').length,
@@ -1196,17 +1272,29 @@ export type BrandSocialPlatform = 'youtube' | 'instagram' | 'tiktok' | 'facebook
 export type BrandSocialAccount = {
   platform: BrandSocialPlatform;
   handleUrl: string;
-  /** True only for YouTube connected with Google sign-in. A typed link is "added", never verified. */
+  /** YouTube connected with Google sign-in, or a typed link an admin approved. */
   isVerified: boolean;
+  /** A typed link waits for an admin ("pending"), then is "approved" or "rejected". YouTube is always approved. */
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewNote?: string;
   connectedAt: string;
 };
 
-type ApiBrandSocial = { platform: BrandSocialPlatform; handle_url: string; is_verified: boolean; connected_at: string };
+type ApiBrandSocial = {
+  platform: BrandSocialPlatform;
+  handle_url: string;
+  is_verified: boolean;
+  review_status?: 'pending' | 'approved' | 'rejected';
+  review_note?: string;
+  connected_at: string;
+};
 
 const mapBrandSocial = (a: ApiBrandSocial): BrandSocialAccount => ({
   platform: a.platform,
   handleUrl: a.handle_url,
   isVerified: a.is_verified,
+  reviewStatus: a.review_status ?? 'approved',
+  reviewNote: a.review_note || undefined,
   connectedAt: a.connected_at,
 });
 
@@ -1242,7 +1330,6 @@ export type CampaignMetrics = {
   views: number;
   funnel: { received: number; shortlisted: number; accepted: number; rejected: number; withdrawn: number };
   acceptedVsNeeded: { accepted: number; needed: number };
-  avgProposedRate: number | null;
   budgetPerCreator: number;
   acceptanceRate: number | null;
 };
@@ -1252,7 +1339,6 @@ export const fetchCampaignAnalytics = async (id: number | string): Promise<Campa
     views: number;
     funnel: { received: number; shortlisted: number; accepted: number; rejected: number; withdrawn: number };
     accepted_vs_needed: { accepted: number; needed: number };
-    avg_proposed_rate: string | null;
     budget_per_creator: string;
     acceptance_rate: number | null;
   }>('brand/campaigns/' + id + '/analytics/');
@@ -1260,7 +1346,6 @@ export const fetchCampaignAnalytics = async (id: number | string): Promise<Campa
     views: data.views,
     funnel: data.funnel,
     acceptedVsNeeded: data.accepted_vs_needed,
-    avgProposedRate: data.avg_proposed_rate ? numFrom(data.avg_proposed_rate) : null,
     budgetPerCreator: numFrom(data.budget_per_creator),
     acceptanceRate: data.acceptance_rate,
   };
@@ -1433,6 +1518,96 @@ export const adminLogin = async (input: { identifier: string; password: string }
   });
   return { access: data.access, user: mapUser(data.user) };
 };
+
+export type AdminPlatformReview = {
+  id: number;
+  creator: { id: number; username: string; fullName: string };
+  platform: Platform;
+  handleUrl?: string;
+  followers: number;
+  engagementRate: number;
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewNote?: string;
+  updatedAt: string;
+};
+
+type ApiPlatformReview = {
+  id: number;
+  creator: { id: number; username: string; full_name: string };
+  platform: string;
+  handle_url: string | null;
+  followers: number;
+  engagement_rate: string;
+  review_status: 'pending' | 'approved' | 'rejected';
+  review_note: string;
+  updated_at: string;
+};
+
+const mapPlatformReview = (r: ApiPlatformReview): AdminPlatformReview => ({
+  id: r.id,
+  creator: { id: r.creator.id, username: r.creator.username, fullName: r.creator.full_name },
+  platform: platformFromBackend(r.platform),
+  handleUrl: r.handle_url ?? undefined,
+  followers: r.followers,
+  engagementRate: numFrom(r.engagement_rate),
+  reviewStatus: r.review_status,
+  reviewNote: r.review_note || undefined,
+  updatedAt: r.updated_at,
+});
+
+/** Instagram, TikTok and Facebook numbers typed by creators. */
+export const listAdminPlatformReviews = async (status: 'pending' | 'approved' | 'rejected' = 'pending'): Promise<AdminPlatformReview[]> => {
+  const { items } = await fetchPages<ApiPlatformReview>('admin/platform-stats/', { status });
+  return items.map(mapPlatformReview);
+};
+
+export const approveAdminPlatformStats = async (id: number): Promise<AdminPlatformReview> =>
+  mapPlatformReview(await request<ApiPlatformReview>(`admin/platform-stats/${id}/approve/`, { method: 'POST', body: {} }));
+
+export const rejectAdminPlatformStats = async (id: number, reason: string): Promise<AdminPlatformReview> =>
+  mapPlatformReview(await request<ApiPlatformReview>(`admin/platform-stats/${id}/reject/`, { method: 'POST', body: { reason } }));
+
+export type AdminBrandPlatformReview = {
+  id: number;
+  brand: { id: number; username: string; fullName: string };
+  platform: Platform;
+  handleUrl: string;
+  reviewStatus: 'pending' | 'approved' | 'rejected';
+  reviewNote?: string;
+  connectedAt: string;
+};
+
+type ApiBrandPlatformReview = {
+  id: number;
+  brand: { id: number; username: string; full_name: string };
+  platform: string;
+  handle_url: string;
+  review_status: 'pending' | 'approved' | 'rejected';
+  review_note: string;
+  connected_at: string;
+};
+
+const mapBrandPlatformReview = (r: ApiBrandPlatformReview): AdminBrandPlatformReview => ({
+  id: r.id,
+  brand: { id: r.brand.id, username: r.brand.username, fullName: r.brand.full_name },
+  platform: platformFromBackend(r.platform),
+  handleUrl: r.handle_url,
+  reviewStatus: r.review_status,
+  reviewNote: r.review_note || undefined,
+  connectedAt: r.connected_at,
+});
+
+/** Instagram, TikTok and Facebook links that brands typed. */
+export const listAdminBrandPlatforms = async (status: 'pending' | 'approved' | 'rejected' = 'pending'): Promise<AdminBrandPlatformReview[]> => {
+  const { items } = await fetchPages<ApiBrandPlatformReview>('admin/brand-platforms/', { status });
+  return items.map(mapBrandPlatformReview);
+};
+
+export const approveAdminBrandPlatform = async (id: number): Promise<AdminBrandPlatformReview> =>
+  mapBrandPlatformReview(await request<ApiBrandPlatformReview>(`admin/brand-platforms/${id}/approve/`, { method: 'POST', body: {} }));
+
+export const rejectAdminBrandPlatform = async (id: number, reason: string): Promise<AdminBrandPlatformReview> =>
+  mapBrandPlatformReview(await request<ApiBrandPlatformReview>(`admin/brand-platforms/${id}/reject/`, { method: 'POST', body: { reason } }));
 
 export const listAdminUsers = async (params: { q?: string; role?: Role; status?: 'active' | 'suspended' } = {}): Promise<AdminUser[]> => {
   const query: Record<string, string> = {};

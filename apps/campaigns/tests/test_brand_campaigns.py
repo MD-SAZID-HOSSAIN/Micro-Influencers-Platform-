@@ -218,3 +218,39 @@ def test_creators_cannot_use_brand_campaign_endpoints(db, auth_client):
 
 def test_logged_out_is_401(db):
     assert APIClient().get(LIST).status_code == 401
+
+
+# ---- may creators withdraw? (the brand's choice when it posts) ----------------------------------------------
+
+
+def test_allow_withdrawal_defaults_to_true_and_can_be_turned_off_in_a_draft(brand, auth_client):
+    client = auth_client(brand)
+
+    default = client.post(LIST, payload(), format="json")
+    strict = client.post(LIST, payload(allow_withdrawal=False), format="json")
+
+    assert default.status_code == 201 and default.json()["allow_withdrawal"] is True
+    assert strict.status_code == 201 and strict.json()["allow_withdrawal"] is False
+    assert client.patch(detail(default.json()["id"]), {"allow_withdrawal": False}, format="json").json()[
+        "allow_withdrawal"
+    ] is False
+
+
+def test_the_choice_is_fixed_once_the_campaign_is_published(brand, auth_client):
+    campaign = CampaignFactory(brand=brand, status=Campaign.Status.PUBLISHED, allow_withdrawal=True)
+
+    response = auth_client(brand).patch(detail(campaign.pk), {"allow_withdrawal": False}, format="json")
+
+    assert response.status_code == 409
+    campaign.refresh_from_db()
+    assert campaign.allow_withdrawal is True
+
+
+def test_creators_see_the_rule_before_they_apply(db, auth_client):
+    creator = UserFactory(role=Role.CREATOR)
+    strict = CampaignFactory(status=Campaign.Status.PUBLISHED, allow_withdrawal=False)
+    open_one = CampaignFactory(status=Campaign.Status.PUBLISHED, allow_withdrawal=True)
+
+    assert auth_client(creator).get(f"/api/v1/campaigns/{strict.pk}/").json()["allow_withdrawal"] is False
+    assert auth_client(creator).get(f"/api/v1/campaigns/{open_one.pk}/").json()["allow_withdrawal"] is True
+

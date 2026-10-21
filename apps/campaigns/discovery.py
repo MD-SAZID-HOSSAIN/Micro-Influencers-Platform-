@@ -52,4 +52,5 @@ def discovery_queryset(params: dict) -> QuerySet:
 
 
 def followers_by_platform(user) -> dict[str, int]:
-    return dict(PlatformStats.objects.filter(creator=user).values_list("platform", "followers"))
+    stats = PlatformStats.objects.filter(creator=user).filter(Q(platform="youtube") | Q(is_verified=True))
+    return dict(stats.values_list("platform", "followers"))

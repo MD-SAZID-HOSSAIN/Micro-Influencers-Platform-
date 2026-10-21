@@ -173,9 +173,15 @@ export default function VerifyEmail() {
             </button>
           )}
         </div>
-        <div className="mt-6 p-3 bg-mist-100 rounded-md text-xs text-ink-500 leading-relaxed">
+        <div className="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-900 leading-relaxed">
+          <strong>Cannot find the email?</strong> Look in your <strong>Spam</strong> or <strong>Junk</strong> folder (and
+          Promotions). If it is there, open it and press <strong>Not spam</strong> so the next ones arrive in your inbox.
+          The code can take a minute to arrive.
+        </div>
+        <div className="mt-3 p-3 bg-mist-100 rounded-md text-xs text-ink-500 leading-relaxed">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline-block mr-1" />
-          Logging in works without verification — only the notification emails need a verified address. You can verify later from your account.
+          You can log in and look around without verifying. Brands need a verified email to publish campaigns and accept
+          proposals, and creators need one to apply. You can verify later from your account.
         </div>
       </form>
     </AuthShell>

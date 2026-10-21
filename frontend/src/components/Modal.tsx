@@ -20,22 +20,27 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  // Pages often pass a new onClose function on every render. Reading it through a ref keeps the effect below from
+  // re-running on every keystroke, which used to pull the focus out of a text box while the person was typing.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Esc-to-close + scroll lock + initial focus
+  // Esc-to-close + scroll lock + initial focus (only when the dialog opens or closes)
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    // Defer focus until paint so the focus ring renders
+    // Defer focus until paint so the focus ring renders. A text box comes first, so the person can start typing.
     const t = setTimeout(() => {
-      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      focusables?.[0]?.focus();
+      const panel = panelRef.current;
+      const target =
+        panel?.querySelector<HTMLElement>('textarea, input, select') ??
+        panel?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])');
+      target?.focus();
     }, 30);
     return () => {
       clearTimeout(t);
@@ -43,7 +48,7 @@ export function Modal({
       document.body.style.overflow = '';
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

@@ -112,6 +112,16 @@ export default function CreatorDashboard() {
       to: '/creator/accounts',
       cta: 'Reconnect',
     };
+  } else if (ytStatus?.belowMinimum) {
+    next = {
+      key: 'too-small',
+      tone: 'amber',
+      icon: <Youtube className="w-5 h-5" />,
+      title: 'Your channel is not big enough to apply yet',
+      text: `Your YouTube channel has ${(ytStatus.followers ?? 0).toLocaleString()} subscribers. You need at least ${ytStatus.minimumFollowers.toLocaleString()} to be Verified and apply to campaigns. We check again every day.`,
+      to: '/creator/accounts',
+      cta: 'See details',
+    };
   } else if (completion < 100) {
     next = {
       key: 'profile',
@@ -207,7 +217,7 @@ export default function CreatorDashboard() {
                       <div className="min-w-0 flex-1">
                         <div className="text-xs text-ink-500 truncate">{p.brandName}</div>
                         <div className="font-semibold text-ink-900 line-clamp-2 leading-snug">{p.campaignTitle}</div>
-                        <div className="mt-2 text-xs text-ink-500">Proposed {currency(p.proposedRate)}</div>
+                        <div className="mt-2 text-xs text-ink-500">Rate {currency(p.proposedRate)}</div>
                       </div>
                       <ProposalStatusBadge status={p.status} />
                     </div>
@@ -269,7 +279,7 @@ export default function CreatorDashboard() {
                     <tr>
                       <th>Campaign</th>
                       <th>Sent</th>
-                      <th>Your rate</th>
+                      <th>Rate</th>
                       <th className="text-right">Status</th>
                     </tr>
                   </thead>
@@ -392,7 +402,12 @@ export default function CreatorDashboard() {
                 <Youtube className="w-5 h-5 text-rose-600" />
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {yt?.status === 'connected' && (
+                {yt?.status === 'connected' && ytStatus?.belowMinimum && (
+                  <span className="tag tag-amber">
+                    <AlertTriangle className="w-3 h-3" /> Not verified · needs {ytStatus.minimumFollowers.toLocaleString()} subscribers
+                  </span>
+                )}
+                {yt?.status === 'connected' && !ytStatus?.belowMinimum && (
                   <>
                     <span className="tag tag-brand"><CheckCircle2 className="w-3 h-3" /> Verified</span>
                     <span className="text-xs text-ink-500">

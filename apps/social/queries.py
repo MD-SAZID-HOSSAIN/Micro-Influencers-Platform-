@@ -1,4 +1,4 @@
-from django.db.models import BooleanField, DecimalField, OuterRef, QuerySet, Subquery, Value
+from django.db.models import BooleanField, DecimalField, OuterRef, Q, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 
 from .models import PlatformStats
@@ -17,10 +17,12 @@ def annotate_primary_stats(
     ``platform_field="creator__creator_profile__primary_platform"`` for proposals.
 
     Adds ``primary_followers``, ``primary_engagement`` (both None when the creator has no
-    stats there) and ``primary_verified`` (False when there are none).
+    public stats there) and ``primary_verified`` (False when there are none).
     """
     stats = PlatformStats.objects.filter(
-        creator_id=OuterRef(creator_field), platform=OuterRef(platform_field)
+        Q(platform="youtube") | Q(is_verified=True),  # Instagram, TikTok and Facebook count once an admin approved them
+        creator_id=OuterRef(creator_field),
+        platform=OuterRef(platform_field),
     )
     return rows.annotate(
         primary_followers=Subquery(stats.values("followers")[:1]),

@@ -29,6 +29,9 @@ class Campaign(models.Model):
     deliverables = models.TextField()  # per creator, e.g. "2 Instagram posts, 1 reel"
     creators_needed = models.PositiveSmallIntegerField(default=1)
     min_followers = models.PositiveIntegerField(null=True, blank=True)
+    # The brand's choice when it posts: may creators withdraw after applying? Fixed once published, so a creator
+    # always applies under the rule they were shown.
+    allow_withdrawal = models.BooleanField(default=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
     published_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)

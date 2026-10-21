@@ -46,6 +46,9 @@ def test_new_creator_dashboard_is_empty_with_a_null_rate(creator, auth_client):
         "needs_reconnect": False,
         "last_synced_at": None,
         "is_outdated": False,
+        "followers": None,
+        "minimum_followers": 1000,
+        "below_minimum": False,
     }
     assert body["available_campaigns"] == []
     assert body["applications"] == []
@@ -100,7 +103,9 @@ def test_available_campaigns_are_the_five_newest_open_ones(creator, auth_client)
 
 def test_available_campaigns_carry_the_eligibility_indicator(creator, auth_client):
     published(platform="instagram", min_followers=1000)
-    PlatformStats.objects.create(creator=creator, platform="instagram", followers=5000, engagement_rate="2.00")
+    PlatformStats.objects.create(
+        creator=creator, platform="instagram", followers=5000, engagement_rate="2.00", is_verified=True
+    )
 
     cards = dashboard(auth_client, creator)["available_campaigns"]
 

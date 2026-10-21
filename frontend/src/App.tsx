@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { accountsPath, withUsername } from './lib/shared';
 import PublicLayout from './components/PublicLayout';
 import AppShell from './components/AppShell';
 import ScrollToTop from './components/ScrollToTop';
@@ -50,6 +51,7 @@ import AdminLogin from './pages/admin/Login';
 import AdminOverview from './pages/admin/Overview';
 import AdminUsers from './pages/admin/Users';
 import AdminActions from './pages/admin/Actions';
+import AdminPlatformReviews from './pages/admin/PlatformReviews';
 
 function Protected({ role, children }: { role: 'creator' | 'brand'; children: JSX.Element }) {
   const { user, ready } = useAuth();
@@ -74,8 +76,43 @@ function ConnectionsRedirect() {
   const { search } = useLocation();
   const { user } = useAuth();
   // Brands and creators finish the Google sign-in on their own accounts page.
-  const pathname = user?.role === 'brand' ? '/brand/accounts' : '/creator/accounts';
+  if (!user) return <Navigate to="/login" replace />;
+  const pathname = accountsPath(user.role === 'brand' ? 'brand' : 'creator', user.username);
   return <Navigate to={{ pathname, search }} replace />;
+}
+
+/**
+ * Pages of a creator or brand live under /creator/<username>/... or /brand/<username>/....
+ * Only the owner's own username works: anything else goes to the same page under their own name.
+ */
+function OwnerGuard({ role, children }: { role: 'creator' | 'brand'; children: JSX.Element }) {
+  const { username } = useParams();
+  const { pathname, search } = useLocation();
+  const { user } = useAuth();
+  if (!user) return null;
+  const rest = pathname.split('/').slice(3).join('/');
+  if (rest === '') {
+    // /creator/imran goes to the dashboard. /creator/campaigns (an old address, no username) gets the name added.
+    const to = username === user.username ? `${pathname.replace(/\/$/, '')}/dashboard` : withUsername(`/${role}/${username}`, user.username);
+    return <Navigate to={{ pathname: to, search }} replace />;
+  }
+  if (username !== user.username) {
+    return <Navigate to={{ pathname: withUsername(`/${role}/${rest}`, user.username), search }} replace />;
+  }
+  return children;
+}
+
+/** The old addresses without a username (/creator/dashboard, links in emails) go to the one with it. */
+function LegacyRedirect() {
+  const { pathname, search } = useLocation();
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  // Already under their own name but no such page (e.g. /creator/imran/nothing): do not add the name again.
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts[1] === user.username) {
+    return parts.length === 2 ? <Navigate to={`${pathname}/dashboard`} replace /> : <NotFound />;
+  }
+  return <Navigate to={{ pathname: withUsername(pathname, user.username), search }} replace />;
 }
 
 function AdminGuard({ children }: { children: JSX.Element }) {
@@ -120,36 +157,42 @@ export default function App() {
         <Route path="/unauthorized" element={<Unauthorized />} />
       </Route>
 
-      <Route element={<Protected role="creator"><AppShell /></Protected>}>
-        <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-        <Route path="/creator/profile" element={<CreatorProfile />} />
-        <Route path="/creator/profile/edit" element={<EditCreatorProfile />} />
-        <Route path="/creator/accounts" element={<ConnectedAccounts />} />
-        <Route path="/creator/campaigns" element={<CampaignDiscovery />} />
-        <Route path="/creator/campaigns/:id" element={<CampaignDetail />} />
-        <Route path="/creator/applications" element={<MyApplications />} />
-        <Route path="/creator/applications/:id" element={<ApplicationDetail />} />
-        <Route path="/creator/notifications" element={<NotificationsPage role="creator" />} />
-        <Route path="/creator/settings/notifications" element={<NotificationSettingsPage />} />
+      <Route path="/creator/:username" element={<Protected role="creator"><OwnerGuard role="creator"><AppShell /></OwnerGuard></Protected>}>
+        <Route path="dashboard" element={<CreatorDashboard />} />
+        <Route path="profile" element={<CreatorProfile />} />
+        <Route path="profile/edit" element={<EditCreatorProfile />} />
+        <Route path="accounts" element={<ConnectedAccounts />} />
+        <Route path="campaigns" element={<CampaignDiscovery />} />
+        <Route path="campaigns/:id" element={<CampaignDetail />} />
+        <Route path="applications" element={<MyApplications />} />
+        <Route path="applications/:id" element={<ApplicationDetail />} />
+        <Route path="notifications" element={<NotificationsPage role="creator" />} />
+        <Route path="settings/notifications" element={<NotificationSettingsPage />} />
       </Route>
 
-      <Route element={<Protected role="brand"><AppShell /></Protected>}>
-        <Route path="/brand/dashboard" element={<BrandDashboard />} />
-        <Route path="/brand/profile" element={<BrandProfile />} />
-        <Route path="/brand/profile/edit" element={<EditBrandProfile />} />
-        <Route path="/brand/accounts" element={<BrandConnectedAccounts />} />
-        <Route path="/brand/creators" element={<CreatorDiscovery />} />
-        <Route path="/brand/creators/:id" element={<CreatorPublicProfile />} />
-        <Route path="/brand/campaigns" element={<CampaignList />} />
-        <Route path="/brand/campaigns/create" element={<CreateCampaign />} />
-        <Route path="/brand/campaigns/:id" element={<CampaignDetailBrand />} />
-        <Route path="/brand/campaigns/:id/analytics" element={<CampaignAnalytics />} />
-        <Route path="/brand/campaigns/:id/edit" element={<EditCampaign />} />
-        <Route path="/brand/campaigns/:id/proposals" element={<ProposalManagement />} />
-        <Route path="/brand/proposals/:id" element={<ProposalDetail />} />
-        <Route path="/brand/notifications" element={<NotificationsPage role="brand" />} />
-        <Route path="/brand/settings/notifications" element={<NotificationSettingsPage />} />
+      <Route path="/brand/:username" element={<Protected role="brand"><OwnerGuard role="brand"><AppShell /></OwnerGuard></Protected>}>
+        <Route path="dashboard" element={<BrandDashboard />} />
+        <Route path="profile" element={<BrandProfile />} />
+        <Route path="profile/edit" element={<EditBrandProfile />} />
+        <Route path="accounts" element={<BrandConnectedAccounts />} />
+        <Route path="creators" element={<CreatorDiscovery />} />
+        <Route path="creators/:id" element={<CreatorPublicProfile />} />
+        <Route path="campaigns" element={<CampaignList />} />
+        <Route path="campaigns/create" element={<CreateCampaign />} />
+        <Route path="campaigns/:id" element={<CampaignDetailBrand />} />
+        <Route path="campaigns/:id/analytics" element={<CampaignAnalytics />} />
+        <Route path="campaigns/:id/edit" element={<EditCampaign />} />
+        <Route path="campaigns/:id/proposals" element={<ProposalManagement />} />
+        <Route path="proposals/:id" element={<ProposalDetail />} />
+        <Route path="notifications" element={<NotificationsPage role="brand" />} />
+        <Route path="settings/notifications" element={<NotificationSettingsPage />} />
       </Route>
+
+      {/* Old addresses without a username. The static "settings/notifications" ones must beat :username. */}
+      <Route path="/creator/settings/notifications" element={<LegacyRedirect />} />
+      <Route path="/brand/settings/notifications" element={<LegacyRedirect />} />
+      <Route path="/creator/*" element={<LegacyRedirect />} />
+      <Route path="/brand/*" element={<LegacyRedirect />} />
 
       <Route path="/settings/connections" element={<ConnectionsRedirect />} />
 
@@ -157,6 +200,7 @@ export default function App() {
       <Route element={<AdminGuard><AdminApp /></AdminGuard>}>
         <Route path="/admin/overview" element={<AdminOverview />} />
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/platform-reviews" element={<AdminPlatformReviews />} />
         <Route path="/admin/actions" element={<AdminActions />} />
       </Route>
 

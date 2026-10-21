@@ -8,6 +8,7 @@ import { Button, PageHeader, SectionHeader, PlatformIcon, StatRow } from '../../
 import { isApiError } from '../../api/client';
 import { completeYouTubeConnect } from '../../api/endpoints';
 import { useLocation } from 'react-router-dom';
+import ManualPlatformStats from './ManualPlatformStats';
 
 /** Codes already sent to the backend this session (each Google code works once). */
 const handledCodes = new Set<string>();
@@ -84,7 +85,7 @@ export default function ConnectedAccounts() {
         <PageHeader
           eyebrow="Account"
           title="Connected accounts"
-          description="Connect YouTube to verify your stats. Other platforms are manual entry only in this version."
+          description="Connect YouTube to verify your stats and apply to campaigns. Instagram, TikTok and Facebook are typed in by hand."
         />
 
         {/* YouTube — primary */}
@@ -121,6 +122,17 @@ export default function ConnectedAccounts() {
                 </div>
               )}
 
+              {yt.belowMinimum && (
+                <div className="bg-amber-50 border-y border-amber-200 px-5 py-3 flex items-start gap-2 text-sm text-amber-800">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Your channel has <strong>{(yt.followers ?? 0).toLocaleString()}</strong> subscribers. You need at least{' '}
+                    <strong>{(yt.minimumFollowers ?? 1000).toLocaleString()}</strong> to be Verified and apply to campaigns.
+                    It is checked again every day, or press Refresh once you have grown.
+                  </span>
+                </div>
+              )}
+
               {yt.problem && (
                 <div className="bg-amber-50 border-y border-amber-200 px-5 py-3 flex items-center gap-2 text-sm text-amber-800">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -136,7 +148,7 @@ export default function ConnectedAccounts() {
                     { label: 'Account', value: '@' + (yt.handle || 'channel') },
                     { label: 'Status', value: yt.verified ? 'Verified' : 'Unverified' },
                     { label: 'Last synced', value: fmtRelativeTime(yt.lastSyncedAt) },
-                    { label: 'Followers', value: (creator?.followers ?? 0).toLocaleString() },
+                    { label: 'Followers', value: (yt.followers ?? 0).toLocaleString() },
                   ]}
                 />
               </div>
@@ -169,32 +181,8 @@ export default function ConnectedAccounts() {
           )}
         </article>
 
-        {/* Other platforms — manual */}
-        <section className="card p-5 sm:p-6">
-          <SectionHeader
-            eyebrow="Manual entry"
-            title="Other platforms"
-            description="OAuth for these platforms isn’t supported in this version. Enter stats on your profile (marked as Unverified)."
-          />
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {(['Instagram', 'TikTok', 'Facebook'] as const).map((p) => (
-              <div key={p} className="p-4 border border-dashed border-ink-200 rounded-md">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-ink-900 text-sm inline-flex items-center gap-1.5 truncate">
-                    <PlatformIcon platform={p as any} />
-                    {p}
-                  </span>
-                  <span className="tag tag-amber shrink-0">
-                    <Lock className="w-3 h-3" /> Manual
-                  </span>
-                </div>
-                <p className="text-xs text-ink-500 mt-2 leading-relaxed">
-                  OAuth not supported in this version. Enter stats manually on your profile.
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* Instagram, TikTok and Facebook: typed by hand, always Unverified */}
+        <ManualPlatformStats stats={creator?.stats ?? []} onChanged={() => loadCreatorProfile()} />
 
         <ConfirmDialog
           open={confirmDisconnect}

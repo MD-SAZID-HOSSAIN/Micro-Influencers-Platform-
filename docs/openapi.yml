@@ -70,6 +70,112 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
           description: ''
+  /api/v1/admin/brand-platforms/:
+    get:
+      operationId: admin_brand_platforms_list
+      description: Instagram, TikTok and Facebook links that brands typed. Oldest
+        first.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          enum:
+          - pending
+          - approved
+          - rejected
+          type: string
+          default: pending
+          minLength: 1
+        description: |-
+          * `pending` - Waiting for an admin
+          * `approved` - Approved
+          * `rejected` - Rejected
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminBrandPlatformList'
+          description: ''
+  /api/v1/admin/brand-platforms/{id}/approve/:
+    post:
+      operationId: admin_brand_platforms_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminBrandPlatform'
+          description: ''
+  /api/v1/admin/brand-platforms/{id}/reject/:
+    post:
+      operationId: admin_brand_platforms_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reason'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminBrandPlatform'
+          description: ''
   /api/v1/admin/campaigns/{id}/close/:
     post:
       operationId: admin_campaigns_close_create
@@ -115,6 +221,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Overview'
+          description: ''
+  /api/v1/admin/platform-stats/:
+    get:
+      operationId: admin_platform_stats_list
+      description: Instagram, TikTok and Facebook numbers that creators typed. Oldest
+        first.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          enum:
+          - pending
+          - approved
+          - rejected
+          type: string
+          default: pending
+          minLength: 1
+        description: |-
+          * `pending` - Waiting for an admin
+          * `approved` - Approved
+          * `rejected` - Rejected
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminPlatformStatsList'
+          description: ''
+  /api/v1/admin/platform-stats/{id}/approve/:
+    post:
+      operationId: admin_platform_stats_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OptionalReason'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPlatformStats'
+          description: ''
+  /api/v1/admin/platform-stats/{id}/reject/:
+    post:
+      operationId: admin_platform_stats_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Reason'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Reason'
+        required: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPlatformStats'
           description: ''
   /api/v1/admin/reviews/{id}/:
     delete:
@@ -2051,62 +2263,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationSettings'
           description: ''
-  /api/v1/social/challenge/{platform}/:
-    get:
-      operationId: social_challenge_retrieve
-      description: Generate a temporary, unique verification challenge code to verify
-        account ownership.
-      parameters:
-      - in: path
-        name: platform
-        schema:
-          type: string
-        required: true
-      tags:
-      - Social
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChallengeCode'
-          description: ''
-  /api/v1/social/direct-connect/{platform}/:
-    post:
-      operationId: social_direct_connect_create
-      description: Directly connect and verify ownership of a social account (OAuth
-        or Challenge verification).
-      parameters:
-      - in: path
-        name: platform
-        schema:
-          type: string
-        required: true
-      tags:
-      - Social
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DirectAccountAuth'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/DirectAccountAuth'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/DirectAccountAuth'
-        required: true
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PlatformStats'
-          description: ''
   /api/v1/social/facebook/connect/:
     get:
       operationId: social_facebook_connect_retrieve
@@ -2225,32 +2381,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthorizationUrl'
           description: ''
-  /api/v1/social/youtube/direct-connect/:
-    post:
-      operationId: social_youtube_direct_connect_create
-      description: Directly link and verify a YouTube channel by handle or URL.
-      tags:
-      - Social
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/YouTubeDirectConnect'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/YouTubeDirectConnect'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/YouTubeDirectConnect'
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/YouTubeStatus'
-          description: ''
   /api/v1/social/youtube/recent-content/:
     get:
       operationId: social_youtube_recent_content_list
@@ -2329,6 +2459,45 @@ components:
       - target_id
       - target_label
       - target_type
+    AdminBrandPlatform:
+      type: object
+      description: The Instagram, TikTok or Facebook link a brand typed, for the admin
+        to open and check.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        brand:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          readOnly: true
+        handle_url:
+          type: string
+          format: uri
+          readOnly: true
+        review_status:
+          allOf:
+          - $ref: '#/components/schemas/ReviewStatusEnum'
+          readOnly: true
+        review_note:
+          type: string
+          readOnly: true
+        connected_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - brand
+      - connected_at
+      - handle_url
+      - id
+      - platform
+      - review_note
+      - review_status
     AdminCampaign:
       type: object
       properties:
@@ -2352,6 +2521,56 @@ components:
       - id
       - status
       - title
+    AdminPlatformStats:
+      type: object
+      description: A creator's typed Instagram, TikTok or Facebook numbers, for the
+        admin to check against the link.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        creator:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          readOnly: true
+        handle_url:
+          type: string
+          format: uri
+          readOnly: true
+          nullable: true
+        followers:
+          type: integer
+          readOnly: true
+        engagement_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        review_status:
+          allOf:
+          - $ref: '#/components/schemas/ReviewStatusEnum'
+          readOnly: true
+        review_note:
+          type: string
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - creator
+      - engagement_rate
+      - followers
+      - handle_url
+      - id
+      - platform
+      - review_note
+      - review_status
+      - updated_at
     AdminUser:
       type: object
       properties:
@@ -2597,6 +2816,13 @@ components:
         is_verified:
           type: boolean
           readOnly: true
+        review_status:
+          allOf:
+          - $ref: '#/components/schemas/ReviewStatusEnum'
+          readOnly: true
+        review_note:
+          type: string
+          readOnly: true
         connected_at:
           type: string
           format: date-time
@@ -2606,6 +2832,8 @@ components:
       - handle_url
       - is_verified
       - platform
+      - review_note
+      - review_status
     BrandSocialLink:
       type: object
       description: The link a brand types for Instagram, TikTok or Facebook.
@@ -2679,6 +2907,11 @@ components:
           type: integer
           minimum: 0
           nullable: true
+        allow_withdrawal:
+          type: boolean
+          default: true
+          description: 'True: creators may withdraw their proposal. False: once they
+            apply, they cannot withdraw.'
         media:
           type: array
           items:
@@ -2838,6 +3071,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        allow_withdrawal:
+          type: boolean
+          readOnly: true
         media:
           type: array
           items:
@@ -2864,6 +3100,7 @@ components:
       required:
       - accepted_count
       - all_creators_selected
+      - allow_withdrawal
       - apply_blocked_reason
       - brand
       - budget
@@ -2921,11 +3158,6 @@ components:
           $ref: '#/components/schemas/Funnel'
         accepted_vs_needed:
           $ref: '#/components/schemas/AcceptedVsNeeded'
-        avg_proposed_rate:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
-          nullable: true
         budget_per_creator:
           type: string
           format: decimal
@@ -2939,7 +3171,6 @@ components:
       required:
       - acceptance_rate
       - accepted_vs_needed
-      - avg_proposed_rate
       - budget_per_creator
       - funnel
       - views
@@ -2953,19 +3184,6 @@ components:
         * `draft` - Draft
         * `published` - Published
         * `closed` - Closed
-    ChallengeCode:
-      type: object
-      properties:
-        platform:
-          type: string
-        challenge_code:
-          type: string
-        instructions:
-          type: string
-      required:
-      - challenge_code
-      - instructions
-      - platform
     CompleteConnect:
       type: object
       description: 'What the frontend received from the callback redirect: pass both
@@ -3205,7 +3423,7 @@ components:
         stats:
           type: array
           items:
-            $ref: '#/components/schemas/PlatformStats'
+            $ref: '#/components/schemas/PublicPlatformStats'
           readOnly: true
         portfolio:
           type: array
@@ -3371,10 +3589,20 @@ components:
           nullable: true
         is_outdated:
           type: boolean
+        followers:
+          type: integer
+          nullable: true
+        minimum_followers:
+          type: integer
+        below_minimum:
+          type: boolean
       required:
+      - below_minimum
       - connected
+      - followers
       - is_outdated
       - last_synced_at
+      - minimum_followers
       - needs_reconnect
       - status
     Deliverable:
@@ -3424,32 +3652,6 @@ components:
           type: string
       required:
       - detail
-    DirectAccountAuth:
-      type: object
-      properties:
-        handle:
-          type: string
-          maxLength: 200
-        verification_method:
-          allOf:
-          - $ref: '#/components/schemas/VerificationMethodEnum'
-          default: direct_auth
-        auth_code:
-          type: string
-          default: ''
-          maxLength: 2048
-        followers:
-          type: integer
-          maximum: 2000000000
-          minimum: 0
-          default: 0
-        engagement_rate:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
-          default: '3.50'
-      required:
-      - handle
     EmailVerify:
       type: object
       properties:
@@ -3568,9 +3770,12 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/CampaignStatusEnum'
+        allow_withdrawal:
+          type: boolean
         brand:
           $ref: '#/components/schemas/MyProposalBrand'
       required:
+      - allow_withdrawal
       - brand
       - id
       - status
@@ -3652,6 +3857,14 @@ components:
     NullEnum:
       enum:
       - null
+    OptionalReason:
+      type: object
+      description: Approving needs no explanation. A default note goes in the audit
+        trail.
+      properties:
+        reason:
+          type: string
+          maxLength: 500
     Overview:
       type: object
       properties:
@@ -3721,6 +3934,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminActionLog'
+    PaginatedAdminBrandPlatformList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminBrandPlatform'
+    PaginatedAdminPlatformStatsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminPlatformStats'
     PaginatedAdminUserList:
       type: object
       required:
@@ -4028,6 +4287,11 @@ components:
           type: integer
           minimum: 0
           nullable: true
+        allow_withdrawal:
+          type: boolean
+          default: true
+          description: 'True: creators may withdraw their proposal. False: once they
+            apply, they cannot withdraw.'
         media:
           type: array
           items:
@@ -4200,6 +4464,13 @@ components:
         is_verified:
           type: boolean
           readOnly: true
+        review_status:
+          allOf:
+          - $ref: '#/components/schemas/ReviewStatusEnum'
+          readOnly: true
+        review_note:
+          type: string
+          readOnly: true
         is_outdated:
           type: boolean
           readOnly: true
@@ -4215,6 +4486,8 @@ components:
       - is_verified
       - last_synced_at
       - platform
+      - review_note
+      - review_status
     PortfolioItem:
       type: object
       properties:
@@ -4321,14 +4594,12 @@ components:
         * `withdrawn` - Withdrawn
     ProposalSubmit:
       type: object
+      description: 'What a creator sends. There is no rate: the brand set it on the
+        campaign, and nobody can negotiate it.'
       properties:
         cover_message:
           type: string
           maxLength: 3000
-        proposed_rate:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
         portfolio_links:
           type: array
           items:
@@ -4341,7 +4612,44 @@ components:
           maxLength: 2000
       required:
       - cover_message
-      - proposed_rate
+    PublicPlatformStats:
+      type: object
+      description: 'What brands see: no review details.'
+      properties:
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          readOnly: true
+        handle_url:
+          type: string
+          nullable: true
+          maxLength: 500
+        followers:
+          type: integer
+          maximum: 2000000000
+          minimum: 0
+        engagement_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        is_verified:
+          type: boolean
+          readOnly: true
+        is_outdated:
+          type: boolean
+          readOnly: true
+        last_synced_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - engagement_rate
+      - followers
+      - is_outdated
+      - is_verified
+      - last_synced_at
+      - platform
     Reason:
       type: object
       description: Every admin action records why it was taken.
@@ -4451,6 +4759,16 @@ components:
           maxLength: 500
       required:
       - rating
+    ReviewStatusEnum:
+      enum:
+      - pending
+      - approved
+      - rejected
+      type: string
+      description: |-
+        * `pending` - Waiting for an admin
+        * `approved` - Approved
+        * `rejected` - Rejected
     RoleEnum:
       enum:
       - creator
@@ -4501,8 +4819,14 @@ components:
           type: boolean
           nullable: true
           readOnly: true
-          description: 'Brands only: whether at least one social platform is connected.
-            Null for everyone else.'
+          description: 'Brands only: whether at least one platform is verified (YouTube,
+            or a link an admin approved). Null for everyone else.'
+        platform_status:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 'Brands only: verified, pending (a link waits for an admin)
+            or none. Null for everyone else.'
         avatar_url:
           type: string
           nullable: true
@@ -4516,18 +4840,9 @@ components:
       - id
       - mobile_number
       - platform_connected
+      - platform_status
       - role
       - username
-    VerificationMethodEnum:
-      enum:
-      - oauth
-      - direct_auth
-      - challenge
-      type: string
-      description: |-
-        * `oauth` - oauth
-        * `direct_auth` - direct_auth
-        * `challenge` - challenge
     Withdraw:
       type: object
       properties:
@@ -4542,22 +4857,6 @@ components:
       description: |-
         * `connected` - Connected
         * `needs_reconnect` - Needs reconnect
-    YouTubeDirectConnect:
-      type: object
-      properties:
-        handle_url:
-          type: string
-          maxLength: 500
-        followers:
-          type: integer
-          maximum: 2000000000
-          minimum: 0
-          default: 0
-        engagement_rate:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
-          default: '3.50'
     YouTubeStatus:
       type: object
       properties:
@@ -4583,12 +4882,26 @@ components:
         last_error:
           type: string
           nullable: true
+        followers:
+          type: integer
+          nullable: true
+          description: Subscribers at the last sync, if any.
+        minimum_followers:
+          type: integer
+          description: Subscribers needed to be Verified and apply.
+        below_minimum:
+          type: boolean
+          description: True when a channel is connected but has fewer subscribers
+            than the minimum.
       required:
+      - below_minimum
       - connected
       - connected_at
+      - followers
       - is_outdated
       - last_error
       - last_synced_at
+      - minimum_followers
       - needs_reconnect
       - status
   securitySchemes:

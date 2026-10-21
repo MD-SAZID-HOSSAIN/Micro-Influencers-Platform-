@@ -33,7 +33,10 @@ def creator_dashboard(user: User) -> dict:
         "profile_completion": completion_percent(get_or_create_profile(user)),
         "youtube": {
             key: connection[key]
-            for key in ("connected", "status", "needs_reconnect", "last_synced_at", "is_outdated")
+            for key in (
+                "connected", "status", "needs_reconnect", "last_synced_at", "is_outdated",
+                "followers", "minimum_followers", "below_minimum",
+            )
         },
         "available_campaigns": list(discovery_queryset({})[:AVAILABLE_CAMPAIGNS_LIMIT]),
         "pending_count": totals["pending"],  # over every proposal, not just the listed ones

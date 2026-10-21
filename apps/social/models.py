@@ -5,7 +5,17 @@ from apps.core.choices import Platform
 
 
 class PlatformStats(models.Model):
-    """A creator's audience numbers on one platform: Verified (API) or Unverified (manual)."""
+    """A creator's audience numbers on one platform.
+
+    YouTube is Verified by Google sign-in. Instagram, TikTok and Facebook are typed by the creator, wait for an
+    admin (``review_status`` "pending") and are Verified only once the admin approves them. Until then they are
+    visible only to the creator, never on the public profile.
+    """
+
+    class Review(models.TextChoices):
+        PENDING = "pending", "Waiting for an admin"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
 
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="platform_stats"
@@ -15,6 +25,8 @@ class PlatformStats(models.Model):
     followers = models.PositiveIntegerField()
     engagement_rate = models.DecimalField(max_digits=5, decimal_places=2)
     is_verified = models.BooleanField(default=False)
+    review_status = models.CharField(max_length=10, choices=Review.choices, default=Review.APPROVED)
+    review_note = models.CharField(max_length=500, blank=True, default="")
     is_outdated = models.BooleanField(default=False)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -26,6 +38,11 @@ class PlatformStats(models.Model):
             )
         ]
         ordering = ["platform"]
+
+    @property
+    def is_public(self) -> bool:
+        """YouTube numbers are always shown (with their own Verified tag). The others only once an admin approved them."""
+        return self.platform == "youtube" or self.is_verified
 
     def __str__(self):
         return f"PlatformStats({self.creator_id}, {self.platform})"
@@ -55,11 +72,14 @@ class YouTubeConnection(models.Model):
 
 
 class BrandSocialAccount(models.Model):
-    """A social account a brand has connected. One connected platform, of any kind, completes a brand's verification.
+    """A social account a brand has connected. One verified platform completes a brand's verification.
 
-    ``is_verified`` is True only when ownership was proven with Google sign-in (YouTube). A link the brand typed for
-    Instagram, TikTok or Facebook is stored with ``is_verified = False``: it counts as connected, but nothing proves it.
+    ``is_verified`` is True when ownership was proven with Google sign-in (YouTube), or when an admin approved the
+    Instagram, TikTok or Facebook link the brand typed. A typed link waits as ``review_status = "pending"`` and does
+    not count until then.
     """
+
+    Review = PlatformStats.Review
 
     brand = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="social_accounts"
@@ -67,6 +87,8 @@ class BrandSocialAccount(models.Model):
     platform = models.CharField(max_length=20, choices=Platform.choices)
     handle_url = models.URLField(max_length=500)
     is_verified = models.BooleanField(default=False)
+    review_status = models.CharField(max_length=10, choices=PlatformStats.Review.choices, default=PlatformStats.Review.APPROVED)
+    review_note = models.CharField(max_length=500, blank=True, default="")
     connected_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

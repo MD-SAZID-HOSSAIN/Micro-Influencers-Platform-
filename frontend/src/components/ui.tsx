@@ -279,13 +279,16 @@ export function initialsOf(name: string): string {
   return letters || '?';
 }
 
-/** Background and accent colour pairs for generated pictures. The same seed always picks the same pair. */
+/**
+ * Colour sets for generated pictures: a calm gradient (from, to) and a soft glow colour. All are muted blues, teals and
+ * slates, so a page never looks loud. The same seed always picks the same set.
+ */
 const ART_PALETTE = [
-  ['#212F41', '#0DA0FD'],
-  ['#16212F', '#06CAB5'],
-  ['#2A3A52', '#5DB6EE'],
-  ['#0E1826', '#14C1CC'],
-  ['#364255', '#9FD2F5'],
+  ['#1E2B3C', '#2F4560', '#7FA8D1'],
+  ['#1B2A38', '#27495A', '#6FB7B0'],
+  ['#232E45', '#38476B', '#93A9E0'],
+  ['#1D2B33', '#2D4A4F', '#7DB9B2'],
+  ['#2A3446', '#46566F', '#A3B6CE'],
 ];
 
 /** A small stable number from some text: picks colours and shapes without storing anything. */
@@ -318,13 +321,13 @@ export function ProfileTile({
       />
     );
   }
-  const [background] = ART_PALETTE[hashSeed(String(seed)) % ART_PALETTE.length];
+  const [from, to] = ART_PALETTE[hashSeed(String(seed)) % ART_PALETTE.length];
   return (
     <div
       role="img"
       aria-label={name}
-      className={clsx('flex items-center justify-center font-semibold text-mist-50 select-none overflow-hidden', className)}
-      style={{ height, background, fontSize: Math.max(12, Math.round(height * 0.36)) }}
+      className={clsx('flex items-center justify-center font-semibold text-white/95 tracking-wide select-none overflow-hidden', className)}
+      style={{ height, background: `linear-gradient(145deg, ${from}, ${to})`, fontSize: Math.max(12, Math.round(height * 0.34)) }}
     >
       {initialsOf(name)}
     </div>
@@ -394,41 +397,30 @@ export function ChannelArt({
   rounded?: 'sm' | 'md' | 'lg' | 'full';
 }) {
   const r = rounded === 'full' ? 'rounded-full' : rounded === 'sm' ? 'rounded-sm' : rounded === 'md' ? 'rounded-md' : 'rounded-lg';
-  const hash = hashSeed;
-  const [bg, accent] = ART_PALETTE[hash(seed) % ART_PALETTE.length];
-  const angle = (hash(seed + 'a') % 24) - 12;
-  const cx1 = 20 + (hash(seed + 'b') % 30);
-  const cy1 = 30 + (hash(seed + 'c') % 20);
-  const cx2 = 60 + (hash(seed + 'd') % 30);
-  const cy2 = 40 + (hash(seed + 'e') % 30);
+  const [from, to, glow] = ART_PALETTE[hashSeed(seed) % ART_PALETTE.length];
+  const id = `art-${String(seed).replace(/[^a-zA-Z0-9]/g, '')}-${height}`;
+  // Where the soft light sits changes a little per seed, so covers differ without any hard shapes.
+  const gx = 70 + (hashSeed(seed + 'x') % 25);
+  const gy = 10 + (hashSeed(seed + 'y') % 40);
   return (
     <div
       className={clsx('relative overflow-hidden', r, className)}
-      style={{ height, background: bg }}
+      style={{ height, background: `linear-gradient(120deg, ${from} 0%, ${to} 100%)` }}
       aria-label={`${name} cover`}
       role="img"
     >
-      <svg
-        viewBox="0 0 100 50"
-        preserveAspectRatio="xMidYMid slice"
-        className="absolute inset-0 w-full h-full"
-        aria-hidden
-      >
+      <svg viewBox="0 0 100 40" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
         <defs>
-          <linearGradient id={`g-${seed}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0.25" />
-          </linearGradient>
+          <radialGradient id={`${id}-glow`} cx={`${gx}%`} cy={`${gy}%`} r="65%">
+            <stop offset="0%" stopColor={glow} stopOpacity="0.38" />
+            <stop offset="100%" stopColor={glow} stopOpacity="0" />
+          </radialGradient>
+          <pattern id={`${id}-lines`} width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+            <line x1="0" y1="0" x2="0" y2="3" stroke="#fff" strokeOpacity="0.045" strokeWidth="0.35" />
+          </pattern>
         </defs>
-        <g transform={`rotate(${angle} 50 25)`}>
-          <circle cx={cx1} cy={cy1} r="20" fill={`url(#g-${seed})`} />
-          <circle cx={cx2} cy={cy2} r="14" fill={accent} fillOpacity="0.4" />
-          <path
-            d={`M -10 ${40 + (hash(seed + 'f') % 10)} Q 50 ${20 + (hash(seed + 'g') % 15)} 110 ${45 + (hash(seed + 'h') % 10)} L 110 60 L -10 60 Z`}
-            fill={accent}
-            fillOpacity="0.18"
-          />
-        </g>
+        <rect width="100" height="40" fill={`url(#${id}-glow)`} />
+        <rect width="100" height="40" fill={`url(#${id}-lines)`} />
       </svg>
     </div>
   );

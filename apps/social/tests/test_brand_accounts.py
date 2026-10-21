@@ -1,7 +1,7 @@
-"""A brand connects any of YouTube, Instagram, TikTok or Facebook; one is enough to be fully verified.
+"""A brand connects any of YouTube, Instagram, TikTok or Facebook; one verified platform is enough.
 
 YouTube is connected with Google sign-in (the only proof of ownership available). The other three are links
-the brand types, saved as "added" and never as Verified.
+the brand types: they wait for an admin ("pending") and are Verified only once the admin approves them.
 """
 from urllib.parse import parse_qs, urlparse
 
@@ -50,12 +50,13 @@ def test_a_new_brand_has_no_connected_platforms(brand, auth_client):
         ("facebook", "https://m.facebook.com/acmefoods"),
     ],
 )
-def test_a_typed_link_is_saved_as_added_not_verified(brand, auth_client, platform, url):
+def test_a_typed_link_is_saved_as_pending_not_verified(brand, auth_client, platform, url):
     response = put(auth_client(brand), platform, url)
 
     assert response.status_code == 200
     body = response.json()
     assert body["platform"] == platform and body["handle_url"] == url and body["is_verified"] is False
+    assert body["review_status"] == "pending" and body["review_note"] == ""
     assert BrandSocialAccount.objects.get(brand=brand, platform=platform).is_verified is False
     assert [a["platform"] for a in auth_client(brand).get(BASE).json()] == [platform]
 

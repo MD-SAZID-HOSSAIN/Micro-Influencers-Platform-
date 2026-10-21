@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import * as api from '../api/endpoints';
 import type { User } from '../types';
-import { getToken, setToken, isApiError, onUnauthorized } from '../api/client';
+import { getToken, setToken, isApiError, onUnauthorized, storageFor } from '../api/client';
 
 type AdminCtx = {
   user: User | null;
@@ -17,7 +17,7 @@ const USER_KEY = 'microinf_admin_user';
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const raw = localStorage.getItem(USER_KEY);
+      const raw = storageFor('admin').getItem(USER_KEY);
       return raw ? (JSON.parse(raw) as User) : null;
     } catch {
       return null;
@@ -27,8 +27,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-    else localStorage.removeItem(USER_KEY);
+    try {
+      if (user) storageFor('admin').setItem(USER_KEY, JSON.stringify(user));
+      else storageFor('admin').removeItem(USER_KEY);
+    } catch {}
   }, [user]);
 
   useEffect(() => onUnauthorized((session) => session === 'admin' && setUser(null)), []);
@@ -74,6 +76,8 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Also end the login on the server, so a copy of the token stops working. The page logs out even if this fails.
+    void api.logout('admin').catch(() => undefined);
     setToken(null, 'admin');
     setUser(null);
   }, []);

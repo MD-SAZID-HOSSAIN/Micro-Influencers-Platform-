@@ -9,6 +9,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.hashers import make_password
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
@@ -94,8 +95,9 @@ def _seed_creators(target: int, hashed: str) -> int:
                 rate_video=Decimal(rng.randint(50, 800)) if rng.random() < 0.7 else None,
             )
         )
-        # YouTube is the only platform that can be Verified; everything else is manual (Unverified).
-        verified = platform == Platform.YOUTUBE and rng.random() < 0.8
+        # YouTube is Verified by Google sign-in (most of the demo ones). The other platforms are typed by hand, so in
+        # the demo data an admin has already approved them: they show on the profile and are Verified.
+        verified = platform != Platform.YOUTUBE or rng.random() < 0.8
         stats.append(
             PlatformStats(
                 creator=user,
@@ -171,6 +173,7 @@ def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
                 deliverables=rng.choice(DELIVERABLES),
                 creators_needed=rng.randint(1, 5),
                 min_followers=rng.choice([None, 1_000, 5_000, 20_000]),
+                allow_withdrawal=i % 4 != 3,  # every fourth demo campaign does not let creators withdraw
                 status=status,
                 published_at=None if status == Campaign.Status.DRAFT else now - timedelta(days=rng.randint(1, 20)),
                 closed_at=deadline if status == Campaign.Status.CLOSED else None,
@@ -200,7 +203,7 @@ def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
                     creator_id=creator_id,
                     status=status,
                     cover_message=rng.choice(COVER_MESSAGES),
-                    proposed_rate=campaign.budget * Decimal(rng.randint(70, 130)) / 100,
+                    proposed_rate=campaign.budget,  # the rate is fixed by the brand
                     portfolio_links=[],
                     experience_note="",
                     withdrawal_reason="Schedule conflict" if status == Proposal.Status.WITHDRAWN and rng.random() < 0.5 else "",
@@ -213,24 +216,46 @@ def _seed_campaigns_and_proposals(target: int) -> tuple[int, int]:
 def _apply_verification() -> None:
     """Make the demo accounts follow the verification rules (and repair data seeded before them).
 
-    Brands need a verified email and one connected platform to publish and accept (demo brands get an Instagram
-    link). Creators need a connected YouTube channel
-    (Verified stats) to apply: every fifth demo creator (005, 010, ...) is left without one, so the
-    blocked state can be tried. Safe to repeat.
+    Brands need a verified email and one verified platform to publish and accept (demo brands get an approved
+    Instagram link). Creators need a verified email and a connected YouTube channel (Verified stats) to apply: every
+    fifth demo creator (005, 010, ...) is left without a channel, so the blocked state can be tried. Demo emails end in
+    @demo.test, so notification emails are switched off for them (nothing is sent to addresses that do not exist).
+    Safe to repeat.
     """
-    User.objects.filter(username__startswith=BRAND_PREFIX, email_verified=False).update(email_verified=True)
+    demo_users = User.objects.filter(Q(username__startswith=BRAND_PREFIX) | Q(username__startswith=CREATOR_PREFIX))
+    demo_users.exclude(email_verified=True, email_notifications_enabled=False).update(
+        email_verified=True, email_notifications_enabled=False
+    )
     brands = list(User.objects.filter(username__startswith=BRAND_PREFIX).values_list("id", "username"))
     connected = set(
         BrandSocialAccount.objects.filter(brand_id__in=[brand_id for brand_id, _ in brands]).values_list(
             "brand_id", flat=True
         )
     )
+    # In the demo data an admin has already approved the Instagram link, so the demo brands are fully verified.
     BrandSocialAccount.objects.bulk_create(
         [
-            BrandSocialAccount(brand_id=brand_id, platform="instagram", handle_url=f"https://instagram.com/{username}")
+            BrandSocialAccount(
+                brand_id=brand_id,
+                platform="instagram",
+                handle_url=f"https://instagram.com/{username}",
+                is_verified=True,
+                review_status=BrandSocialAccount.Review.APPROVED,
+            )
             for brand_id, username in brands
             if brand_id not in connected
         ]
+    )
+    names = dict(brands)
+    seeded_but_unapproved = [  # links seeded before admin approval existed
+        link.pk
+        for link in BrandSocialAccount.objects.filter(
+            brand_id__in=list(names), platform="instagram", is_verified=False
+        ).only("id", "brand_id", "handle_url")
+        if link.handle_url == f"https://instagram.com/{names[link.brand_id]}"
+    ]
+    BrandSocialAccount.objects.filter(pk__in=seeded_but_unapproved).update(
+        is_verified=True, review_status=BrandSocialAccount.Review.APPROVED, review_note=""
     )
 
     now = timezone.now()
@@ -241,6 +266,11 @@ def _apply_verification() -> None:
     without_youtube = [user_id for user_id, n in numbers.items() if n % 5 == 0]
     with_youtube = [user_id for user_id, n in numbers.items() if n % 5 != 0]
     youtube = PlatformStats.objects.filter(platform=Platform.YOUTUBE)
+
+    # Seeded Instagram/TikTok/Facebook numbers have no typed link; they count as already approved by an admin.
+    PlatformStats.objects.filter(creator_id__in=list(numbers), handle_url__isnull=True).exclude(
+        platform=Platform.YOUTUBE
+    ).update(is_verified=True, review_status=PlatformStats.Review.APPROVED, review_note="", updated_at=now)
 
     youtube.filter(creator_id__in=without_youtube, is_verified=True).update(is_verified=False, updated_at=now)
     existing = dict(youtube.filter(creator_id__in=with_youtube).values_list("creator_id", "is_verified"))

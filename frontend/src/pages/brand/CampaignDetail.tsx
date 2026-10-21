@@ -134,6 +134,7 @@ export default function CampaignDetailBrand() {
           { label: 'Deadline', value: fmtDate(c.applicationDeadline) },
           { label: 'Creators', value: `${acceptedCount} / ${c.creatorsNeeded}` },
           { label: 'Min followers', value: c.minFollowers?.toLocaleString() ?? 'None' },
+          { label: 'Withdrawing', value: c.allowWithdrawal === false ? 'Not allowed' : 'Allowed' },
         ]}
       />
 

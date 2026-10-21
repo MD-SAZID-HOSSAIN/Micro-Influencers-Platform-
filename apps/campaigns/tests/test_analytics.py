@@ -40,7 +40,6 @@ def test_a_campaign_nobody_has_seen_or_applied_to(campaign, auth_client):
         "views": 0,
         "funnel": {"received": 0, "shortlisted": 0, "accepted": 0, "rejected": 0, "withdrawn": 0},
         "accepted_vs_needed": {"accepted": 0, "needed": 3},
-        "avg_proposed_rate": None,
         "budget_per_creator": "500.00",
         "acceptance_rate": None,
     }
@@ -89,17 +88,6 @@ def test_acceptance_rate_is_rounded_to_four_places(campaign, auth_client):
     ProposalFactory(campaign=campaign, status=S.PENDING)
 
     assert metrics(auth_client, campaign)["acceptance_rate"] == 0.3333
-
-
-def test_average_proposed_rate_is_compared_with_the_budget_per_creator(campaign, auth_client):
-    ProposalFactory(campaign=campaign, proposed_rate=Decimal("400.00"))
-    ProposalFactory(campaign=campaign, proposed_rate=Decimal("650.50"), status=S.REJECTED)
-    ProposalFactory(campaign=campaign, proposed_rate=Decimal("300.00"), status=S.WITHDRAWN)
-
-    body = metrics(auth_client, campaign)
-
-    assert body["avg_proposed_rate"] == "450.17"
-    assert body["budget_per_creator"] == "500.00"
 
 
 def test_other_campaigns_proposals_are_not_counted(campaign, auth_client):

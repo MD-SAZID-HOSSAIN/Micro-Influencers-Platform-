@@ -151,7 +151,7 @@ def test_brand_name_falls_back_to_the_account_holder_until_a_company_name_is_set
 # ---- eligibility indicator --------------------------------------------------------------------
 
 
-def stats(creator, platform="instagram", followers=5000, verified=False):
+def stats(creator, platform="instagram", followers=5000, verified=True):  # Instagram counts once an admin approved it
     PlatformStats.objects.create(
         creator=creator, platform=platform, followers=followers, engagement_rate="2.00", is_verified=verified
     )
@@ -168,11 +168,11 @@ def test_eligible_when_platform_stats_exist_and_meet_the_minimum(creator, auth_c
     assert eligible(auth_client, creator) is True
 
 
-def test_unverified_stats_count_as_eligible(creator, auth_client):
+def test_typed_stats_waiting_for_an_admin_do_not_count_as_eligible(creator, auth_client):
     published(platform="instagram", min_followers=3000)
     stats(creator, followers=5000, verified=False)
 
-    assert eligible(auth_client, creator) is True
+    assert eligible(auth_client, creator) is False
 
 
 def test_not_eligible_without_stats_for_the_platform(creator, auth_client):

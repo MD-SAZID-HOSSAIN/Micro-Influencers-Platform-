@@ -75,16 +75,16 @@ export default function CreatorProfile() {
           ) : (
             <ChannelArt name={creator.fullName} seed={creator.id} height={120} className="rounded-none w-full" />
           )}
-          <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-10 sm:-mt-12">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 min-w-0">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 min-w-0">
               <ProfileTile
                 name={creator.fullName}
                 seed={creator.id}
                 imageUrl={creator.avatarUrl}
                 height={96}
-                className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-md ring-4 ring-mist-50 shrink-0"
+                className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
               />
-              <div className="min-w-0 pb-1">
+              <div className="min-w-0 pt-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-display text-xl sm:text-2xl md:text-3xl text-ink-900 tracking-[-0.02em] leading-tight break-words">
                     {creator.fullName}
@@ -192,6 +192,29 @@ export default function CreatorProfile() {
                 { label: 'Video rate', value: currency(creator.ratePerVideo) },
               ]}
             />
+
+            {(creator.stats ?? []).filter((st) => st.platform === 'YouTube' || st.isVerified).length > 0 && (
+              <div className="card p-5">
+                <div className="eyebrow">Platforms</div>
+                <ul className="mt-3 space-y-3 text-sm">
+                  {(creator.stats ?? []).filter((st) => st.platform === 'YouTube' || st.isVerified).map((st) => (
+                    <li key={st.platform} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium text-ink-900 inline-flex items-center gap-1.5">
+                          <PlatformIcon platform={st.platform} /> {st.platform}
+                        </div>
+                        <div className="text-xs text-ink-500">
+                          {st.followers.toLocaleString()} followers · {st.engagementRate}% engagement
+                        </div>
+                      </div>
+                      <span className={st.isVerified ? 'tag tag-green shrink-0' : 'tag tag-amber shrink-0'}>
+                        {st.isVerified ? 'Verified' : 'Unverified'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="card p-5">
               <div className="eyebrow">Details</div>

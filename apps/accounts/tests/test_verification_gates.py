@@ -10,7 +10,7 @@ from apps.proposals.tests.factories import ProposalFactory
 from apps.social.models import PlatformStats
 
 CAMPAIGNS = "/api/v1/brand/campaigns/"
-PROPOSAL_BODY = {"cover_message": "Hello", "proposed_rate": "100"}
+PROPOSAL_BODY = {"cover_message": "Hello"}
 
 
 def error_code(response):
@@ -105,7 +105,7 @@ def campaign(db):
 
 
 def test_creator_with_no_stats_cannot_apply(campaign, auth_client):
-    creator = UserFactory(role=Role.CREATOR)
+    creator = UserFactory(role=Role.CREATOR, email_verified=True)
 
     response = apply_to(auth_client, creator, campaign)
 
@@ -116,7 +116,7 @@ def test_creator_with_no_stats_cannot_apply(campaign, auth_client):
 
 @pytest.mark.parametrize("platform", ["instagram", "tiktok", "facebook", "youtube"])
 def test_manual_unverified_stats_do_not_count(campaign, auth_client, platform):
-    creator = UserFactory(role=Role.CREATOR)
+    creator = UserFactory(role=Role.CREATOR, email_verified=True)
     PlatformStats.objects.create(
         creator=creator, platform=platform, followers=50_000, engagement_rate="5.00", is_verified=False
     )
@@ -150,3 +150,36 @@ def test_creator_email_verification_does_not_replace_youtube(campaign, auth_clie
     creator = UserFactory(role=Role.CREATOR, email_verified=True)
 
     assert apply_to(auth_client, creator, campaign).status_code == 403
+
+
+# ---- creators: the email is part of being verified ---------------------------------------------------------
+
+
+def test_a_creator_with_youtube_but_an_unconfirmed_email_cannot_apply(campaign, auth_client):
+    creator = UserFactory(role=Role.CREATOR, youtube_verified=True)
+    type(creator).objects.filter(pk=creator.pk).update(email_verified=False)
+    creator.refresh_from_db()
+
+    response = apply_to(auth_client, creator, campaign)
+
+    assert response.status_code == 403
+    assert error_code(response) == "creator_email_unverified"
+    assert not Proposal.objects.filter(creator=creator).exists()
+
+
+def test_the_email_is_checked_before_youtube(campaign, auth_client):
+    creator = UserFactory(role=Role.CREATOR, email_verified=False)
+
+    assert error_code(apply_to(auth_client, creator, campaign)) == "creator_email_unverified"
+
+
+def test_a_creator_can_apply_once_the_email_is_confirmed(campaign, auth_client):
+    creator = UserFactory(role=Role.CREATOR, youtube_verified=True)
+    type(creator).objects.filter(pk=creator.pk).update(email_verified=False)
+    creator.refresh_from_db()
+    assert apply_to(auth_client, creator, campaign).status_code == 403
+
+    type(creator).objects.filter(pk=creator.pk).update(email_verified=True)
+    creator.refresh_from_db()
+
+    assert apply_to(auth_client, creator, campaign).status_code == 201

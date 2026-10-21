@@ -36,13 +36,21 @@ class UserFactory(factory.django.DjangoModelFactory):
             from apps.social.models import BrandSocialAccount
 
             BrandSocialAccount.objects.create(
-                brand=self, platform="instagram", handle_url=f"https://instagram.com/{self.username}"
+                brand=self,
+                platform="instagram",
+                handle_url=f"https://instagram.com/{self.username}",
+                is_verified=True,  # an admin approved it
             )
 
     @factory.post_generation
     def youtube_verified(self, create, extracted, **kwargs):
+        """A Verified creator: a proven YouTube channel and a confirmed email."""
         if create and extracted:
             from apps.social.models import PlatformStats
+
+            if not self.email_verified:
+                self.email_verified = True
+                self.save(update_fields=["email_verified"])
 
             PlatformStats.objects.create(
                 creator=self,

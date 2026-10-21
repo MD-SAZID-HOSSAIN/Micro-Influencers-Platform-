@@ -92,7 +92,7 @@ def test_a_verified_email_does_not_let_a_creator_apply_without_youtube(db, auth_
     campaign = CampaignFactory(status=Campaign.Status.PUBLISHED)
 
     response = auth_client(creator).post(
-        f"/api/v1/campaigns/{campaign.pk}/proposals/", {"cover_message": "Hello", "proposed_rate": "100"}, format="json"
+        f"/api/v1/campaigns/{campaign.pk}/proposals/", {"cover_message": "Hello"}, format="json"
     )
 
     assert response.status_code == 403

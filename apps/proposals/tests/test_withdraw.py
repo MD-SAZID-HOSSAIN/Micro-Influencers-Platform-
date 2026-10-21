@@ -148,3 +148,38 @@ def test_brands_cannot_withdraw_and_logged_out_gets_401(creator):
 
     assert client.post(withdraw_url(proposal.pk), {}, format="json").status_code == 403
     assert APIClient().post(withdraw_url(proposal.pk), {}, format="json").status_code == 401
+
+
+# ---- the brand's choice when it posts: may creators withdraw? ------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [S.PENDING, S.SHORTLISTED, S.ACCEPTED])
+def test_a_creator_cannot_withdraw_when_the_brand_turned_withdrawing_off(creator, auth_client, status):
+    campaign = CampaignFactory(status=Campaign.Status.PUBLISHED, allow_withdrawal=False)
+    proposal = ProposalFactory(creator=creator, campaign=campaign, status=status)
+
+    response = withdraw(auth_client, creator, proposal, reason="Changed my mind")
+
+    assert response.status_code == 403
+    assert error_code(response) == "withdrawal_not_allowed"
+    assert reload(proposal).status == status
+    assert not Notification.objects.filter(user=campaign.brand, kind=Kind.PROPOSAL_WITHDRAWN).exists()
+
+
+def test_withdrawing_is_allowed_by_default(creator, auth_client):
+    campaign = CampaignFactory(status=Campaign.Status.PUBLISHED)
+    proposal = ProposalFactory(creator=creator, campaign=campaign, status=S.PENDING)
+
+    assert campaign.allow_withdrawal is True
+    assert withdraw(auth_client, creator, proposal).status_code == 200
+    assert reload(proposal).status == S.WITHDRAWN
+
+
+def test_the_creators_own_list_says_whether_each_campaign_allows_withdrawing(creator, auth_client):
+    locked = ProposalFactory(creator=creator, campaign=CampaignFactory(allow_withdrawal=False))
+    open_one = ProposalFactory(creator=creator, campaign=CampaignFactory(allow_withdrawal=True))
+
+    rows = auth_client(creator).get("/api/v1/creators/me/proposals/").json()["results"]
+
+    flags = {row["id"]: row["campaign"]["allow_withdrawal"] for row in rows}
+    assert flags == {locked.id: False, open_one.id: True}

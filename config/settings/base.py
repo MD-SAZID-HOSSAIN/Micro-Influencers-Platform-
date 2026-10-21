@@ -119,6 +119,10 @@ REST_FRAMEWORK = {
     },
 }
 
+# How long an admin stays logged in. 0 (the default) means the login does not expire in practice (10 years): the admin
+# stays logged in until they press Log out or their password changes. A number of minutes sets a limit instead.
+ADMIN_TOKEN_MINUTES = env.int("ADMIN_TOKEN_MINUTES", default=0)
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
     "AUTH_HEADER_TYPES": ("Bearer",),
@@ -202,6 +206,8 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 YOUTUBE_REFRESH_COOLDOWN_SECONDS = 900
+# A creator is Verified, and may apply, only with at least this many YouTube subscribers.
+MIN_CREATOR_FOLLOWERS = env.int("MIN_CREATOR_FOLLOWERS", default=1000)
 # The daily YouTube sync starts creators evenly over this many seconds (0 = all at once).
 YOUTUBE_SYNC_SPREAD_SECONDS = 1800
 

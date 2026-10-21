@@ -2,10 +2,16 @@ from django.urls import path
 
 from .views import (
     AdminActionLogView,
+    AdminApproveBrandPlatformView,
+    AdminApproveStatsView,
+    AdminBrandPlatformListView,
     AdminCloseCampaignView,
     AdminLoginView,
     AdminOverviewView,
+    AdminPlatformStatsListView,
     AdminReactivateUserView,
+    AdminRejectBrandPlatformView,
+    AdminRejectStatsView,
     AdminReviewDetailView,
     AdminSuspendUserView,
     AdminUserDetailView,
@@ -22,6 +28,16 @@ urlpatterns = [
     ),
     path("admin/campaigns/<int:pk>/close/", AdminCloseCampaignView.as_view(), name="admin-campaign-close"),
     path("admin/reviews/<int:pk>/", AdminReviewDetailView.as_view(), name="admin-review"),
+    path("admin/platform-stats/", AdminPlatformStatsListView.as_view(), name="admin-platform-stats"),
+    path("admin/platform-stats/<int:pk>/approve/", AdminApproveStatsView.as_view(), name="admin-stats-approve"),
+    path("admin/platform-stats/<int:pk>/reject/", AdminRejectStatsView.as_view(), name="admin-stats-reject"),
+    path("admin/brand-platforms/", AdminBrandPlatformListView.as_view(), name="admin-brand-platforms"),
+    path(
+        "admin/brand-platforms/<int:pk>/approve/", AdminApproveBrandPlatformView.as_view(), name="admin-brand-platform-approve"
+    ),
+    path(
+        "admin/brand-platforms/<int:pk>/reject/", AdminRejectBrandPlatformView.as_view(), name="admin-brand-platform-reject"
+    ),
     path("admin/actions/", AdminActionLogView.as_view(), name="admin-actions"),
     path("admin/overview/", AdminOverviewView.as_view(), name="admin-overview"),
 ]

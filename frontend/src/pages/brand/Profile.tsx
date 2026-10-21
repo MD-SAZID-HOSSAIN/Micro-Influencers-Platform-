@@ -64,16 +64,16 @@ export default function BrandProfile() {
         ) : (
           <ChannelArt name={brand.companyName} seed={brand.id} height={120} className="rounded-none w-full" />
         )}
-        <div className="p-5 sm:p-6 flex items-end gap-4 -mt-10 sm:-mt-12">
+        <div className="p-5 sm:p-6 flex items-start gap-4">
           <ProfileTile
             name={brand.companyName}
             seed={brand.id}
             imageUrl={brand.logoUrl}
             height={96}
-            className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-md ring-4 ring-mist-50 shrink-0"
+            className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
           />
-          <div className="min-w-0 pb-1 flex-1">
-            <h1 className="font-display text-2xl sm:text-3xl text-ink-900 leading-none tracking-[-0.02em]">
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="font-display text-2xl sm:text-3xl text-ink-900 leading-tight tracking-[-0.02em]">
               {brand.companyName}
             </h1>
             <div className="text-sm text-ink-500 mt-1.5">{brand.industry}</div>

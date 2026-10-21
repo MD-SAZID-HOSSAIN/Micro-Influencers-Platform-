@@ -51,17 +51,17 @@ export default function CreatorPublicProfile() {
       {/* Identity */}
       <div className="card overflow-hidden">
         <ChannelArt name={creator.fullName} seed={creator.id} height={120} className="rounded-none" />
-        <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end gap-4 -mt-10 sm:-mt-12">
+        <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-start gap-4">
           <ProfileTile
             name={creator.fullName}
             seed={creator.id}
             imageUrl={creator.avatarUrl}
             height={88}
-            className="w-20 sm:w-24 rounded-md ring-4 ring-mist-50 shrink-0"
+            className="w-20 sm:w-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
           />
-          <div className="min-w-0 pb-1 flex-1">
+          <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-2xl sm:text-3xl text-ink-900 tracking-[-0.02em] leading-none">
+              <h1 className="font-display text-2xl sm:text-3xl text-ink-900 tracking-[-0.02em] leading-tight">
                 {creator.fullName}
               </h1>
               <VerifiedBadge verified={creator.verified} />

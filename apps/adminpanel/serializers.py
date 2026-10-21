@@ -3,6 +3,7 @@ from rest_framework import serializers
 from apps.accounts.models import Role, User
 from apps.campaigns.models import Campaign
 from apps.core.fields import SafeCharField
+from apps.social.models import BrandSocialAccount, PlatformStats
 
 from .models import AdminActionLog
 
@@ -11,6 +12,56 @@ class ReasonSerializer(serializers.Serializer):
     """Every admin action records why it was taken."""
 
     reason = SafeCharField(max_length=500)
+
+
+class OptionalReasonSerializer(serializers.Serializer):
+    """Approving needs no explanation. A default note goes in the audit trail."""
+
+    reason = SafeCharField(max_length=500, required=False, allow_blank=True)
+
+
+class AdminStatsFilterSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=PlatformStats.Review.choices, required=False, default="pending")
+
+
+class AdminPlatformStatsSerializer(serializers.ModelSerializer):
+    """A creator's typed Instagram, TikTok or Facebook numbers, for the admin to check against the link."""
+
+    creator = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PlatformStats
+        fields = [
+            "id",
+            "creator",
+            "platform",
+            "handle_url",
+            "followers",
+            "engagement_rate",
+            "review_status",
+            "review_note",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_creator(self, stats) -> dict:
+        user = stats.creator
+        return {"id": user.id, "username": user.username, "full_name": user.full_name}
+
+
+class AdminBrandPlatformSerializer(serializers.ModelSerializer):
+    """The Instagram, TikTok or Facebook link a brand typed, for the admin to open and check."""
+
+    brand = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BrandSocialAccount
+        fields = ["id", "brand", "platform", "handle_url", "review_status", "review_note", "connected_at"]
+        read_only_fields = fields
+
+    def get_brand(self, account) -> dict:
+        user = account.brand
+        return {"id": user.id, "username": user.username, "full_name": user.full_name}
 
 
 class AdminUserFilterSerializer(serializers.Serializer):

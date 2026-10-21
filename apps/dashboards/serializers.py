@@ -13,6 +13,9 @@ class DashboardYouTubeSerializer(serializers.Serializer):
     needs_reconnect = serializers.BooleanField()
     last_synced_at = serializers.DateTimeField(allow_null=True)
     is_outdated = serializers.BooleanField()
+    followers = serializers.IntegerField(allow_null=True)
+    minimum_followers = serializers.IntegerField()
+    below_minimum = serializers.BooleanField()
 
 
 class PerformanceSerializer(serializers.Serializer):

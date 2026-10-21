@@ -170,19 +170,21 @@ export default function EditCreatorProfile() {
           <SectionHeader
             eyebrow="Audience"
             title="Stats"
-            description={
-              form.primaryPlatform === 'YouTube'
-                ? 'YouTube stats come from your connected account. To change them, reconnect via the Accounts page.'
-                : 'YouTube is the only platform that auto-verifies stats. For others, the numbers below are entered manually.'
-            }
+            description="Your followers and engagement are not edited here. YouTube stats come from your connected channel. Type Instagram, TikTok and Facebook numbers on the Accounts page. They show on your profile after an admin approves them."
           />
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Followers" htmlFor="followers" helper={form.primaryPlatform === 'YouTube' ? 'Managed by YouTube' : 'Manually entered. Not verified.'}>
-              <Input id="followers" type="number" min={0} value={creator.followers} disabled={form.primaryPlatform === 'YouTube'} />
-            </FormField>
-            <FormField label="Engagement rate (%)" htmlFor="er" helper={form.primaryPlatform === 'YouTube' ? 'Managed by YouTube' : 'Manually entered.'}>
-              <Input id="er" type="number" min={0} step="0.1" value={creator.engagementRate} disabled={form.primaryPlatform === 'YouTube'} />
-            </FormField>
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-700">
+            {(creator.stats ?? []).length === 0 && <span>No platforms added yet.</span>}
+            {(creator.stats ?? []).map((st) => (
+              <span key={st.platform}>
+                <strong className="text-ink-900">{st.platform}</strong> {st.followers.toLocaleString()} followers · {st.engagementRate}%{' '}
+                <span className="text-xs text-ink-500">
+                  {st.platform === 'YouTube'
+                    ? st.isVerified ? '(Verified)' : '(Unverified)'
+                    : st.reviewStatus === 'approved' ? '(Verified)' : st.reviewStatus === 'rejected' ? '(Rejected)' : '(Waiting for admin)'}
+                </span>
+              </span>
+            ))}
+            <Link to="/creator/accounts" className="link-accent ml-auto">Manage on Accounts</Link>
           </div>
         </section>
 

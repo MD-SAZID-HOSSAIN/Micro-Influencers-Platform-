@@ -24,7 +24,7 @@ def make_creator(
     platform="instagram",
     followers=1000,
     engagement="3.00",
-    verified=False,
+    verified=None,  # None: approved for Instagram/TikTok/Facebook (an admin checked them), not Verified for YouTube
     city="Dhaka",
     country="Bangladesh",
     rate_post=None,
@@ -55,7 +55,7 @@ def make_creator(
             platform=platform,
             followers=followers,
             engagement_rate=engagement,
-            is_verified=verified,
+            is_verified=(platform != "youtube") if verified is None else verified,
         )
     return user
 
@@ -323,7 +323,8 @@ def test_detail_shows_full_profile_with_stats_labels_and_portfolio(brand, auth_c
     stats = {s["platform"]: s for s in body["stats"]}
     assert stats["instagram"]["is_verified"] is True
     assert stats["instagram"]["last_synced_at"] is None or isinstance(stats["instagram"]["last_synced_at"], str)
-    assert stats["tiktok"]["is_verified"] is False
+    assert "tiktok" not in stats  # typed, still waiting for an admin: hidden from brands
+    assert "review_status" not in stats["instagram"] and "review_note" not in stats["instagram"]
     assert [p["caption"] for p in body["portfolio"]] == ["First"]
 
 

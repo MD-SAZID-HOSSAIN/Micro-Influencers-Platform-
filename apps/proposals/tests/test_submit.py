@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from django.db import connection
@@ -30,7 +31,6 @@ def campaign_url(campaign_id):
 def body(**overrides):
     data = {
         "cover_message": "I run a fitness page with an engaged audience.",
-        "proposed_rate": "250.00",
         "portfolio_links": ["https://instagram.com/p/1"],
         "experience_note": "Worked with three sports brands.",
     }
@@ -65,7 +65,7 @@ def test_submit_creates_a_pending_proposal_and_notifies_the_brand(creator, campa
     assert response.status_code == 201
     data = response.json()
     assert data["status"] == "pending"
-    assert data["proposed_rate"] == "250.00"
+    assert data["proposed_rate"] == f"{campaign.budget:.2f}"  # the brand's fixed rate, not chosen by the creator
     assert data["portfolio_links"] == ["https://instagram.com/p/1"]
     assert data["campaign_id"] == campaign.id
     proposal = Proposal.objects.get(pk=data["id"])
@@ -77,7 +77,7 @@ def test_submit_creates_a_pending_proposal_and_notifies_the_brand(creator, campa
 
 
 def test_links_and_note_are_optional(creator, campaign, auth_client):
-    data = {"cover_message": "Hello", "proposed_rate": "100"}
+    data = {"cover_message": "Hello"}
 
     response = auth_client(creator).post(submit_url(campaign.pk), data, format="json")
 
@@ -140,7 +140,6 @@ def test_two_simultaneous_submits_create_exactly_one_active_proposal(transaction
                 creator=creator,
                 campaign_id=campaign.pk,
                 cover_message="Hi",
-                proposed_rate="100",
                 portfolio_links=[],
                 experience_note="",
             )
@@ -228,15 +227,27 @@ def test_html_is_stripped_from_text_fields(creator, campaign, auth_client):  # R
     assert data["experience_note"] == "Five years"
 
 
-@pytest.mark.parametrize("rate", ["0", "-5", "abc"])
-def test_proposed_rate_must_be_positive(creator, campaign, auth_client, rate):
+@pytest.mark.parametrize("rate", ["1", "250.00", "9999", "0", "abc"])
+def test_a_creator_cannot_name_a_rate(creator, campaign, auth_client, rate):
+    """No negotiation: sending a rate is refused, whatever the number, and nothing is created."""
     response = submit(auth_client, creator, campaign, proposed_rate=rate)
 
     assert response.status_code == 400
     assert "proposed_rate" in response.json()["error"]["details"]
+    assert not Proposal.objects.filter(creator=creator).exists()
 
 
-@pytest.mark.parametrize("field", ["cover_message", "proposed_rate"])
+def test_the_proposal_always_gets_the_brands_fixed_rate(creator, campaign, auth_client):
+    Campaign.objects.filter(pk=campaign.pk).update(budget="480.50")
+
+    response = submit(auth_client, creator, campaign)
+
+    assert response.status_code == 201
+    assert response.json()["proposed_rate"] == "480.50"
+    assert Proposal.objects.get(creator=creator, campaign=campaign).proposed_rate == Decimal("480.50")
+
+
+@pytest.mark.parametrize("field", ["cover_message"])
 def test_required_fields(creator, campaign, auth_client, field):
     data = body()
     del data[field]

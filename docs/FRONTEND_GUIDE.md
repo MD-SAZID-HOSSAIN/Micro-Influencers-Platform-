@@ -201,21 +201,29 @@ creator the email code is separate from YouTube: it confirms their address and e
 applying still needs a connected YouTube channel.
 
 An unverified **brand** cannot publish a campaign or accept a proposal: those calls return 403 with code
-`brand_email_unverified` (email not confirmed) or `brand_platform_required` (no connected platform; the email is
-checked first). Everything else works unverified (drafts, shortlisting, rejecting, browsing).
+`brand_email_unverified` (email not confirmed) or `brand_platform_required` (no verified platform: YouTube, or a link an
+admin approved; the email is checked first). Everything else works unverified (drafts, shortlisting, rejecting, browsing).
 
 A brand connects platforms with `GET /brands/me/social/` (list), `PUT /brands/me/social/{instagram|tiktok|facebook}/`
-with `{"handle_url"}` (a link on that platform; saved as `is_verified: false`), `DELETE /brands/me/social/{platform}/`,
+with `{"handle_url"}` (a link on that platform; saved as `is_verified: false`, `review_status: "pending"` until an admin
+approves it, then `"approved"`, or `"rejected"` with a `review_note`), `DELETE /brands/me/social/{platform}/`,
 and YouTube through Google: `GET /brands/me/social/youtube/connect/`, then `POST /brands/me/social/youtube/complete/`
 with the `state` and `code` the callback redirect carries (the same `?youtube=confirm&code=...&state=...` redirect creators
-use; send brands to their own accounts page). `GET /auth/me/` returns `platform_connected` (true or false for brands,
-null for others): show a "connect a platform" banner while it is `false`.
+use; send brands to their own accounts page). `GET /auth/me/` returns `platform_connected` (true only when a platform is verified; null for
+non-brands) and `platform_status` (`verified`, `pending` when a link waits for an admin, or `none`): show a "connect a
+platform" banner while `platform_connected` is `false`, and "an admin is checking your link" when it is `pending`.
 For everyone, verification also decides whether notification emails are sent (section 7.2). Show a
 "verify your email" banner while `email_verified` is `false`.
 
-A **creator** cannot apply unless a YouTube channel is connected (YouTube stats with `is_verified: true`):
-`POST /campaigns/{id}/proposals/` returns 403 with code `creator_youtube_required`. Send them to the
-connections page to connect YouTube. Email verification does not unlock applying.
+A **creator** cannot apply unless the email is confirmed (403 `creator_email_unverified`, checked first) AND a YouTube
+channel is connected (YouTube stats with `is_verified: true`): `POST /campaigns/{id}/proposals/` returns 403 with code
+`creator_youtube_required` otherwise. Send them to the verify-email page or the connections page.
+
+The channel also needs at least `minimum_followers` subscribers (the setting `MIN_CREATOR_FOLLOWERS`, 1,000 by
+default). A connected channel under it gets 403 `creator_followers_too_low` with a ready-to-show message ("Your YouTube
+channel has 640 subscribers. You need at least 1,000..."). `GET /social/youtube/` and the `youtube` block of
+`GET /creators/me/dashboard/` return `followers`, `minimum_followers` and `below_minimum` (true when a channel is
+connected but under the minimum), so the website can explain it before the creator tries to apply.
 
 ### 4.3 Log in
 
@@ -283,7 +291,7 @@ Errors (400): `invalid_reset_code`, `reset_code_expired`, `reset_code_used`, `re
 ### 5.3 Audience numbers ("stats")
 
 - `GET /creators/me/stats/` returns one entry per platform:
-  `{ platform, handle_url, followers, engagement_rate, is_verified, is_outdated, last_synced_at }`.
+  `{ platform, handle_url, followers, engagement_rate, is_verified, review_status, review_note, is_outdated, last_synced_at }`.
 - `PUT /creators/me/stats/{platform}/` with `{ "followers": 12000, "engagement_rate": "4.20", "handle_url": "https://..." }`
   saves numbers typed by hand. These are labelled **Unverified** (`is_verified: false`). `{platform}` must be
   one of the four platforms (otherwise 404).
@@ -318,7 +326,7 @@ Each card: `{ id, title, brand: {id, name, logo_url}, niche, budget, platform, d
 `eligible` is a **hint only**: `true` when the creator has numbers for that platform and enough followers.
 Show "You may not match" when `false`, but **never block** the Apply button because of it.
 
-`GET /campaigns/{id}/` adds `description`, `deliverables`, `min_followers`, `status`, `accepted_count`,
+`GET /campaigns/{id}/` adds `description`, `deliverables`, `min_followers`, `allow_withdrawal`, `status`, `accepted_count`,
 `all_creators_selected`, `can_apply` and `apply_blocked_reason`.
 
 - Draw the Apply button from **`can_apply`**. When it is `false`, `apply_blocked_reason` says why:
@@ -336,12 +344,14 @@ Show "You may not match" when `false`, but **never block** the Apply button beca
 `POST /campaigns/{id}/proposals/`
 
 ```json
-{ "cover_message": "Hi! ...", "proposed_rate": "150.00",
+{ "cover_message": "Hi! ...",
   "portfolio_links": ["https://..."], "experience_note": "Optional" }
 ```
 
-- `cover_message` up to 3000 characters, `proposed_rate` required, up to 3 `portfolio_links`,
-  `experience_note` up to 2000.
+- `cover_message` up to 3000 characters, up to 3 `portfolio_links`, `experience_note` up to 2000.
+- **There is no rate to send and no negotiation.** The proposal's `proposed_rate` is the campaign's `budget` (per creator),
+  set by the brand and returned read-only. Sending `proposed_rate` is refused with **400** (`proposed_rate` in `details`).
+  In the UI show the rate as a fixed amount, not an input.
 - **201** returns the proposal. A proposal **cannot be edited** afterwards (only withdrawn).
 - Errors (409): `campaign_closed`, `proposal_exists` (double click or already applied), `proposal_rejected`.
 - Two clicks at once still create exactly one proposal. Disable the button while sending anyway.
@@ -353,7 +363,9 @@ Show "You may not match" when `false`, but **never block** the Apply button beca
   A re-application is a separate entry. Withdrawn ones stay as history.
 - `POST /creators/me/proposals/{id}/withdraw/` with `{ "reason": "..." }` (up to 300 characters).
   The **reason is required when the proposal is accepted** (otherwise 400 `validation_error` on `reason`).
-  Errors: `already_completed` (409, completed work cannot be withdrawn), `invalid_transition` (409).
+  Errors: `withdrawal_not_allowed` (403, the brand turned withdrawing off for this campaign; each row of
+  `GET /creators/me/proposals/` carries `campaign.allow_withdrawal`, so hide the button), `already_completed` (409,
+  completed work cannot be withdrawn), `invalid_transition` (409).
   The brand is told a slot has opened.
 
 ### 5.8 Delivering the work (after being accepted)
@@ -396,9 +408,11 @@ the same `brand.id` you get inside campaign cards.
   ```json
   { "title": "...", "description": "...", "niche": "fitness", "platform": "instagram",
     "budget": "500.00", "deadline": "2026-11-30T18:00:00Z", "deliverables": "2 posts and 3 stories",
-    "creators_needed": 2, "min_followers": 5000 }
+    "creators_needed": 2, "min_followers": 5000, "allow_withdrawal": true }
   ```
-  `creators_needed` is 1 to 20 (default 1). `min_followers` is optional (`null` for none). `budget` is more
+  `creators_needed` is 1 to 20 (default 1). `min_followers` is optional (`null` for none). `allow_withdrawal` (default
+  `true`) is the brand's choice: `false` means creators cannot withdraw after applying. It can only be set while the
+  campaign is a draft, so it is fixed once published. Show it to creators before they apply. `budget` is more
   than 0. The deadline must be in the future (400).
 - `GET /brand/campaigns/{id}/`, `PATCH` and `DELETE` work **only while it is a draft**; otherwise
   **409 `campaign_not_editable`** (the check comes before field validation).
@@ -478,10 +492,9 @@ Accept and Reject cannot be undone, so confirm them in the UI. Clicking Accept t
   { "views": 120,
     "funnel": { "received": 14, "shortlisted": 4, "accepted": 2, "rejected": 3, "withdrawn": 1 },
     "accepted_vs_needed": { "accepted": 2, "needed": 3 },
-    "avg_proposed_rate": "140.00", "budget_per_creator": "166.67", "acceptance_rate": 0.1429 }
+    "budget_per_creator": "166.67", "acceptance_rate": 0.1429 }
   ```
-  `avg_proposed_rate` and `acceptance_rate` are `null` when there is nothing to average.
-  `acceptance_rate` is a ratio from 0 to 1.
+  `acceptance_rate` is `null` when there are no proposals, otherwise a ratio from 0 to 1.
 - `GET /brand/campaigns/{id}/analytics/content/` returns one row per delivered post:
   `{ deliverable_id, proposal_id, creator, platform, post_url, views, likes, comments, engagement_rate, synced_at }`.
   Any figure can be the text **`"not_available"`** instead of a number (not synced yet, not a YouTube link, or
@@ -597,8 +610,14 @@ and cannot register.
 | Close a campaign | `POST /admin/campaigns/{id}/close/` with `{ "reason": "..." }` |
 | Remove a review | `DELETE /admin/reviews/{id}/` **with a JSON body** `{ "reason": "..." }` |
 | Audit trail | `GET /admin/actions/` (newest first) |
+| Typed brand links | `GET /admin/brand-platforms/?status=pending|approved|rejected` (default `pending`, oldest first). Each row: `id`, `brand {id, username, full_name}`, `platform`, `handle_url`, `review_status`, `review_note`, `connected_at`. Never lists YouTube. |
+| Approve / reject a brand link | `POST /admin/brand-platforms/{id}/approve/` with `{}` (a `reason` is optional) and `POST /admin/brand-platforms/{id}/reject/` with `{ "reason": "..." }`. Approving sets `is_verified: true` (the brand can publish and accept). Rejecting hides it and also takes back an earlier approval. YouTube rows return 404. |
+| Typed platform stats | `GET /admin/platform-stats/?status=pending|approved|rejected` (default `pending`, oldest first). Each row: `id`, `creator {id, username, full_name}`, `platform`, `handle_url`, `followers`, `engagement_rate`, `review_status`, `review_note`, `updated_at`. Never lists YouTube. |
+| Approve typed stats | `POST /admin/platform-stats/{id}/approve/` with `{}` (a `reason` is optional). Sets `is_verified: true`, `review_status: "approved"`. |
+| Reject typed stats | `POST /admin/platform-stats/{id}/reject/` with `{ "reason": "..." }`. Sets `is_verified: false`, `review_status: "rejected"`, `review_note` = the reason. Also takes back an earlier approval. |
 
-- `reason` is **required** on every action (up to 500 characters).
+- `reason` is **required** on every action (up to 500 characters), except approving typed stats.
+- Approve and reject on a YouTube row return 404 (YouTube is proven by Google, not by an admin).
 - Make sure your HTTP client sends the body on `DELETE`. Some wrappers drop it, and the call then fails with
   `validation_error`.
 - Errors (409): `cannot_modify_self` (admins cannot suspend or delete themselves), `already_suspended`,
@@ -650,6 +669,7 @@ links live in one dictionary in `apps/notifications/emails.py`).
 | `invalid_transition` | 409 | proposal buttons, withdraw | not allowed from this status |
 | `campaign_full` | 409 | accept | all slots taken |
 | `already_completed` | 409 | withdraw | completed work is final |
+| `withdrawal_not_allowed` | 403 | withdraw | the brand does not let creators withdraw from this campaign |
 | `deliverables_locked`, `deliverables_full` | 409 | deliverables | not accepted yet or already completed / 20 max |
 | `not_completed`, `already_reviewed` | 409 | review | complete first / one review only |
 | `portfolio_full` | 409 | portfolio | 10 max |
@@ -767,7 +787,9 @@ Notes:
 ### 12.4 Where to keep the token
 
 The API returns a bearer token in JSON (there is no cookie option). The simplest choice is
-`localStorage`, as above. It survives page reloads, and the token expires by itself after 24 hours. Because
+`localStorage`, as above. It survives page reloads, and the token expires by itself after 24 hours.
+(An admin token does not expire unless `ADMIN_TOKEN_MINUTES` is set; the admin's Log out button calls `POST /auth/logout/`
+so the token stops working on the server, and a password change does the same.) Because
 any script on the page can read it, **never render user text as HTML**: React escapes text by default, so
 avoid `dangerouslySetInnerHTML`, and never put the token in a URL. Keeping it only in memory is safer but logs
 the person out on every refresh.
@@ -811,6 +833,11 @@ Suggested route map (routes marked with * are fixed by the backend, see section 
 | `/notifications` | any | notification list |
 | `/admin/login`, `/admin/...` | admin | section 9 |
 | `/privacy`, `/terms` | public | pages Google requires |
+
+In the bundled website, every creator and brand page has the person's username in its address, for example
+`/creator/imran/dashboard` and `/brand/acme/campaigns/12`. The old addresses without a name (`/creator/dashboard`, the
+links in emails, `/settings/connections`) redirect to the same page with the username added, and a different username
+in the address redirects to the person's own page. `withUsername()` in `src/lib/shared.ts` builds these addresses.
 
 ### 12.6 Data fetching with TanStack Query
 
@@ -973,3 +1000,16 @@ When everything is connected, walk through this once. If every step works, the m
 If a field is missing, a rule seems wrong or a response does not match this guide, tell the backend
 developer. The reasons behind the rules are in `docs/DECISIONS.md`. When an endpoint changes, regenerate
 your types from `docs/openapi.yml`.
+
+## Typed platform stats (creator)
+
+`pages/creator/ManualPlatformStats.tsx` shows one form per Instagram, TikTok and Facebook on the creator Accounts page.
+It reads `creator.stats` (from `GET /creators/me/`) and saves with `saveManualStats` / `removeManualStats`
+(`PUT` / `DELETE /creators/me/stats/{platform}/`). For Instagram, TikTok and Facebook `handle_url` is **required** and
+must be a page on that site (400 with `handle_url` otherwise). Every save is `review_status: "pending"`,
+`is_verified: false`; an admin approves or rejects it (see section 9). `GET /creators/me/` returns all of the creator's
+rows with `review_status` and `review_note`, so the Accounts page shows Waiting for admin / Verified / Rejected.
+
+Brands never see unapproved rows: `GET /creators/{id}/` leaves them out of `stats` (and drops `review_status` and
+`review_note`), and the directory, proposals and eligibility use only YouTube rows and approved rows. The creator's own
+profile page lists only those public rows. Edit profile shows all rows with their status and links to Accounts.

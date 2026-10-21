@@ -82,9 +82,15 @@ def authenticate_login(identifier: str, password: str) -> User:
     return user
 
 
+ADMIN_NO_EXPIRY_MINUTES = 10 * 365 * 24 * 60  # "does not expire" is ten years
+
+
 def issue_access_token(user: User) -> str:
     token = AccessToken.for_user(user)
     token["tv"] = user.token_version
+    if user.role == Role.ADMIN:  # an admin stays logged in (no expiry unless ADMIN_TOKEN_MINUTES sets a limit)
+        minutes = settings.ADMIN_TOKEN_MINUTES or ADMIN_NO_EXPIRY_MINUTES
+        token.set_exp(lifetime=timedelta(minutes=minutes))
     return str(token)
 
 
@@ -109,7 +115,7 @@ def request_password_reset(email: str) -> None:
     transaction.on_commit(
         lambda: queue_email(
             user.email,
-            "Your password reset code",
+            "Your CollabNest password reset code",
             "password_reset",
             {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
         )
@@ -122,7 +128,7 @@ def request_email_verification(user: User) -> str:
     transaction.on_commit(
         lambda: queue_email(
             user.email,
-            "Verify your email address",
+            "Your CollabNest verification code",
             "verify_email",
             {"code": code, "expires_minutes": int(CODE_TTL.total_seconds() // 60)},
         )

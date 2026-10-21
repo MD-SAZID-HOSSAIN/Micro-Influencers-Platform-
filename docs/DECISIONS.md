@@ -104,6 +104,18 @@ line of code, and the tests that pin them sit next to the code.
   (any platform, including a hand-typed YouTube entry) do not count, and the channel works for campaigns on
   any platform. Disconnecting YouTube marks the stats Unverified, so it removes the right to apply. A creator's
   email verification does not replace this.
+- **A creator also needs at least `MIN_CREATOR_FOLLOWERS` (default 1,000) YouTube subscribers.** `apply_snapshot`
+  stores `is_verified = subscribers >= MIN_CREATOR_FOLLOWERS` every time the channel is read (when connecting, on the
+  daily sync and on Refresh), so a channel that grows becomes Verified and one that shrinks stops being Verified. A
+  connected channel below the minimum stays connected. `submit_proposal` checks the count again at apply time, so
+  raising the minimum applies at once. A connected channel under the minimum gets 403 `creator_followers_too_low`
+  with both numbers in the message; no YouTube at all still gets `creator_youtube_required`. `/social/youtube/` and the
+  creator dashboard report `followers`, `minimum_followers` and `below_minimum`.
+- **The direct-connect endpoints were removed** (`POST /social/youtube/direct-connect/`,
+  `/social/direct-connect/{platform}/`, `GET /social/challenge/{platform}/`). They marked stats Verified from a handle
+  and a follower count the caller typed, with no proof, which bypassed both the Google sign-in rule and the minimum.
+  Migration `social.0004` takes the Verified flag from anything they (or a lower minimum) left behind: non-YouTube
+  stats, channels linked by handle, and Verified channels under the minimum. Numbers are never changed.
 - **A brand also needs one connected platform.** `publish_campaign` and `accept_proposal` check the email first
   (`brand_email_unverified`), then that the brand has at least one `BrandSocialAccount` (`brand_platform_required`).
   Any of YouTube, Instagram, TikTok or Facebook counts. YouTube is connected with Google sign-in (the brand's channel
@@ -151,3 +163,40 @@ line of code, and the tests that pin them sit next to the code.
 - **The independent whole-branch code review was not run.** The final pass was a self-review by the
   author (static checks, migration drift, a hunt for defects the tests cannot see). It found and fixed one
   defect: email retries did not actually back off. A fresh reviewer is still recommended before launch.
+
+- **Typed Instagram/TikTok/Facebook stats need an admin** — a creator types followers, engagement and a profile link
+  (on that site). The row is `review_status = pending`, `is_verified = false` and hidden from everything brands see
+  (profile detail, directory cards, proposals, campaign eligibility) until an admin approves it, which sets
+  `is_verified = true`. Rejecting stores a reason the creator sees; editing the numbers sends the row back to pending.
+  YouTube is unchanged (Google proves it). An approved typed platform still does NOT make a creator Verified or let
+  them apply: that stays YouTube-only. No notification is sent on approve or reject for now; the Accounts page shows
+  the status. Existing typed rows became `pending` in migration 0005; the demo seeder treats its own typed rows as
+  already approved — cost if wrong: one filter in `social.queries` and one in the profile serializer.
+
+- **Verification now needs an admin for typed links, and the email for creators** — a creator needs a confirmed email
+  AND a Google-proven YouTube channel with at least `MIN_CREATOR_FOLLOWERS` subscribers (`creator_email_unverified` is
+  checked before `creator_youtube_required`). A brand needs a confirmed email AND one verified platform:
+  `BrandSocialAccount.is_verified` is true for YouTube proven by Google, or for an Instagram, TikTok or Facebook link
+  an admin approved (`review_status` pending, approved, rejected, plus `review_note`). Saving a typed link, or a new one,
+  sets it back to pending. A pending or rejected link does not count, so `brand_has_platform` now means "has a verified
+  platform". `/auth/me/` keeps `platform_connected` (true only when verified) and adds `platform_status`. YouTube accounts
+  are not reviewed (the admin endpoints return 404 for them). Existing typed links became pending in migration
+  `social.0006`; the demo seeder treats its demo Instagram links as approved. Assumption (the rules list names only the typed links): a YouTube channel a
+  brand connects with Google still counts without an admin, because Google proves it is theirs — cost if wrong: also
+  require `review_status = approved` for YouTube in `brand_has_platform`.
+
+- **No negotiation: the rate is fixed by the brand.** A creator no longer sends a rate when applying. The proposal's
+  `proposed_rate` is copied from the campaign's `budget` (per creator) at the moment of applying, and sending
+  `proposed_rate` is refused with 400 so nobody thinks it was used. The column and the read-only response field keep
+  their name, so existing proposals and the pages that show them keep working (older proposals keep the rate that was
+  typed). `avg_proposed_rate` was removed from the campaign analytics because it would always equal the budget; the
+  analytics page shows the total if every spot is filled instead — cost if wrong: re-add the field and the rate input.
+
+- **A brand chooses, per campaign, whether creators may withdraw.** `Campaign.allow_withdrawal` (default true, so every
+  existing campaign behaves as before). When it is false, `withdraw_proposal` answers 403 `withdrawal_not_allowed` for
+  every status (pending, shortlisted and accepted) and changes nothing. The choice is made in the draft and is locked
+  once the campaign is published (only drafts are editable), so a creator always applies under the rule they were
+  shown. Creators see it on the campaign (`allow_withdrawal`) and on each of their proposals
+  (`campaign.allow_withdrawal`). The brand can still reject a proposal; only the creator's own withdrawal is blocked —
+  cost if wrong: one check in `proposals.services.withdraw_proposal`.
+

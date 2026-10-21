@@ -2,7 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
-from apps.accounts.models import Role
+from apps.accounts.models import Role, User
 from apps.accounts.services import issue_access_token
 from apps.accounts.tests.factories import DEFAULT_PASSWORD, UserFactory
 
@@ -96,7 +96,9 @@ def test_token_lifetime_is_24_hours():
 
 @pytest.mark.django_db
 def test_token_carries_token_version_claim():
-    user = UserFactory(token_version=3)
+    user = UserFactory()
+    User.objects.filter(pk=user.pk).update(token_version=3)
+    user.refresh_from_db()
 
     assert AccessToken(issue_access_token(user))["tv"] == 3
 
@@ -146,6 +148,7 @@ def test_token_of_deactivated_user_rejected(client):
 @pytest.mark.django_db
 def test_logout_invalidates_token(client):
     user = UserFactory()
+    version_before = user.token_version
     token = issue_access_token(user)
     bearer(client, token)
     assert client.get(ME).status_code == 200
@@ -154,7 +157,7 @@ def test_logout_invalidates_token(client):
 
     assert client.get(ME).status_code == 401
     user.refresh_from_db()
-    assert user.token_version == 1
+    assert user.token_version == version_before + 1
 
 
 @pytest.mark.django_db
@@ -179,3 +182,15 @@ def test_login_throttled(client):
         assert login(client, "nobody", "whatever1").status_code == 401
 
     assert login(client, "nobody", "whatever1").status_code == 429
+
+
+@pytest.mark.django_db
+def test_changing_a_password_ends_every_login_made_before(client):
+    user = UserFactory()
+    bearer(client, issue_access_token(user))
+    assert client.get(ME).status_code == 200
+
+    user.set_password("A-brand-new-Passw0rd!")  # what the changepassword command does, then saves
+    user.save()
+
+    assert client.get(ME).status_code == 401

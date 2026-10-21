@@ -11,21 +11,30 @@ from apps.accounts.serializers import LoginResponseSerializer, LoginSerializer, 
 from apps.accounts.services import InvalidCredentials, authenticate_login, issue_access_token
 from apps.core.throttling import FailOpenScopedRateThrottle
 from apps.core.permissions import IsAdminRole
+from apps.social.models import BrandSocialAccount, PlatformStats
 
 from .models import AdminActionLog
 from .serializers import (
     AdminActionLogSerializer,
+    AdminBrandPlatformSerializer,
     AdminCampaignSerializer,
+    AdminPlatformStatsSerializer,
+    AdminStatsFilterSerializer,
     AdminUserFilterSerializer,
     AdminUserSerializer,
+    OptionalReasonSerializer,
     OverviewSerializer,
     ReasonSerializer,
 )
 from .services import (
+    approve_brand_platform,
+    approve_platform_stats,
     close_campaign_as_admin,
     delete_user,
     overview,
     reactivate_user,
+    reject_brand_platform,
+    reject_platform_stats,
     remove_review,
     suspend_user,
 )
@@ -123,6 +132,84 @@ class AdminReviewDetailView(_ReasonedAction):
     def delete(self, request, pk):
         remove_review(admin=request.user, review_id=pk, reason=self.reason(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=["Admin"], parameters=[AdminStatsFilterSerializer])
+class AdminPlatformStatsListView(ListAPIView):
+    """Instagram, TikTok and Facebook numbers that creators typed. Oldest first."""
+
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminPlatformStatsSerializer
+
+    def get_queryset(self):
+        params = AdminStatsFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        return (
+            PlatformStats.objects.exclude(platform="youtube")
+            .filter(review_status=params.validated_data["status"])
+            .select_related("creator")
+            .order_by("updated_at", "id")
+        )
+
+
+class AdminApproveStatsView(GenericAPIView):
+    permission_classes = [IsAdminRole]
+    serializer_class = OptionalReasonSerializer
+
+    @extend_schema(tags=["Admin"], responses={200: AdminPlatformStatsSerializer})
+    def post(self, request, pk):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        stats = approve_platform_stats(
+            admin=request.user, stats_id=pk, reason=serializer.validated_data.get("reason", "")
+        )
+        return Response(AdminPlatformStatsSerializer(stats).data)
+
+
+class AdminRejectStatsView(_ReasonedAction):
+    @extend_schema(tags=["Admin"], responses={200: AdminPlatformStatsSerializer})
+    def post(self, request, pk):
+        stats = reject_platform_stats(admin=request.user, stats_id=pk, reason=self.reason(request))
+        return Response(AdminPlatformStatsSerializer(stats).data)
+
+
+@extend_schema(tags=["Admin"], parameters=[AdminStatsFilterSerializer])
+class AdminBrandPlatformListView(ListAPIView):
+    """Instagram, TikTok and Facebook links that brands typed. Oldest first."""
+
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminBrandPlatformSerializer
+
+    def get_queryset(self):
+        params = AdminStatsFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        return (
+            BrandSocialAccount.objects.exclude(platform="youtube")
+            .filter(review_status=params.validated_data["status"])
+            .select_related("brand")
+            .order_by("connected_at", "id")
+        )
+
+
+class AdminApproveBrandPlatformView(GenericAPIView):
+    permission_classes = [IsAdminRole]
+    serializer_class = OptionalReasonSerializer
+
+    @extend_schema(tags=["Admin"], responses={200: AdminBrandPlatformSerializer})
+    def post(self, request, pk):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        account = approve_brand_platform(
+            admin=request.user, account_id=pk, reason=serializer.validated_data.get("reason", "")
+        )
+        return Response(AdminBrandPlatformSerializer(account).data)
+
+
+class AdminRejectBrandPlatformView(_ReasonedAction):
+    @extend_schema(tags=["Admin"], responses={200: AdminBrandPlatformSerializer})
+    def post(self, request, pk):
+        account = reject_brand_platform(admin=request.user, account_id=pk, reason=self.reason(request))
+        return Response(AdminBrandPlatformSerializer(account).data)
 
 
 @extend_schema(tags=["Admin"])

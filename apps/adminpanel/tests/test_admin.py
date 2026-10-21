@@ -426,3 +426,20 @@ def test_ordinary_accounts_are_forbidden_everywhere_in_the_panel(db, auth_client
     assert client.post(user_url(target.pk, "suspend/"), {"reason": REASON}, format="json").status_code == 403
     assert delete_with_reason(client, user_url(target.pk)).status_code == 403
     assert User.objects.get(pk=target.pk).is_active
+
+
+def test_an_admin_login_does_not_expire_but_an_ordinary_login_lasts_a_day(admin, settings):
+    from rest_framework_simplejwt.tokens import AccessToken
+
+    from apps.accounts.services import issue_access_token
+
+    def lifetime(user):
+        token = AccessToken(issue_access_token(user))
+        return token["exp"] - token["iat"]
+
+    assert settings.ADMIN_TOKEN_MINUTES == 0
+    assert lifetime(admin) == 10 * 365 * 24 * 3600  # ten years: no expiry in practice
+    settings.ADMIN_TOKEN_MINUTES = 30  # a limit can still be set
+    assert lifetime(admin) == 30 * 60
+    assert lifetime(UserFactory(role=Role.CREATOR)) == 24 * 3600
+    assert lifetime(UserFactory(role=Role.BRAND)) == 24 * 3600

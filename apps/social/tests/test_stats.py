@@ -21,8 +21,16 @@ def creator(db):
     return UserFactory(role=Role.CREATOR)
 
 
+LINKS = {
+    "instagram": "https://instagram.com/amina",
+    "tiktok": "https://www.tiktok.com/@amina",
+    "facebook": "https://facebook.com/amina",
+    "youtube": "https://youtube.com/@amina",
+}
+
+
 def put(client, platform, **overrides):
-    data = {"followers": 12000, "engagement_rate": "4.25", "handle_url": "https://instagram.com/amina"}
+    data = {"followers": 12000, "engagement_rate": "4.25", "handle_url": LINKS.get(platform)}
     data.update(overrides)
     return client.put(url(platform), data, format="json")
 
