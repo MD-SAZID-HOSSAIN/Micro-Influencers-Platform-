@@ -187,22 +187,6 @@ export default function CampaignList() {
                         Close
                       </Button>
                     )}
-                    {c.status === 'closed' && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await setCampaignStatus(c.id, 'published');
-                            push('Campaign reopened', 'info');
-                          } catch (err) {
-                            push(isApiError(err) ? err.message : 'Failed to reopen.', 'error');
-                          }
-                        }}
-                      >
-                        Reopen
-                      </Button>
-                    )}
                     <Button variant="secondary" size="sm" onClick={() => navigate(`/brand/campaigns/${c.id}/proposals`)}>
                       Review <ArrowRight className="w-3.5 h-3.5" />
                     </Button>

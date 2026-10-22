@@ -1,8 +1,10 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.accounts.models import Role, User
 from apps.campaigns.models import Campaign
 from apps.core.fields import SafeCharField
+from apps.reviews.models import Review
 from apps.social.models import BrandSocialAccount, PlatformStats
 
 from .models import AdminActionLog
@@ -96,6 +98,82 @@ class AdminCampaignSerializer(serializers.ModelSerializer):
         model = Campaign
         fields = ["id", "title", "status", "closed_at"]
         read_only_fields = fields
+
+
+class AdminPersonSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    full_name = serializers.CharField()
+
+
+class AdminCampaignFilterSerializer(serializers.Serializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    status = serializers.ChoiceField(choices=Campaign.Status.choices, required=False)
+
+
+class AdminCampaignRowSerializer(serializers.ModelSerializer):
+    """One campaign in the moderation list. Expects a ``proposal_count`` annotation."""
+
+    brand = serializers.SerializerMethodField()
+    proposal_count = serializers.IntegerField(read_only=True, help_text="Every proposal received, withdrawn ones included.")
+
+    class Meta:
+        model = Campaign
+        fields = [
+            "id",
+            "title",
+            "status",
+            "brand",
+            "deadline",
+            "creators_needed",
+            "proposal_count",
+            "created_at",
+            "closed_at",
+        ]
+        read_only_fields = fields
+
+    @extend_schema_field(AdminPersonSerializer)
+    def get_brand(self, campaign) -> dict:
+        user = campaign.brand
+        return {"id": user.id, "username": user.username, "full_name": user.full_name}
+
+
+class AdminReviewFilterSerializer(serializers.Serializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    rating = serializers.IntegerField(required=False, min_value=1, max_value=5)
+
+
+class AdminReviewCampaignSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+
+
+class AdminReviewRowSerializer(serializers.ModelSerializer):
+    """One review in the moderation list: what was written, by which brand, about which creator."""
+
+    brand = serializers.SerializerMethodField()
+    creator = serializers.SerializerMethodField()
+    campaign = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Review
+        fields = ["id", "rating", "text", "brand", "creator", "campaign", "created_at"]
+        read_only_fields = fields
+
+    @extend_schema_field(AdminPersonSerializer)
+    def get_brand(self, review) -> dict:
+        user = review.brand
+        return {"id": user.id, "username": user.username, "full_name": user.full_name}
+
+    @extend_schema_field(AdminPersonSerializer)
+    def get_creator(self, review) -> dict:
+        user = review.creator
+        return {"id": user.id, "username": user.username, "full_name": user.full_name}
+
+    @extend_schema_field(AdminReviewCampaignSerializer)
+    def get_campaign(self, review) -> dict:
+        campaign = review.proposal.campaign
+        return {"id": campaign.id, "title": campaign.title}
 
 
 class ActionAdminSerializer(serializers.Serializer):

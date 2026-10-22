@@ -2,7 +2,11 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Megaphone, Users, Eye, Inbox, TrendingUp, Wallet, CheckCircle2, Clock, X, Check, Minus } from 'lucide-react';
 import { useStore, loadBrandCampaigns } from '../../state/Store';
 import { useAsyncLoader } from '../../state/useEffectAsync';
-import { fetchCampaignAnalytics, type CampaignMetrics } from '../../api/endpoints';
+import {
+  fetchCampaignAnalytics, fetchContentPerformance, type CampaignMetrics, type ContentPerformanceRow, type Metric,
+} from '../../api/endpoints';
+import { fmtRelativeTime } from '../../lib/shared';
+import { ExternalLink } from 'lucide-react';
 import { PageHeader, SectionHeader, StatRow, ChannelArt, CampaignStatusBadge } from '../../components/ui';
 import { currency } from '../../lib/shared';
 import { useEffect } from 'react';
@@ -40,6 +44,8 @@ export default function CampaignAnalytics() {
     () => fetchCampaignAnalytics(id!),
     [id],
   );
+  // The posts table loads on its own, so a slow or failed one never hides the numbers above it.
+  const content = useAsyncLoader<ContentPerformanceRow[]>(() => fetchContentPerformance(id!), [id]);
 
   if (loading || (!m && !error)) {
     return <div className="container-page py-8"><div className="card p-8 text-center text-sm text-ink-500">Loading analytics…</div></div>;
@@ -65,7 +71,7 @@ export default function CampaignAnalytics() {
       </Link>
 
       <PageHeader
-        eyebrow="FR-23"
+        eyebrow="Analytics"
         title={campaign?.title ?? 'Campaign analytics'}
         description="How this campaign has performed so far. Updated as new proposals come in."
         action={campaign && <CampaignStatusBadge status={campaign.status} />}
@@ -83,7 +89,8 @@ export default function CampaignAnalytics() {
 
       <StatRow
         items={[
-          { label: 'Views', value: m.views, hint: 'creator opens' },
+          // Every time a creator opens the campaign page counts, so the same creator can add more than one.
+          { label: 'Page views', value: m.views, hint: 'times it was opened' },
           { label: 'Proposals', value: m.funnel.received, hint: 'total received' },
           { label: 'Accepted', value: m.funnel.accepted, hint: `of ${m.acceptedVsNeeded.needed}` },
           { label: 'Acceptance', value: m.acceptanceRate !== null ? `${acceptancePct}%` : '—', hint: 'from sent' },
@@ -128,6 +135,71 @@ export default function CampaignAnalytics() {
           </div>
         </div>
       </section>
+
+      <section className="card p-5 sm:p-6">
+        <SectionHeader
+          eyebrow="Content"
+          title="How the delivered posts are doing"
+          description="Views, likes and comments of each post the accepted creators delivered. YouTube posts are refreshed once a day. Other platforms do not share these numbers, so they show “Not available”."
+        />
+        <div className="mt-5">
+          {content.loading ? (
+            <div className="text-sm text-ink-500">Loading posts…</div>
+          ) : content.error ? (
+            <div className="text-sm text-rose-700">{content.error}</div>
+          ) : !content.data || content.data.length === 0 ? (
+            <div className="border border-dashed border-ink-200 rounded-md p-6 text-center text-sm text-ink-500">
+              No posts yet. They appear here once an accepted creator adds a link to their published content.
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-1 px-1">
+              <table className="table-quiet min-w-[640px] w-full">
+                <thead>
+                  <tr>
+                    <th>Post</th>
+                    <th className="text-right">Views</th>
+                    <th className="text-right">Likes</th>
+                    <th className="text-right">Comments</th>
+                    <th className="text-right">Engagement</th>
+                    <th className="text-right">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {content.data.map((r) => (
+                    <tr key={r.deliverableId}>
+                      <td className="max-w-[260px]">
+                        <div className="font-semibold text-ink-900 truncate">{r.creator.name}</div>
+                        <a
+                          href={r.postUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="text-xs link-accent inline-flex items-center gap-1 max-w-full"
+                        >
+                          <span className="truncate">{r.platform} · {r.postUrl.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </td>
+                      <td className="text-right font-mono"><MetricValue value={r.views} /></td>
+                      <td className="text-right font-mono"><MetricValue value={r.likes} /></td>
+                      <td className="text-right font-mono"><MetricValue value={r.comments} /></td>
+                      <td className="text-right font-mono"><MetricValue value={r.engagementRate} suffix="%" /></td>
+                      <td className="text-right text-xs text-ink-500 whitespace-nowrap">
+                        {r.syncedAt ? fmtRelativeTime(r.syncedAt) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
+}
+
+/** A number, or a quiet "Not available" when the platform does not give it. */
+function MetricValue({ value, suffix = '' }: { value: Metric; suffix?: string }) {
+  if (value === 'not_available') return <span className="text-xs text-ink-400 font-sans">Not available</span>;
+  return <>{value.toLocaleString()}{suffix}</>;
 }

@@ -357,6 +357,80 @@ def test_removing_an_unknown_review_is_404(admin, auth_client):
     assert delete_with_reason(auth_client(admin), review_url(999999)).status_code == 404
 
 
+# ---- finding campaigns and reviews to moderate ------------------------------------------------------------------------------
+
+CAMPAIGNS = "/api/v1/admin/campaigns/"
+REVIEWS = "/api/v1/admin/reviews/"
+
+
+@pytest.mark.parametrize("url", [CAMPAIGNS, REVIEWS])
+def test_only_admins_can_list_campaigns_and_reviews(admin, auth_client, url):
+    assert auth_client(admin).get(url).status_code == 200
+    assert auth_client(UserFactory(role=Role.CREATOR)).get(url).status_code == 403
+    assert auth_client(UserFactory(role=Role.BRAND)).get(url).status_code == 403
+    assert APIClient().get(url).status_code == 401
+
+
+def test_the_campaign_list_shows_every_status_with_search_filter_and_proposal_counts(admin, auth_client):
+    acme = UserFactory(role=Role.BRAND, username="acme", full_name="Acme Owner")
+    live = CampaignFactory(brand=acme, title="Summer launch", status=Campaign.Status.PUBLISHED)
+    draft = CampaignFactory(brand=acme, title="Quiet draft", status=Campaign.Status.DRAFT)
+    other = CampaignFactory(title="Winter sale", status=Campaign.Status.CLOSED)
+    ProposalFactory(campaign=live, status=Proposal.Status.PENDING)
+    ProposalFactory(campaign=live, status=Proposal.Status.WITHDRAWN)
+    client = auth_client(admin)
+
+    def ids(**params):
+        return {c["id"] for c in client.get(CAMPAIGNS, params).json()["results"]}
+
+    assert ids() == {live.id, draft.id, other.id}  # drafts are listed too
+    assert ids(q="summer") == {live.id}
+    assert ids(q="ACME") == {live.id, draft.id}  # the brand's username
+    assert ids(status="closed") == {other.id}
+    row = next(c for c in client.get(CAMPAIGNS, {"q": "summer"}).json()["results"] if c["id"] == live.id)
+    assert row["proposal_count"] == 2  # withdrawn ones are counted too
+    assert row["brand"] == {"id": acme.id, "username": "acme", "full_name": "Acme Owner"}
+    assert row["status"] == "published" and "deadline" in row and "creators_needed" in row
+
+
+def test_the_campaign_list_rejects_an_unknown_status(admin, auth_client):
+    assert auth_client(admin).get(CAMPAIGNS, {"status": "frozen"}).status_code == 400
+
+
+def test_the_review_list_shows_who_wrote_what_about_whom_and_can_be_searched(admin, auth_client):
+    creator = UserFactory(role=Role.CREATOR, username="amina", full_name="Amina Rahman")
+    kind = ProposalFactory(creator=creator, status=Proposal.Status.ACCEPTED, completed_at=timezone.now())
+    rude = ProposalFactory(creator=creator, status=Proposal.Status.ACCEPTED, completed_at=timezone.now())
+    good = Review.objects.create(proposal=kind, brand=kind.campaign.brand, creator=creator, rating=5, text="Lovely work")
+    bad = Review.objects.create(proposal=rude, brand=rude.campaign.brand, creator=creator, rating=1, text="Terrible")
+    client = auth_client(admin)
+
+    def ids(**params):
+        return {r["id"] for r in client.get(REVIEWS, params).json()["results"]}
+
+    assert ids() == {good.id, bad.id}
+    assert ids(q="terrible") == {bad.id}  # the written text
+    assert ids(q="amina") == {good.id, bad.id}  # the creator
+    assert ids(q=rude.campaign.title) == {bad.id}  # the campaign
+    assert ids(rating=5) == {good.id}
+    row = next(r for r in client.get(REVIEWS, {"q": "terrible"}).json()["results"] if r["id"] == bad.id)
+    assert row["rating"] == 1 and row["text"] == "Terrible"
+    assert row["creator"]["username"] == "amina"
+    assert row["brand"]["username"] == rude.campaign.brand.username
+    assert row["campaign"] == {"id": rude.campaign.id, "title": rude.campaign.title}
+
+
+def test_the_review_list_is_newest_first_and_rejects_a_bad_rating_filter(admin, auth_client):
+    first = ProposalFactory(status=Proposal.Status.ACCEPTED, completed_at=timezone.now())
+    second = ProposalFactory(status=Proposal.Status.ACCEPTED, completed_at=timezone.now())
+    older = Review.objects.create(proposal=first, brand=first.campaign.brand, creator=first.creator, rating=3)
+    newer = Review.objects.create(proposal=second, brand=second.campaign.brand, creator=second.creator, rating=4)
+    client = auth_client(admin)
+
+    assert [r["id"] for r in client.get(REVIEWS).json()["results"]] == [newer.id, older.id]
+    assert client.get(REVIEWS, {"rating": 9}).status_code == 400
+
+
 # ---- the action log ---------------------------------------------------------------------------------------------------------
 
 

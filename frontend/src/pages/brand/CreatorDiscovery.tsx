@@ -1,15 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { searchCreators } from '../../state/Store';
 import type { CreatorProfile } from '../../types';
 import {
   EmptyState, Input, Select, Button, PageHeader, ProfileTile, PlatformIcon,
-  VerifiedBadge, Label,
+  VerifiedBadge, Label, Rating,
 } from '../../components/ui';
-import { NICHES, PLATFORMS, fmtNumber, currency } from '../../lib/shared';
-import { Search, X, SlidersHorizontal, MapPin, ArrowUpRight, Users } from 'lucide-react';
+import { NICHES, PLATFORMS, fmtNumber } from '../../lib/shared';
+import { Search, X, SlidersHorizontal, ArrowUpRight, ArrowLeft, ArrowRight, Users } from 'lucide-react';
 
-type Sort = 'relevance' | 'followers' | 'engagement' | 'rateLow' | 'rateHigh';
+/** The words the sort box shows, and what the server is asked for ("-" in front means high to low). */
+const SORTS = [
+  { value: 'followers', label: 'Followers (high to low)', ordering: '-followers' },
+  { value: 'engagement', label: 'Engagement (high to low)', ordering: '-engagement' },
+  { value: 'rating', label: 'Rating (high to low)', ordering: '-rating' },
+  { value: 'rateLow', label: 'Rate (low to high)', ordering: 'rate' },
+  { value: 'rateHigh', label: 'Rate (high to low)', ordering: '-rate' },
+] as const;
+type Sort = (typeof SORTS)[number]['value'];
+
+const MIN_RATINGS = [
+  { value: '', label: 'Any rating' },
+  { value: '3', label: '3 stars and up' },
+  { value: '3.5', label: '3.5 stars and up' },
+  { value: '4', label: '4 stars and up' },
+  { value: '4.5', label: '4.5 stars and up' },
+];
+
+const PAGE_SIZE = 12;
 
 export default function CreatorDiscovery() {
   const [keyword, setKeyword] = useState('');
@@ -19,73 +37,95 @@ export default function CreatorDiscovery() {
   const [minFollowers, setMinFollowers] = useState('');
   const [maxFollowers, setMaxFollowers] = useState('');
   const [minEngagement, setMinEngagement] = useState('');
+  const [maxEngagement, setMaxEngagement] = useState('');
   const [minRate, setMinRate] = useState('');
   const [maxRate, setMaxRate] = useState('');
+  const [minRating, setMinRating] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [sort, setSort] = useState<Sort>('relevance');
+  const [sort, setSort] = useState<Sort>('followers');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [page, setPage] = useState(1);
 
   const [results, setResults] = useState<CreatorProfile[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Any change to the search (not to the page) starts again from page 1.
+  const searchKey = JSON.stringify([
+    keyword, niche, platform, location, minFollowers, maxFollowers, minEngagement, maxEngagement,
+    minRate, maxRate, minRating, verifiedOnly, sort,
+  ]);
+  const lastSearchKey = useRef(searchKey);
+
   useEffect(() => {
+    if (lastSearchKey.current !== searchKey) {
+      lastSearchKey.current = searchKey;
+      if (page !== 1) {
+        setPage(1); // this run is dropped; the page change runs the search once
+        return;
+      }
+    }
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    const ordering =
-      sort === 'followers' ? 'followers' :
-      sort === 'engagement' ? 'engagement' :
-      sort === 'rateLow' ? 'rate' :
-      sort === 'rateHigh' ? '-rate' : '';
-    searchCreators({
-      q: keyword || undefined,
-      niche: niche || undefined,
-      platform: platform || undefined,
-      location: location || undefined,
-      minFollowers: minFollowers ? Number(minFollowers) : undefined,
-      maxFollowers: maxFollowers ? Number(maxFollowers) : undefined,
-      minEngagement: minEngagement ? Number(minEngagement) : undefined,
-      minRate: minRate ? Number(minRate) : undefined,
-      maxRate: maxRate ? Number(maxRate) : undefined,
-      verifiedOnly,
-      // Ordering is handled server-side when set.
-      ...(ordering ? { ordering } : {}),
-    })
-      .then((list) => {
-        if (cancelled) return;
-        setResults(list);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err?.message ?? 'Could not load creators.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    // A short wait while someone is typing, so each keystroke does not become a request.
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      searchCreators(
+        {
+          q: keyword || undefined,
+          niche: niche || undefined,
+          platform: platform || undefined,
+          location: location || undefined,
+          minFollowers: minFollowers ? Number(minFollowers) : undefined,
+          maxFollowers: maxFollowers ? Number(maxFollowers) : undefined,
+          minEngagement: minEngagement ? Number(minEngagement) : undefined,
+          maxEngagement: maxEngagement ? Number(maxEngagement) : undefined,
+          minRate: minRate ? Number(minRate) : undefined,
+          maxRate: maxRate ? Number(maxRate) : undefined,
+          minRating: minRating ? Number(minRating) : undefined,
+          verifiedOnly,
+          ordering: SORTS.find((s) => s.value === sort)?.ordering,
+        },
+        page,
+        PAGE_SIZE,
+      )
+        .then((res) => {
+          if (cancelled) return;
+          setResults(res.items);
+          setTotal(res.total);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setError(err?.message ?? 'Could not load creators.');
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 300);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [keyword, niche, platform, location, minFollowers, maxFollowers, minEngagement, minRate, maxRate, verifiedOnly, sort]);
-
-  const sorted = useMemo(() => {
-    // Server already returns ordered results when the user picked a sort;
-    // this is the client-side fallback for "relevance" (default order = -followers).
-    return [...results];
-  }, [results]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey, page]);
 
   const reset = () => {
     setKeyword(''); setNiche(''); setPlatform(''); setLocation('');
-    setMinFollowers(''); setMaxFollowers(''); setMinEngagement('');
-    setMinRate(''); setMaxRate('');
+    setMinFollowers(''); setMaxFollowers(''); setMinEngagement(''); setMaxEngagement('');
+    setMinRate(''); setMaxRate(''); setMinRating('');
     setVerifiedOnly(false);
   };
 
   const hasFilters = !!(
     keyword || niche || platform || location ||
-    minFollowers || maxFollowers || minEngagement ||
-    minRate || maxRate || verifiedOnly
+    minFollowers || maxFollowers || minEngagement || maxEngagement ||
+    minRate || maxRate || minRating || verifiedOnly
   );
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const firstShown = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastShown = Math.min(total, page * PAGE_SIZE);
 
   return (
     <div className="container-page py-6 sm:py-8 space-y-6">
@@ -95,7 +135,9 @@ export default function CreatorDiscovery() {
         description={
           loading
             ? 'Searching…'
-            : `${sorted.length} creator${sorted.length === 1 ? '' : 's'}${hasFilters ? ' match your filters' : ' in the marketplace'}.`
+            : `${total} creator${total === 1 ? '' : 's'}${
+                hasFilters ? (total === 1 ? ' matches your filters' : ' match your filters') : ' in the marketplace'
+              }.`
         }
       />
 
@@ -105,7 +147,7 @@ export default function CreatorDiscovery() {
             <Search className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
             <Input
               className="pl-10 h-11 w-full"
-              placeholder="Search by name, niche, location or bio"
+              placeholder="Search by name or username"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
@@ -156,13 +198,16 @@ export default function CreatorDiscovery() {
               </Field>
             </div>
             <Field label="Min followers">
-              <Input type="number" placeholder="10,000" value={minFollowers} onChange={(e) => setMinFollowers(e.target.value)} />
+              <Input type="number" min={0} placeholder="10,000" value={minFollowers} onChange={(e) => setMinFollowers(e.target.value)} />
             </Field>
             <Field label="Max followers">
-              <Input type="number" placeholder="100,000" value={maxFollowers} onChange={(e) => setMaxFollowers(e.target.value)} />
+              <Input type="number" min={0} placeholder="100,000" value={maxFollowers} onChange={(e) => setMaxFollowers(e.target.value)} />
             </Field>
             <Field label="Min engagement (%)">
-              <Input type="number" step="0.1" placeholder="3" value={minEngagement} onChange={(e) => setMinEngagement(e.target.value)} />
+              <Input type="number" min={0} max={100} step="0.1" placeholder="3" value={minEngagement} onChange={(e) => setMinEngagement(e.target.value)} />
+            </Field>
+            <Field label="Max engagement (%)">
+              <Input type="number" min={0} max={100} step="0.1" placeholder="10" value={maxEngagement} onChange={(e) => setMaxEngagement(e.target.value)} />
             </Field>
             <Field label="Location">
               <Input placeholder="City or country" value={location} onChange={(e) => setLocation(e.target.value)} />
@@ -179,6 +224,11 @@ export default function CreatorDiscovery() {
                 <Input type="number" min={0} className="pl-6" placeholder="2000" value={maxRate} onChange={(e) => setMaxRate(e.target.value)} />
               </div>
             </Field>
+            <Field label="Rating">
+              <Select value={minRating} onChange={(e) => setMinRating(e.target.value)}>
+                {MIN_RATINGS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </Select>
+            </Field>
             <label className="flex items-center gap-2 sm:col-span-2 lg:col-span-4 text-sm text-ink-700">
               <input
                 type="checkbox"
@@ -193,17 +243,13 @@ export default function CreatorDiscovery() {
 
         <div className="px-4 sm:px-5 py-2.5 border-t border-ink-200 flex flex-wrap items-center justify-between gap-2 sm:gap-3 text-xs text-ink-500">
           <span>
-            <span className="font-mono text-ink-900">{sorted.length}</span> creators
+            <span className="font-mono text-ink-900">{total}</span> creators
             {hasFilters && <span className="text-ink-400"> · filtered</span>}
           </span>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="hidden sm:inline">Sort by</span>
-            <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="h-8 py-0 text-xs w-full sm:w-auto sm:min-w-[140px]">
-              <option value="relevance">Relevance</option>
-              <option value="followers">Followers (high to low)</option>
-              <option value="engagement">Engagement (high to low)</option>
-              <option value="rateLow">Rate (low to high)</option>
-              <option value="rateHigh">Rate (high to high)</option>
+            <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="h-8 py-0 text-xs w-full sm:w-auto sm:min-w-[160px]">
+              {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </Select>
             {hasFilters && (
               <Button variant="ghost" size="xs" onClick={reset}>
@@ -216,7 +262,7 @@ export default function CreatorDiscovery() {
 
       {error ? (
         <div className="card p-8 text-center text-sm text-rose-700">{error}</div>
-      ) : sorted.length === 0 ? (
+      ) : results.length === 0 ? (
         <div className="card">
           <EmptyState
             icon={<Users className="w-5 h-5" />}
@@ -230,42 +276,61 @@ export default function CreatorDiscovery() {
           />
         </div>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger">
-          {sorted.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/brand/creators/${c.id}`}
-                className="card card-hover p-4 sm:p-5 group block h-full"
-              >
-                <div className="flex items-start gap-3">
-                  <ProfileTile name={c.fullName} seed={c.id} imageUrl={c.avatarUrl} height={48} className="w-12 rounded-md shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
-                      {c.fullName}
+        <>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger">
+            {results.map((c) => (
+              <li key={c.id}>
+                <Link
+                  to={`/brand/creators/${c.id}`}
+                  className="card card-hover p-4 sm:p-5 group block h-full"
+                >
+                  <div className="flex items-start gap-3">
+                    <ProfileTile name={c.fullName} seed={c.id} imageUrl={c.avatarUrl} height={48} className="w-12 rounded-md shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
+                        {c.fullName}
+                      </div>
+                      <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {c.primaryPlatform && <PlatformIcon platform={c.primaryPlatform} className="w-3 h-3" />}
+                        <span>{c.niche || 'No niche yet'}</span>
+                      </div>
+                      <div className="mt-1.5">
+                        <Rating value={c.ratingAvg} count={c.ratingCount} />
+                      </div>
                     </div>
-                    <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <PlatformIcon platform={c.primaryPlatform} className="w-3 h-3" />
-                      <span>{c.niche}</span>
-                    </div>
+                    <VerifiedBadge verified={c.verified} />
                   </div>
-                  <VerifiedBadge verified={c.verified} />
-                </div>
-                <p className="text-sm text-ink-500 mt-3 line-clamp-2 leading-relaxed min-h-[2.5em]">
-                  {c.bio || <span className="text-ink-400">No bio yet.</span>}
-                </p>
-                <dl className="mt-4 grid grid-cols-3 gap-px bg-ink-200 border border-ink-200 rounded-md overflow-hidden">
-                  <Stat label="Followers" value={fmtNumber(c.followers)} />
-                  <Stat label="Engagement" value={c.engagementRate + '%'} />
-                  <Stat label="Post rate" value={c.ratePerPost > 0 ? currency(c.ratePerPost) : '—'} />
-                </dl>
-                <div className="mt-3 flex items-center justify-end text-[11px] font-mono uppercase tracking-[0.12em] text-ink-500 group-hover:text-ink-900 transition-colors">
-                  View profile
-                  <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  <dl className="mt-4 grid grid-cols-2 gap-px bg-ink-200 border border-ink-200 rounded-md overflow-hidden">
+                    <Stat label="Followers" value={fmtNumber(c.followers)} />
+                    <Stat label="Engagement" value={c.engagementRate + '%'} />
+                  </dl>
+                  <div className="mt-3 flex items-center justify-end text-[11px] font-mono uppercase tracking-[0.12em] text-ink-500 group-hover:text-ink-900 transition-colors">
+                    View profile
+                    <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {pageCount > 1 && (
+            <nav className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-600" aria-label="Pages">
+              <span>
+                Showing <span className="font-mono text-ink-900">{firstShown}–{lastShown}</span> of{' '}
+                <span className="font-mono text-ink-900">{total}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
+                  <ArrowLeft className="w-3.5 h-3.5" /> Previous
+                </Button>
+                <span className="text-xs text-ink-500 font-mono">Page {page} of {pageCount}</span>
+                <Button variant="secondary" size="sm" disabled={page >= pageCount || loading} onClick={() => setPage((p) => p + 1)}>
+                  Next <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </nav>
+          )}
+        </>
       )}
     </div>
   );

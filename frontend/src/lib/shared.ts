@@ -21,6 +21,22 @@ export const NICHES = ['Beauty', 'Fitness', 'Food', 'Tech', 'Travel', 'Other'] a
 
 export const PLATFORMS = ['YouTube', 'Instagram', 'TikTok', 'Facebook'] as const;
 
+/**
+ * How a YouTube channel link is shown: "https://www.youtube.com/@mychannel" becomes "@mychannel".
+ * A link without a handle (a channel id) is shown without "https://www." so it still reads as an address.
+ */
+export const youtubeHandle = (url?: string | null): string => {
+  if (!url) return '';
+  try {
+    const u = new URL(url);
+    const first = u.pathname.split('/').filter(Boolean)[0] ?? '';
+    if (first.startsWith('@')) return decodeURIComponent(first);
+    return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, '');
+  } catch {
+    return url.replace(/^https?:\/\/(www\.)?/, '');
+  }
+};
+
 export const fmtNumber = (n: number): string => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 10_000 ? 0 : 1) + 'K';

@@ -1,4 +1,5 @@
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Role
@@ -8,6 +9,7 @@ from apps.campaigns.tests.factories import CampaignFactory
 from apps.profiles.models import CreatorProfile
 from apps.proposals.models import Proposal
 from apps.proposals.tests.factories import ProposalFactory
+from apps.reviews.models import Review
 from apps.social.models import PlatformStats
 
 S = Proposal.Status
@@ -47,6 +49,21 @@ def make_creator(*, name="Amina Rahman", niche="fitness", platform="instagram", 
             is_verified=verified,
         )
     return user
+
+
+# ---- the brand's own review ----------------------------------------------------------------------
+
+
+def test_a_proposal_carries_the_brands_review_or_null_so_the_screen_can_offer_one(brand, campaign, auth_client):
+    reviewed = ProposalFactory(campaign=campaign, status=S.ACCEPTED, completed_at=timezone.now())
+    not_reviewed = ProposalFactory(campaign=campaign, status=S.ACCEPTED, completed_at=timezone.now())
+    Review.objects.create(proposal=reviewed, brand=brand, creator=reviewed.creator, rating=4, text="Good work")
+
+    rows = {row["id"]: row for row in fetch(auth_client, brand, campaign).json()["results"]}
+
+    assert rows[reviewed.id]["review"]["rating"] == 4
+    assert rows[reviewed.id]["review"]["text"] == "Good work"
+    assert rows[not_reviewed.id]["review"] is None
 
 
 # ---- ordering, filtering, visibility -------------------------------------------------------------
@@ -169,6 +186,7 @@ def test_item_shows_everything_the_brand_needs_to_decide(brand, campaign, auth_c
         "withdrawal_reason": None,
         "profile_url": f"/api/v1/creators/{creator.id}/",
         "completed_at": None,
+        "review": None,
         "created_at": item["created_at"],
     }
 

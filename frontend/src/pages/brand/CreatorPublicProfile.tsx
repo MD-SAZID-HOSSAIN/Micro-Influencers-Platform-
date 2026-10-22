@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, MapPin, Megaphone, Star } from 'lucide-react';
 import { useAsyncLoader } from '../../state/useEffectAsync';
 import { fetchCreatorDetail, listCreatorReviews, type Review } from '../../api/endpoints';
 import {
-  Button, VerifiedBadge, ChannelArt, ProfileTile, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
+  VerifiedBadge, ChannelArt, ProfileTile, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
 import { fmtNumber, currency, fmtDate, fmtRelativeTime } from '../../lib/shared';
 import { useEffect, useState } from 'react';
@@ -67,17 +67,14 @@ export default function CreatorPublicProfile() {
               <VerifiedBadge verified={creator.verified} />
             </div>
             <div className="text-sm text-ink-500 mt-2 flex items-center gap-1.5 flex-wrap">
-              <PlatformIcon platform={creator.primaryPlatform} />
-              <span>{creator.niche}</span>
+              {creator.primaryPlatform && <PlatformIcon platform={creator.primaryPlatform} />}
+              <span>{creator.niche || 'No niche yet'}</span>
               <span className="text-ink-300">·</span>
               <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {creator.location}</span>
             </div>
             <div className="mt-3">
               <Rating value={creator.ratingAvg ?? null} count={creator.ratingCount ?? 0} size="md" />
             </div>
-          </div>
-          <div className="shrink-0">
-            <Button variant="primary" size="md" className="w-full sm:w-auto">Invite to campaign</Button>
           </div>
         </div>
       </div>
@@ -132,6 +129,32 @@ export default function CreatorPublicProfile() {
         </div>
 
         <aside className="lg:col-span-4 space-y-5">
+          {(creator.stats ?? []).length > 0 && (
+            <div className="card p-5">
+              <div className="eyebrow">Platforms</div>
+              <ul className="mt-3 space-y-3 text-sm">
+                {(creator.stats ?? []).map((st) => (
+                  <li key={st.platform} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-ink-900 inline-flex items-center gap-1.5">
+                        <PlatformIcon platform={st.platform} /> {st.platform}
+                      </div>
+                      <div className="text-xs text-ink-500">
+                        {st.followers.toLocaleString()} followers · {st.engagementRate}% engagement
+                      </div>
+                      <div className="text-[11px] text-ink-400 mt-0.5">
+                        {st.lastSyncedAt ? `Updated ${fmtRelativeTime(st.lastSyncedAt)}` : 'Not updated yet'}
+                        {st.isOutdated && <span className="text-amber-700"> · may be out of date</span>}
+                      </div>
+                    </div>
+                    <span className={st.isVerified ? 'tag tag-green shrink-0' : 'tag tag-amber shrink-0'}>
+                      {st.isVerified ? 'Verified' : 'Unverified'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="card p-5">
             <div className="eyebrow">Rates</div>
             <dl className="mt-3 space-y-2.5 text-sm">

@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, Megaphone, Star, CheckCircle2, ClipboardCheck,
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandCampaigns } from '../../state/Store';
 import { listBrandCampaignProposals, listCampaignDeliverables, completeProposal, createReview, type CampaignDeliverableRow } from '../../api/endpoints';
-import { Button, ProfileTile, ProposalStatusBadge, SectionHeader, PageHeader, StatRow } from '../../components/ui';
+import { Button, ProfileTile, ProposalStatusBadge, SectionHeader, PageHeader, StatRow, Rating } from '../../components/ui';
 import { currency, fmtDate, fmtRelativeTime } from '../../lib/shared';
 import { Modal, ConfirmDialog } from '../../components/Modal';
 import { Textarea } from '../../components/ui';
@@ -88,22 +88,44 @@ export default function BrandProposalDetail() {
     if (!proposal) return;
     try {
       await completeProposal(Number(proposal.id));
-      // Refresh the proposal list so the local "completed" state is accurate.
-      const { results } = await listBrandCampaignProposals(proposal.campaignId);
-      setProposals(results);
-      push('Collaboration marked Completed', 'success');
-      setConfirmComplete(false);
-      setReviewOpen(true); // Open the review modal right after
     } catch (err) {
       push(isApiError(err) ? err.message : 'Could not complete collaboration.', 'error');
+      return;
     }
+    // From here on it is saved on the server. Nothing that goes wrong while refreshing the screen may be
+    // reported as "could not complete": that used to happen and also stopped the review box from opening.
+    setProposals((prev) =>
+      prev.map((p) => (p.id === proposal.id ? { ...p, completedAt: new Date().toISOString() } : p)),
+    );
+    push('Collaboration marked Completed', 'success');
+    setConfirmComplete(false);
+    setReviewOpen(true); // Open the review modal right after
+    try {
+      const { results } = await listBrandCampaignProposals(proposal.campaignId);
+      setProposals((prev) => prev.map((p) => results.find((r) => r.id === p.id) ?? p));
+    } catch {
+      /* the list shows the saved state the next time it loads */
+    }
+  };
+
+  // Opens the review box fresh. Used by the "Leave a review" button, for a brand that skipped it right after completing.
+  const openReview = () => {
+    setRating(5);
+    setReviewText('');
+    setReviewOpen(true);
   };
 
   const onSubmitReview = async () => {
     if (!proposal) return;
     setSaving(true);
     try {
-      await createReview(Number(proposal.id), { rating, text: reviewText });
+      const created = await createReview(Number(proposal.id), { rating, text: reviewText });
+      // Remember it on the screen at once: the card below switches from "Leave a review" to the written review.
+      setProposals((prev) =>
+        prev.map((p) =>
+          p.id === proposal.id ? { ...p, review: { id: created.id, rating: created.rating, text: created.text } } : p,
+        ),
+      );
       push('Review submitted', 'success');
       setReviewOpen(false);
       setRating(5);
@@ -157,6 +179,9 @@ export default function BrandProposalDetail() {
               <div className="text-xs text-ink-500 mt-0.5">
                 Rate {currency(proposal.proposedRate)} · {fmtRelativeTime(proposal.submittedAt)}
               </div>
+              <div className="mt-1">
+                <Rating value={proposal.creatorRatingAvg} count={proposal.creatorRatingCount} />
+              </div>
             </div>
           </div>
           <ProposalStatusBadge status={proposal.status} />
@@ -197,7 +222,7 @@ export default function BrandProposalDetail() {
         <>
           <div className="card p-5 sm:p-6">
             <SectionHeader
-              eyebrow="FR-20"
+              eyebrow="Delivered work"
               title="Deliverables"
               description="Links the creator submitted for this campaign."
             />
@@ -239,6 +264,41 @@ export default function BrandProposalDetail() {
               {proposal.completedAt ? 'Already completed' : 'Mark completed'}
             </Button>
           </div>
+
+          {proposal.completedAt && (
+            <div className="card p-5 sm:p-6">
+              {proposal.review ? (
+                <>
+                  <div className="eyebrow">Your review</div>
+                  <div className="mt-2 flex items-center gap-1" aria-label={`${proposal.review.rating} out of 5 stars`}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Star
+                        key={n}
+                        className={n <= proposal.review!.rating ? 'w-5 h-5 fill-brand-500 text-brand-500' : 'w-5 h-5 text-ink-200'}
+                      />
+                    ))}
+                    <span className="text-sm text-ink-600 ml-2">{proposal.review.rating} of 5</span>
+                  </div>
+                  {proposal.review.text && (
+                    <p className="text-sm text-ink-700 mt-3 leading-relaxed whitespace-pre-line break-words">{proposal.review.text}</p>
+                  )}
+                  <p className="text-xs text-ink-500 mt-3">A review cannot be changed once it is sent.</p>
+                </>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-ink-900">You have not reviewed this creator yet</div>
+                    <div className="text-xs text-ink-500 mt-0.5">
+                      Give a rating from 1 to 5 stars and, if you like, a short note. One review per collaboration.
+                    </div>
+                  </div>
+                  <Button onClick={openReview}>
+                    <Star className="w-4 h-4" /> Leave a review
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

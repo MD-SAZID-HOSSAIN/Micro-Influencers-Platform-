@@ -89,6 +89,36 @@ def test_each_brand_is_notified_about_its_own_campaigns(db):
     assert Notification.objects.filter(user=b).count() == 1
 
 
+def test_a_campaign_with_the_longest_title_still_closes_and_notifies(brand):
+    # The notification text holds the title; with a 200-character title it used to overflow the database column.
+    campaign = CampaignFactory(brand=brand, title="T" * 200, status=Campaign.Status.PUBLISHED, deadline=PAST())
+
+    assert close_expired_campaigns() == 1
+
+    assert status_of(campaign) == Campaign.Status.CLOSED
+    assert Notification.objects.filter(user=brand, kind=Kind.CAMPAIGN_AUTO_CLOSED).count() == 1
+
+
+def test_one_campaign_that_fails_does_not_stop_the_others(brand, monkeypatch):
+    from apps.campaigns import services
+
+    bad = CampaignFactory(brand=brand, title="Bad one", status=Campaign.Status.PUBLISHED, deadline=PAST())
+    good = CampaignFactory(brand=brand, title="Good one", status=Campaign.Status.PUBLISHED, deadline=PAST())
+    real_close = services.close_campaign
+
+    def flaky(campaign, **kwargs):
+        if campaign.pk == bad.pk:
+            raise RuntimeError("boom")
+        return real_close(campaign, **kwargs)
+
+    monkeypatch.setattr(services, "close_campaign", flaky)
+
+    assert close_expired_campaigns() == 1
+
+    assert status_of(good) == Campaign.Status.CLOSED
+    assert status_of(bad) == Campaign.Status.PUBLISHED  # left alone, tried again on the next run
+
+
 def test_beat_schedule_runs_every_five_minutes(settings):
     entry = settings.CELERY_BEAT_SCHEDULE["close-expired-campaigns"]
 

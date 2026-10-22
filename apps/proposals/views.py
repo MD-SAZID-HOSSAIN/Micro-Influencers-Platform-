@@ -121,7 +121,7 @@ class BrandProposalListView(ListAPIView):
         params = ProposalStatusFilterSerializer(data=self.request.query_params)
         params.is_valid(raise_exception=True)
         proposals = Proposal.objects.filter(campaign=self.campaign).select_related(
-            "creator", "creator__creator_profile"
+            "creator", "creator__creator_profile", "review"
         )
         if wanted := params.validated_data.get("status"):
             proposals = proposals.filter(status=wanted)

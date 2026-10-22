@@ -176,6 +176,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminBrandPlatform'
           description: ''
+  /api/v1/admin/campaigns/:
+    get:
+      operationId: admin_campaigns_list
+      description: Every campaign (drafts too), newest first, so an admin can find
+        one to close. Search by title or brand.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 100
+      - in: query
+        name: status
+        schema:
+          enum:
+          - draft
+          - published
+          - closed
+          type: string
+          minLength: 1
+        description: |-
+          * `draft` - Draft
+          * `published` - Published
+          * `closed` - Closed
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminCampaignRowList'
+          description: ''
   /api/v1/admin/campaigns/{id}/close/:
     post:
       operationId: admin_campaigns_close_create
@@ -327,6 +374,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminPlatformStats'
+          description: ''
+  /api/v1/admin/reviews/:
+    get:
+      operationId: admin_reviews_list
+      description: Every review, newest first, so an admin can find an inappropriate
+        one. Search the text, people or campaign.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 100
+      - in: query
+        name: rating
+        schema:
+          type: integer
+          maximum: 5
+          minimum: 1
+      tags:
+      - Admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminReviewRowList'
           description: ''
   /api/v1/admin/reviews/{id}/:
     delete:
@@ -2521,6 +2608,68 @@ components:
       - id
       - status
       - title
+    AdminCampaignRow:
+      type: object
+      description: One campaign in the moderation list. Expects a ``proposal_count``
+        annotation.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/CampaignStatusEnum'
+          readOnly: true
+        brand:
+          allOf:
+          - $ref: '#/components/schemas/AdminPerson'
+          readOnly: true
+        deadline:
+          type: string
+          format: date-time
+          readOnly: true
+        creators_needed:
+          type: integer
+          readOnly: true
+        proposal_count:
+          type: integer
+          readOnly: true
+          description: Every proposal received, withdrawn ones included.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - brand
+      - closed_at
+      - created_at
+      - creators_needed
+      - deadline
+      - id
+      - proposal_count
+      - status
+      - title
+    AdminPerson:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        full_name:
+          type: string
+      required:
+      - full_name
+      - id
+      - username
     AdminPlatformStats:
       type: object
       description: A creator's typed Instagram, TikTok or Facebook numbers, for the
@@ -2571,6 +2720,54 @@ components:
       - review_note
       - review_status
       - updated_at
+    AdminReviewCampaign:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+      required:
+      - id
+      - title
+    AdminReviewRow:
+      type: object
+      description: 'One review in the moderation list: what was written, by which
+        brand, about which creator.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        rating:
+          type: integer
+          readOnly: true
+        text:
+          type: string
+          readOnly: true
+        brand:
+          allOf:
+          - $ref: '#/components/schemas/AdminPerson'
+          readOnly: true
+        creator:
+          allOf:
+          - $ref: '#/components/schemas/AdminPerson'
+          readOnly: true
+        campaign:
+          allOf:
+          - $ref: '#/components/schemas/AdminReviewCampaign'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - brand
+      - campaign
+      - created_at
+      - creator
+      - id
+      - rating
+      - text
     AdminUser:
       type: object
       properties:
@@ -2786,6 +2983,11 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        review:
+          allOf:
+          - $ref: '#/components/schemas/ProposalReview'
+          nullable: true
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -2800,6 +3002,7 @@ components:
       - portfolio_links
       - profile_url
       - proposed_rate
+      - review
       - status
       - withdrawal_reason
     BrandSocialAccount:
@@ -3957,6 +4160,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminBrandPlatform'
+    PaginatedAdminCampaignRowList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCampaignRow'
     PaginatedAdminPlatformStatsList:
       type: object
       required:
@@ -3980,6 +4206,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AdminPlatformStats'
+    PaginatedAdminReviewRowList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminReviewRow'
     PaginatedAdminUserList:
       type: object
       required:
@@ -4578,6 +4827,26 @@ components:
       - creators_needed
       - id
       - status
+    ProposalReview:
+      type: object
+      description: The brand's own review of a completed collaboration.
+      properties:
+        id:
+          type: integer
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - created_at
+      - id
+      - rating
+      - text
     ProposalStatusEnum:
       enum:
       - pending

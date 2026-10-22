@@ -53,6 +53,15 @@ class CreatorSummarySerializer(serializers.Serializer):
     rating_count = serializers.IntegerField()
 
 
+class ProposalReviewSerializer(serializers.Serializer):
+    """The brand's own review of a completed collaboration."""
+
+    id = serializers.IntegerField()
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    text = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField()
+
+
 class BrandProposalSerializer(serializers.ModelSerializer):
     """A proposal as the brand that received it sees it.
 
@@ -62,6 +71,7 @@ class BrandProposalSerializer(serializers.ModelSerializer):
     creator = serializers.SerializerMethodField()
     profile_url = serializers.SerializerMethodField()
     withdrawal_reason = serializers.SerializerMethodField()
+    review = serializers.SerializerMethodField()
 
     class Meta:
         model = Proposal
@@ -76,9 +86,18 @@ class BrandProposalSerializer(serializers.ModelSerializer):
             "withdrawal_reason",
             "profile_url",
             "completed_at",
+            "review",
             "created_at",
         ]
         read_only_fields = fields
+
+    @extend_schema_field(ProposalReviewSerializer(allow_null=True))
+    def get_review(self, proposal):
+        """The review the brand wrote for this collaboration, or null (also tells the brand it can still leave one)."""
+        review = getattr(proposal, "review", None)  # a missing review raises an AttributeError subclass
+        if review is None:
+            return None
+        return ProposalReviewSerializer(review).data
 
     @extend_schema_field(CreatorSummarySerializer)
     def get_creator(self, proposal) -> dict:

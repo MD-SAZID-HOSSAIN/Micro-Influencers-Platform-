@@ -31,6 +31,8 @@ export type PlatformStatEntry = {
   reviewStatus: 'pending' | 'approved' | 'rejected';
   reviewNote?: string;
   lastSyncedAt?: string;
+  /** The last refresh failed (for example the YouTube connection expired), so these numbers may be old. */
+  isOutdated?: boolean;
 };
 
 export type CreatorProfile = {
@@ -39,8 +41,10 @@ export type CreatorProfile = {
   avatarUrl?: string;
   coverUrl?: string;
   bio: string;
-  niche: Niche;
-  primaryPlatform: Platform;
+  /** Empty until the creator chooses one. */
+  niche: Niche | '';
+  /** Empty until the creator chooses one. */
+  primaryPlatform: Platform | '';
   /** "City, Country" for display. The two parts below are what the profile form edits and saves. */
   location: string;
   city?: string;
@@ -62,7 +66,10 @@ export type CreatorProfile = {
 export type ConnectedAccount = {
   id: string;
   platform: Platform;
+  /** How the channel is shown, e.g. "@mychannel". Empty until the first sync has stored a link. */
   handle: string;
+  /** The channel's address, when known. */
+  url?: string;
   verified: boolean;
   lastSyncedAt: string; // ISO
   status: 'connected' | 'expired' | 'revoked';
@@ -88,9 +95,6 @@ export type BrandProfile = {
   logoUrl?: string;
   coverUrl?: string;
   about: string;
-  size?: '1–10' | '11–50' | '51–200' | '201–1000' | '1000+';
-  headquarters?: string;
-  foundedYear?: number;
 };
 
 export type CampaignStatus = 'draft' | 'published' | 'closed';
@@ -110,6 +114,8 @@ export type Campaign = {
   deliverables: string;
   creatorsNeeded: number;
   minFollowers?: number;
+  /** The server's hint that the signed-in creator's stats fit this brief. Only on creator-facing cards; it never blocks applying. */
+  eligible?: boolean;
   /** The brand's choice: may creators withdraw after applying? Missing means yes. Fixed once published. */
   allowWithdrawal?: boolean;
   status: CampaignStatus;
@@ -142,6 +148,11 @@ export type Proposal = {
   creatorPlatform: Platform;
   creatorFollowers: number;
   creatorEngagement: number;
+  /** The creator's average rating from past reviews; null until they have one. Only on the brand's view. */
+  creatorRatingAvg?: number | null;
+  creatorRatingCount?: number;
+  /** The brand's own review of this collaboration. Null until it is written; only on the brand's view. */
+  review?: { id: number; rating: number; text: string } | null;
   coverMessage: string;
   proposedRate: number;
   portfolio: PortfolioLink[];

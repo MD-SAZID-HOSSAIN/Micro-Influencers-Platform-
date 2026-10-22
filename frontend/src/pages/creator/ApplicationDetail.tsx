@@ -1,9 +1,9 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Plus, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Pencil, Plus, Trash2, Save, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useStore, loadMyProposals, updateProposalStatus } from '../../state/Store';
 import {
-  listMyDeliverables, addDeliverable, deleteDeliverable,
+  listMyDeliverables, addDeliverable, updateDeliverable, deleteDeliverable,
   type Deliverable,
 } from '../../api/endpoints';
 import { Button, ProposalStatusBadge, ChannelArt, SectionHeader, PageHeader, EmptyState } from '../../components/ui';
@@ -42,6 +42,24 @@ export default function ApplicationDetail() {
   const [newNote, setNewNote] = useState('');
   const [addingDeliverable, setAddingDeliverable] = useState(false);
   const [confirmDeleteDeliverable, setConfirmDeleteDeliverable] = useState<Deliverable | null>(null);
+  // The id of the deliverable being changed; null means the box is adding a new one.
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const openAdd = () => {
+    setEditingId(null);
+    setNewUrl('');
+    setNewPlatform('YouTube');
+    setNewNote('');
+    setAddOpen(true);
+  };
+
+  const openEdit = (d: Deliverable) => {
+    setEditingId(d.id);
+    setNewUrl(d.postUrl);
+    setNewPlatform(d.platform);
+    setNewNote(d.note);
+    setAddOpen(true);
+  };
 
   useEffect(() => {
     if (!proposal || proposal.status !== 'accepted') return;
@@ -84,22 +102,34 @@ export default function ApplicationDetail() {
     }
   };
 
+  // Adds a new link, or saves changes to the one being edited (allowed until the brand marks the work completed).
   const onAddDeliverable = async () => {
     if (!newUrl) return;
     setAddingDeliverable(true);
     try {
-      const d = await addDeliverable(Number(proposal.id), {
-        postUrl: newUrl,
-        platform: newPlatform,
-        note: newNote,
-      });
-      setDeliverables((prev) => [...prev, d]);
+      if (editingId !== null) {
+        const d = await updateDeliverable(Number(proposal.id), editingId, {
+          postUrl: newUrl,
+          platform: newPlatform,
+          note: newNote,
+        });
+        setDeliverables((prev) => prev.map((x) => (x.id === d.id ? d : x)));
+        push('Deliverable updated', 'success');
+      } else {
+        const d = await addDeliverable(Number(proposal.id), {
+          postUrl: newUrl,
+          platform: newPlatform,
+          note: newNote,
+        });
+        setDeliverables((prev) => [...prev, d]);
+        push('Deliverable added', 'success');
+      }
       setAddOpen(false);
+      setEditingId(null);
       setNewUrl('');
       setNewNote('');
-      push('Deliverable added', 'success');
     } catch (err) {
-      push(isApiError(err) ? err.message : 'Could not add deliverable.', 'error');
+      push(isApiError(err) ? err.message : 'Could not save the deliverable.', 'error');
     } finally {
       setAddingDeliverable(false);
     }
@@ -126,7 +156,15 @@ export default function ApplicationDetail() {
       <div className="card p-6">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <div className="text-xs text-ink-500">{campaign?.brandName ?? proposal.brandName}</div>
+            <div className="text-xs text-ink-500">
+              {proposal.brandId ? (
+                <Link to={`/creator/brands/${proposal.brandId}`} className="link-accent font-semibold">
+                  {campaign?.brandName ?? proposal.brandName}
+                </Link>
+              ) : (
+                campaign?.brandName ?? proposal.brandName
+              )}
+            </div>
             <h1 className="text-xl font-bold text-ink-900">{campaign?.title ?? proposal.campaignTitle}</h1>
             <div className="text-xs text-ink-500 mt-1">
               Submitted {fmtRelativeTime(proposal.submittedAt)} · Rate {currency(proposal.proposedRate)}
@@ -198,7 +236,7 @@ export default function ApplicationDetail() {
               description="Add the links to the content you published for this campaign."
             />
             {canEditDeliverables && (
-              <Button onClick={() => setAddOpen(true)} size="sm">
+              <Button onClick={openAdd} size="sm">
                 <Plus className="w-3.5 h-3.5" /> Add link
               </Button>
             )}
@@ -226,13 +264,22 @@ export default function ApplicationDetail() {
                     </div>
                   </div>
                   {canEditDeliverables && (
-                    <button
-                      className="p-1.5 text-ink-500 hover:text-rose-600"
-                      onClick={() => setConfirmDeleteDeliverable(d)}
-                      aria-label="Remove deliverable"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <>
+                      <button
+                        className="p-1.5 text-ink-500 hover:text-ink-900"
+                        onClick={() => openEdit(d)}
+                        aria-label="Edit deliverable"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        className="p-1.5 text-ink-500 hover:text-rose-600"
+                        onClick={() => setConfirmDeleteDeliverable(d)}
+                        aria-label="Remove deliverable"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
                   )}
                 </li>
               ))}
@@ -333,7 +380,7 @@ export default function ApplicationDetail() {
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title="Add a deliverable"
+        title={editingId !== null ? 'Edit a deliverable' : 'Add a deliverable'}
         size="md"
         footer={
           <>
@@ -343,7 +390,7 @@ export default function ApplicationDetail() {
               onClick={onAddDeliverable}
               disabled={!newUrl || addingDeliverable}
             >
-              {addingDeliverable ? 'Adding…' : 'Add'}
+              {addingDeliverable ? 'Saving…' : editingId !== null ? 'Save' : 'Add'}
             </button>
           </>
         }

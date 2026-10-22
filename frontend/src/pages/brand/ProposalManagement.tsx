@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, ArrowRight, ArrowUpRight, Inbox, Sparkles } fr
 import { useEffect, useMemo, useState } from 'react';
 import { useStore, loadBrandCampaigns, setBrandProposals, updateProposalStatus } from '../../state/Store';
 import { listBrandCampaignProposals } from '../../api/endpoints';
-import { Button, EmptyState, ProposalStatusBadge, ProfileTile, PageHeader, StatRow } from '../../components/ui';
+import { Button, EmptyState, ProposalStatusBadge, ProfileTile, PageHeader, StatRow, Rating } from '../../components/ui';
 import { fmtNumber, fmtRelativeTime, currency } from '../../lib/shared';
 import type { Proposal, ProposalStatus } from '../../types';
 import { ConfirmDialog } from '../../components/Modal';
@@ -12,7 +12,7 @@ import clsx from 'clsx';
 import { isApiError } from '../../api/client';
 import { useAuth } from '../../state/AuthContext';
 
-const STATUSES: ('all' | ProposalStatus)[] = ['all', 'pending', 'shortlisted', 'accepted', 'rejected'];
+const STATUSES: ('all' | ProposalStatus)[] = ['all', 'pending', 'shortlisted', 'accepted', 'rejected', 'withdrawn'];
 
 export default function ProposalManagement() {
   const { id } = useParams();
@@ -28,14 +28,24 @@ export default function ProposalManagement() {
   const [showWithdrawn, setShowWithdrawn] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ p: Proposal; status: ProposalStatus } | null>(null);
 
+  // The server hides withdrawn proposals unless they are asked for by name (status=withdrawn). So they are
+  // fetched only when the brand wants them: the box is ticked or the Withdrawn tab is open.
+  const wantWithdrawn = showWithdrawn || filter === 'withdrawn';
+  const fetchProposals = async (campaignId: string) => {
+    const main = await listBrandCampaignProposals(campaignId);
+    const withdrawn = wantWithdrawn
+      ? (await listBrandCampaignProposals(campaignId, { status: 'withdrawn' })).results
+      : [];
+    return { results: [...main.results, ...withdrawn], acceptedCount: main.acceptedCount };
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!id) return;
-      setLoading(true);
       try {
         await loadBrandCampaigns();
-        const res = await listBrandCampaignProposals(id);
+        const res = await fetchProposals(id);
         if (cancelled) return;
         setProposals(res.results);
         setAcceptedCount(res.acceptedCount);
@@ -51,29 +61,31 @@ export default function ProposalManagement() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, wantWithdrawn]);
 
   const counts = useMemo(() => ({
-    all: proposals.length,
+    all: proposals.filter((p) => wantWithdrawn || p.status !== 'withdrawn').length,
     pending: proposals.filter((p) => p.status === 'pending').length,
     shortlisted: proposals.filter((p) => p.status === 'shortlisted').length,
     accepted: proposals.filter((p) => p.status === 'accepted').length,
     rejected: proposals.filter((p) => p.status === 'rejected').length,
-  }), [proposals]);
+    withdrawn: proposals.filter((p) => p.status === 'withdrawn').length,
+  }), [proposals, wantWithdrawn]);
 
   const mine = useMemo(() => {
     let list = [...proposals];
-    if (!showWithdrawn) list = list.filter((p) => p.status !== 'withdrawn');
+    if (!wantWithdrawn) list = list.filter((p) => p.status !== 'withdrawn');
     if (filter !== 'all') list = list.filter((p) => p.status === filter);
     return list.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
-  }, [proposals, filter, showWithdrawn]);
+  }, [proposals, filter, wantWithdrawn]);
 
   const applyChange = async (p: Proposal, status: ProposalStatus) => {
     try {
       const res = await updateProposalStatus(p.id, status) as unknown as { accepted_count?: number; creators_needed?: number } | void;
       // Refetch the list to keep the UI in sync.
       if (id) {
-        const fresh = await listBrandCampaignProposals(id);
+        const fresh = await fetchProposals(id);
         setProposals(fresh.results);
         setAcceptedCount(fresh.acceptedCount);
         setBrandProposals(fresh.results);
@@ -178,6 +190,9 @@ export default function ProposalManagement() {
                     </div>
                     <div className="text-xs text-ink-500 mt-1 break-words">
                       {p.creatorNiche} · {p.creatorPlatform} · {fmtNumber(p.creatorFollowers)} followers · {p.creatorEngagement}% engagement
+                    </div>
+                    <div className="mt-1">
+                      <Rating value={p.creatorRatingAvg} count={p.creatorRatingCount} />
                     </div>
                   </div>
                   <div className="text-left sm:text-right">

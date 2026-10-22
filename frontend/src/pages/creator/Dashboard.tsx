@@ -325,10 +325,9 @@ export default function CreatorDashboard() {
             </div>
           ) : (
             <ul className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 stagger">
-              {available.slice(0, 4).map((c) => {
-                const eligible =
-                  c.requiredPlatform === creator?.primaryPlatform &&
-                  (!c.minFollowers || (creator?.followers ?? 0) >= c.minFollowers);
+              {available.slice(0, 5).map((c) => {
+                // The server's answer, so this screen and the campaign page always agree.
+                const eligible = c.eligible === true;
                 return (
                   <li key={c.id}>
                     <Link to={`/creator/campaigns/${c.id}`} className="card card-hover p-4 sm:p-5 group block">
@@ -391,7 +390,7 @@ export default function CreatorDashboard() {
                 <div>
                   <div className="eyebrow">YouTube</div>
                   <div className="mt-1.5 font-display text-xl text-ink-900 tracking-[-0.01em]">
-                    {yt ? (yt.handle && yt.handle !== 'YouTube channel' ? `@${yt.handle}` : 'Connected') : 'Not connected'}
+                    {yt ? (yt.handle || 'Connected') : 'Not connected'}
                   </div>
                   <div className="text-xs text-ink-500 mt-1">
                     {yt

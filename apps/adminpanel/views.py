@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Count, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListAPIView
@@ -9,15 +9,21 @@ from rest_framework.views import APIView
 from apps.accounts.models import Role, User
 from apps.accounts.serializers import LoginResponseSerializer, LoginSerializer, UserSerializer
 from apps.accounts.services import InvalidCredentials, authenticate_login, issue_access_token
+from apps.campaigns.models import Campaign
 from apps.core.throttling import FailOpenScopedRateThrottle
 from apps.core.permissions import IsAdminRole
+from apps.reviews.models import Review
 from apps.social.models import BrandSocialAccount, PlatformStats
 
 from .models import AdminActionLog
 from .serializers import (
     AdminActionLogSerializer,
     AdminBrandPlatformSerializer,
+    AdminCampaignFilterSerializer,
+    AdminCampaignRowSerializer,
     AdminCampaignSerializer,
+    AdminReviewFilterSerializer,
+    AdminReviewRowSerializer,
     AdminPlatformStatsSerializer,
     AdminStatsFilterSerializer,
     AdminUserFilterSerializer,
@@ -114,6 +120,55 @@ class AdminUserDetailView(_ReasonedAction):
     def delete(self, request, pk):
         delete_user(admin=request.user, user_id=pk, reason=self.reason(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema(tags=["Admin"], parameters=[AdminCampaignFilterSerializer])
+class AdminCampaignListView(ListAPIView):
+    """Every campaign (drafts too), newest first, so an admin can find one to close. Search by title or brand."""
+
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminCampaignRowSerializer
+
+    def get_queryset(self):
+        params = AdminCampaignFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        campaigns = (
+            Campaign.objects.select_related("brand")
+            .annotate(proposal_count=Count("proposals"))
+            .order_by("-created_at", "-id")
+        )
+        if q := params.validated_data.get("q"):
+            campaigns = campaigns.filter(
+                Q(title__icontains=q) | Q(brand__username__icontains=q) | Q(brand__full_name__icontains=q)
+            )
+        if wanted := params.validated_data.get("status"):
+            campaigns = campaigns.filter(status=wanted)
+        return campaigns
+
+
+@extend_schema(tags=["Admin"], parameters=[AdminReviewFilterSerializer])
+class AdminReviewListView(ListAPIView):
+    """Every review, newest first, so an admin can find an inappropriate one. Search the text, people or campaign."""
+
+    permission_classes = [IsAdminRole]
+    serializer_class = AdminReviewRowSerializer
+
+    def get_queryset(self):
+        params = AdminReviewFilterSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        reviews = Review.objects.select_related("brand", "creator", "proposal__campaign").order_by("-created_at", "-id")
+        if q := params.validated_data.get("q"):
+            reviews = reviews.filter(
+                Q(text__icontains=q)
+                | Q(brand__username__icontains=q)
+                | Q(brand__full_name__icontains=q)
+                | Q(creator__username__icontains=q)
+                | Q(creator__full_name__icontains=q)
+                | Q(proposal__campaign__title__icontains=q)
+            )
+        if rating := params.validated_data.get("rating"):
+            reviews = reviews.filter(rating=rating)
+        return reviews
 
 
 class AdminCloseCampaignView(_ReasonedAction):

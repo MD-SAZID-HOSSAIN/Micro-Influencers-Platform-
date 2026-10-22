@@ -73,7 +73,8 @@ export default function ConnectedAccounts() {
       // returns if the navigation somehow failed; in that case, just re-load.
       await loadCreatorProfile();
     } catch (err) {
-      push(isApiError(err) ? err.message : 'Could not start YouTube connect.', 'error');
+      // Also covers "Google sign-in is not set up on this server yet" (a plain Error from the store).
+      push(err instanceof Error ? err.message : 'Could not start YouTube connect.', 'error');
     } finally {
       setWorking(false);
     }
@@ -145,7 +146,16 @@ export default function ConnectedAccounts() {
               <div className="p-5 sm:p-6 border-t border-ink-200">
                 <StatRow
                   items={[
-                    { label: 'Account', value: '@' + (yt.handle || 'channel') },
+                    {
+                      label: 'Channel',
+                      value: yt.url ? (
+                        <a href={yt.url} target="_blank" rel="noreferrer noopener" className="hover:underline" title={yt.url}>
+                          {yt.handle || 'Open channel'}
+                        </a>
+                      ) : (
+                        yt.handle || 'Not available yet'
+                      ),
+                    },
                     { label: 'Status', value: yt.verified ? 'Verified' : 'Unverified' },
                     { label: 'Last synced', value: fmtRelativeTime(yt.lastSyncedAt) },
                     { label: 'Followers', value: (yt.followers ?? 0).toLocaleString() },
@@ -160,8 +170,9 @@ export default function ConnectedAccounts() {
                     try {
                       await updateConnectedAccount(yt.id, { lastSyncedAt: new Date().toISOString() });
                       await loadCreatorProfile();
-                      push('Stats refreshed', 'success');
+                      push('Refresh started. Your numbers update in a moment.', 'success');
                     } catch (err) {
+                      // Shows the server's own reason, for example "You refreshed recently. Please try again in a few minutes."
                       push(isApiError(err) ? err.message : 'Could not refresh stats.', 'error');
                     }
                   }}

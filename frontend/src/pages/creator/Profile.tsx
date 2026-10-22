@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useStore, loadCreatorProfile, profileCompletion } from '../../state/Store';
 import { fmtNumber, fmtDate, currency } from '../../lib/shared';
 import {
-  PlatformIcon, ChannelArt, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader,
+  PlatformIcon, ChannelArt, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
 import { CheckCircle2, MapPin, ArrowUpRight, Pencil, Link as LinkIcon, Plus, Sparkles, Youtube } from 'lucide-react';
 
@@ -93,16 +93,25 @@ export default function CreatorProfile() {
                 </div>
                 <div className="text-sm text-ink-500 mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <span className="inline-flex items-center gap-1">
-                    <PlatformIcon platform={creator.primaryPlatform} className="w-3.5 h-3.5" />
-                    {creator.primaryPlatform}
+                    {creator.primaryPlatform ? (
+                      <>
+                        <PlatformIcon platform={creator.primaryPlatform} className="w-3.5 h-3.5" />
+                        {creator.primaryPlatform}
+                      </>
+                    ) : (
+                      <span className="text-ink-400">No main platform yet</span>
+                    )}
                   </span>
                   <span className="text-ink-300">·</span>
-                  <span>{creator.niche}</span>
+                  <span>{creator.niche || <span className="text-ink-400">No niche yet</span>}</span>
                   <span className="text-ink-300">·</span>
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5" />
                     {creator.location}
                   </span>
+                </div>
+                <div className="mt-2">
+                  <Rating value={creator.ratingAvg} count={creator.ratingCount} />
                 </div>
               </div>
             </div>
@@ -188,8 +197,8 @@ export default function CreatorProfile() {
               items={[
                 { label: 'Followers',  value: fmtNumber(creator.followers) },
                 { label: 'Engagement', value: `${creator.engagementRate}%` },
-                { label: 'Post rate',  value: currency(creator.ratePerPost) },
-                { label: 'Video rate', value: currency(creator.ratePerVideo) },
+                { label: 'Post rate',  value: creator.ratePerPost > 0 ? currency(creator.ratePerPost) : '—' },
+                { label: 'Video rate', value: creator.ratePerVideo > 0 ? currency(creator.ratePerVideo) : '—' },
               ]}
             />
 
@@ -219,10 +228,10 @@ export default function CreatorProfile() {
             <div className="card p-5">
               <div className="eyebrow">Details</div>
               <dl className="mt-3 space-y-2.5 text-sm">
-                <Row label="Niche">{creator.niche}</Row>
-                <Row label="Primary platform">{creator.primaryPlatform}</Row>
-                <Row label="Location">{creator.location}</Row>
-                <Row label="Story rate">{currency(creator.ratePerStory)}</Row>
+                <Row label="Niche">{creator.niche || '—'}</Row>
+                <Row label="Primary platform">{creator.primaryPlatform || '—'}</Row>
+                <Row label="Location">{creator.location || '—'}</Row>
+                <Row label="Story rate">{creator.ratePerStory > 0 ? currency(creator.ratePerStory) : '—'}</Row>
               </dl>
             </div>
 

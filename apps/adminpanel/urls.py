@@ -5,6 +5,7 @@ from .views import (
     AdminApproveBrandPlatformView,
     AdminApproveStatsView,
     AdminBrandPlatformListView,
+    AdminCampaignListView,
     AdminCloseCampaignView,
     AdminLoginView,
     AdminOverviewView,
@@ -13,6 +14,7 @@ from .views import (
     AdminRejectBrandPlatformView,
     AdminRejectStatsView,
     AdminReviewDetailView,
+    AdminReviewListView,
     AdminSuspendUserView,
     AdminUserDetailView,
     AdminUserListView,
@@ -26,7 +28,9 @@ urlpatterns = [
     path(
         "admin/users/<int:pk>/reactivate/", AdminReactivateUserView.as_view(), name="admin-user-reactivate"
     ),
+    path("admin/campaigns/", AdminCampaignListView.as_view(), name="admin-campaigns"),
     path("admin/campaigns/<int:pk>/close/", AdminCloseCampaignView.as_view(), name="admin-campaign-close"),
+    path("admin/reviews/", AdminReviewListView.as_view(), name="admin-reviews"),
     path("admin/reviews/<int:pk>/", AdminReviewDetailView.as_view(), name="admin-review"),
     path("admin/platform-stats/", AdminPlatformStatsListView.as_view(), name="admin-platform-stats"),
     path("admin/platform-stats/<int:pk>/approve/", AdminApproveStatsView.as_view(), name="admin-stats-approve"),

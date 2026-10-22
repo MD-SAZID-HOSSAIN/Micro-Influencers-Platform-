@@ -17,7 +17,9 @@ class Notification(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications"
     )
     kind = models.CharField(max_length=30, choices=Kind.choices)
-    message = models.CharField(max_length=255)
+    # No length limit: the text carries a campaign title (up to 200 characters) and sometimes a person's name,
+    # so a fixed 255 overflowed and made the database reject the notification.
+    message = models.TextField()
     # IDs the frontend needs to link to the right page, e.g. {"campaign_id": 3}.
     payload = models.JSONField(default=dict, blank=True)
     is_read = models.BooleanField(default=False)

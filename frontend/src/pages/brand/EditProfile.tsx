@@ -20,8 +20,6 @@ const INDUSTRIES = [
   'Finance', 'Health & Wellness', 'Lifestyle', 'Other',
 ];
 
-const COMPANY_SIZES = ['1–10', '11–50', '51–200', '201–1000', '1000+'] as const;
-
 export default function EditBrandProfile() {
   const { brand } = useStore();
   const { setAvatar } = useAuth();
@@ -123,29 +121,16 @@ export default function EditBrandProfile() {
             <FormField label="Company name" htmlFor="company" required>
               <Input id="company" value={form.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="e.g. Northwind Beverages" />
             </FormField>
-            <FormField label="Industry" htmlFor="industry" required>
+            <FormField label="Industry" htmlFor="industry" optional>
               <Select id="industry" value={form.industry} onChange={(e) => set('industry', e.target.value)}>
+                <option value="">Choose an industry</option>
+                {/* An industry saved earlier that is not in the list must still show, or the box would lie. */}
+                {form.industry && !INDUSTRIES.includes(form.industry) && <option>{form.industry}</option>}
                 {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
               </Select>
             </FormField>
-            <FormField label="Website" htmlFor="website">
+            <FormField label="Website" htmlFor="website" optional>
               <Input id="website" value={form.website} onChange={(e) => set('website', e.target.value)} placeholder="https://example.com" type="url" />
-            </FormField>
-            <FormField label="Company size" htmlFor="size" helper="Optional — affects how creators see you">
-              <Select
-                id="size"
-                value={form.size ?? ''}
-                onChange={(e) => set('size', (e.target.value || undefined) as BrandProfile['size'])}
-              >
-                <option value="">Prefer not to say</option>
-                {COMPANY_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Headquarters" htmlFor="hq" optional>
-              <Input id="hq" value={form.headquarters ?? ''} onChange={(e) => set('headquarters', e.target.value || undefined)} placeholder="City, Country" />
-            </FormField>
-            <FormField label="Year founded" htmlFor="yr" optional>
-              <Input id="yr" type="number" min={1800} max={new Date().getFullYear()} value={form.foundedYear ?? ''} onChange={(e) => set('foundedYear', e.target.value ? Number(e.target.value) : undefined)} placeholder="e.g. 2019" />
             </FormField>
           </div>
           <div className="mt-4">

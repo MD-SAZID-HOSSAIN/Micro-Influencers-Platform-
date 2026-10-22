@@ -7,7 +7,7 @@
  */
 
 import { request, resolveAssetUrl } from './client';
-import { NICHES } from '../lib/shared';
+import { NICHES, youtubeHandle } from '../lib/shared';
 import type {
   AppNotification,
   BrandProfile,
@@ -155,6 +155,10 @@ export const nicheFromBackend = (v: string | null | undefined): Niche =>
 export const platformFromBackend = (v: string | null | undefined): Platform =>
   (v && PLATFORM_LABELS[v]) || 'YouTube';
 
+/** A creator's own choice: empty when they have not chosen yet (not "Other" / "YouTube"). */
+export const nicheOrEmpty = (v: string | null | undefined): Niche | '' => (v && NICHE_LABELS[v]) || '';
+export const platformOrEmpty = (v: string | null | undefined): Platform | '' => (v && PLATFORM_LABELS[v]) || '';
+
 export const platformToBackend = (p: Platform): string => p.toLowerCase();
 
 /** Backend uses one of the canonical Platform enum values. The UI select lets
@@ -217,8 +221,8 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
     avatarUrl: resolveAssetUrl(p.photo_url),
     coverUrl: undefined,
     bio: p.bio,
-    niche: nicheFromBackend(p.niche),
-    primaryPlatform: platformFromBackend(p.primary_platform),
+    niche: nicheOrEmpty(p.niche),
+    primaryPlatform: platformOrEmpty(p.primary_platform),
     location: [p.city, p.country].filter(Boolean).join(', '),
     city: p.city,
     country: p.country,
@@ -231,6 +235,7 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
       reviewStatus: s.review_status ?? 'approved',
       reviewNote: s.review_note || undefined,
       lastSyncedAt: s.last_synced_at ?? undefined,
+      isOutdated: s.is_outdated,
     })),
     ratePerPost: numFrom(p.rate_post),
     ratePerStory: numFrom(p.rate_story),
@@ -246,7 +251,8 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
       ? {
           id: 'yt',
           platform: 'YouTube',
-          handle: (yt.handle_url ?? '').replace(/^https?:\/\//, '').replace(/^@/, ''),
+          handle: youtubeHandle(yt.handle_url),
+          url: yt.handle_url ?? undefined,
           verified: yt.is_verified,
           lastSyncedAt: yt.last_synced_at ?? new Date().toISOString(),
           status: 'connected',
@@ -277,11 +283,15 @@ export const uploadCreatorPhoto = async (file: File): Promise<CreatorProfile> =>
 export const deleteCreatorPhoto = async (): Promise<CreatorProfile> =>
   mapCreatorMe(await request<ApiCreatorMe>('creators/me/photo/', { method: 'DELETE' }));
 
+/** A rate of 0 (or nothing) means "not set": send null so the server keeps it empty instead of storing $0. */
+const rateToBackend = (n: number): string | null => (n > 0 ? String(n) : null);
+
 export const updateCreatorMe = async (patch: Partial<{
   fullName: string;
   bio: string;
-  niche: Niche;
-  primaryPlatform: Platform;
+  /** '' means the creator has not chosen one: it is saved as empty. */
+  niche: Niche | '';
+  primaryPlatform: Platform | '';
   city: string;
   country: string;
   ratePerPost: number;
@@ -291,13 +301,15 @@ export const updateCreatorMe = async (patch: Partial<{
   const body: Record<string, unknown> = {};
   if (patch.fullName !== undefined) body.full_name = patch.fullName;
   if (patch.bio !== undefined) body.bio = patch.bio;
-  if (patch.niche !== undefined) body.niche = nicheToBackend(patch.niche);
-  if (patch.primaryPlatform !== undefined) body.primary_platform = platformToBackend(patch.primaryPlatform);
+  if (patch.niche !== undefined) body.niche = patch.niche === '' ? null : nicheToBackend(patch.niche);
+  if (patch.primaryPlatform !== undefined) {
+    body.primary_platform = patch.primaryPlatform === '' ? null : platformToBackend(patch.primaryPlatform);
+  }
   if (patch.city !== undefined) body.city = patch.city;
   if (patch.country !== undefined) body.country = patch.country;
-  if (patch.ratePerPost !== undefined) body.rate_post = String(patch.ratePerPost);
-  if (patch.ratePerStory !== undefined) body.rate_story = String(patch.ratePerStory);
-  if (patch.ratePerVideo !== undefined) body.rate_video = String(patch.ratePerVideo);
+  if (patch.ratePerPost !== undefined) body.rate_post = rateToBackend(patch.ratePerPost);
+  if (patch.ratePerStory !== undefined) body.rate_story = rateToBackend(patch.ratePerStory);
+  if (patch.ratePerVideo !== undefined) body.rate_video = rateToBackend(patch.ratePerVideo);
   const data = await request<ApiCreatorMe>('creators/me/', { method: 'PATCH', body });
   return mapCreatorMe(data);
 };
@@ -343,9 +355,6 @@ export const mapBrandMe = (p: ApiBrandMe): BrandProfile => ({
   logoUrl: resolveAssetUrl(p.logo_url),
   coverUrl: undefined,
   about: p.about,
-  size: undefined,
-  headquarters: undefined,
-  foundedYear: undefined,
 });
 
 export const fetchBrandMe = async (): Promise<BrandProfile> => {
@@ -398,8 +407,8 @@ export const mapCreatorCard = (c: ApiCreatorCard): CreatorProfile => ({
   avatarUrl: resolveAssetUrl(c.photo_url),
   coverUrl: undefined,
   bio: '',
-  niche: nicheFromBackend(c.niche),
-  primaryPlatform: platformFromBackend(c.primary_platform),
+  niche: nicheOrEmpty(c.niche),
+  primaryPlatform: platformOrEmpty(c.primary_platform),
   location: '',
   ratePerPost: 0,
   ratePerStory: 0,
@@ -408,6 +417,8 @@ export const mapCreatorCard = (c: ApiCreatorCard): CreatorProfile => ({
   engagementRate: c.engagement_rate ? numFrom(c.engagement_rate) : 0,
   verified: c.is_verified,
   portfolio: [],
+  ratingAvg: c.rating_avg !== null && c.rating_avg !== undefined ? numFrom(c.rating_avg) : null,
+  ratingCount: c.rating_count ?? 0,
 });
 
 export type SearchCreatorsParams = {
@@ -418,8 +429,11 @@ export type SearchCreatorsParams = {
   minFollowers?: number;
   maxFollowers?: number;
   minEngagement?: number;
+  maxEngagement?: number;
   minRate?: number;
   maxRate?: number;
+  /** 0 to 5: only creators whose average rating is at least this. */
+  minRating?: number;
   verifiedOnly?: boolean;
   /** One of: followers, -followers, engagement, -engagement, rate, -rate, rating, -rating. */
   ordering?: string;
@@ -461,8 +475,15 @@ async function fetchPages<T, Extra extends object = Record<string, never>>(
   return { items, extra };
 }
 
-export const searchCreators = async (p: SearchCreatorsParams = {}): Promise<CreatorProfile[]> => {
-  const query: Record<string, string | number> = {};
+/** One page of creator search results, with the total so the screen can offer Previous / Next. */
+export type CreatorPage = { items: CreatorProfile[]; total: number; page: number; pageSize: number };
+
+export const searchCreatorsPage = async (
+  p: SearchCreatorsParams = {},
+  page = 1,
+  pageSize = 12,
+): Promise<CreatorPage> => {
+  const query: Record<string, string | number> = { page, page_size: pageSize };
   if (p.q) query.q = p.q;
   if (p.niche) query.niche = nicheToBackend(labelToNiche(p.niche) ?? ('Other' as Niche));
   if (p.platform) query.platform = platformToBackend(p.platform as Platform);
@@ -470,19 +491,28 @@ export const searchCreators = async (p: SearchCreatorsParams = {}): Promise<Crea
   if (p.minFollowers !== undefined) query.min_followers = p.minFollowers;
   if (p.maxFollowers !== undefined) query.max_followers = p.maxFollowers;
   if (p.minEngagement !== undefined) query.min_engagement = p.minEngagement;
+  if (p.maxEngagement !== undefined) query.max_engagement = p.maxEngagement;
   if (p.minRate !== undefined) query.min_rate = p.minRate;
   if (p.maxRate !== undefined) query.max_rate = p.maxRate;
+  if (p.minRating !== undefined) query.min_rating = p.minRating;
   if (p.verifiedOnly) query.verified_only = 'true';
   if (p.ordering) query.ordering = p.ordering;
-  const { items } = await fetchPages<ApiCreatorCard>('creators/', query);
-  return items.map(mapCreatorCard);
+  const data = await request<{ count: number; results: ApiCreatorCard[] }>('creators/', { query });
+  return { items: data.results.map(mapCreatorCard), total: data.count, page, pageSize };
 };
 
-type ApiCreatorDetail = ApiCreatorMe;
+/** What a brand sees of a creator: the same fields as the creator's own profile, plus the portfolio items. */
+type ApiCreatorDetail = ApiCreatorMe & {
+  portfolio?: Array<{ id: number; url: string; caption: string }>;
+};
 
 export const fetchCreatorDetail = async (id: string | number): Promise<CreatorProfile> => {
   const data = await request<ApiCreatorDetail>(`creators/${id}/`);
-  return mapCreatorMe(data);
+  return {
+    ...mapCreatorMe(data),
+    // mapCreatorMe is built for the creator's own screen, where the portfolio is loaded separately.
+    portfolio: (data.portfolio ?? []).map((p) => ({ id: String(p.id), url: p.url, title: p.caption || undefined })),
+  };
 };
 
 // ----- Brand detail ---------------------------------------------------------
@@ -561,6 +591,7 @@ export const mapCampaignCard = (c: ApiCampaignCard): Campaign => ({
   deliverables: '',
   creatorsNeeded: c.creators_needed,
   minFollowers: undefined,
+  eligible: c.eligible,
   // Creator-facing listings only ever contain published campaigns.
   status: 'published',
 });
@@ -608,13 +639,15 @@ export const listCreatorCampaigns = async (filters: {
   niche?: Niche;
   platform?: Platform;
   minBudget?: number;
+  maxBudget?: number;
   deadlineBefore?: string;
 } = {}): Promise<Campaign[]> => {
   const query: Record<string, string | number> = {};
-  if (filters.q) query.search = filters.q;
+  if (filters.q) query.q = filters.q; // the server reads "q"; any other name is silently ignored
   if (filters.niche) query.niche = nicheToBackend(filters.niche);
   if (filters.platform) query.platform = platformToBackend(filters.platform);
   if (filters.minBudget) query.min_budget = filters.minBudget;
+  if (filters.maxBudget) query.max_budget = filters.maxBudget;
   if (filters.deadlineBefore) query.deadline_before = filters.deadlineBefore;
   const { items } = await fetchPages<ApiCampaignCard>('campaigns/', query);
   return items.map(mapCampaignCard);
@@ -760,6 +793,7 @@ type ApiBrandProposal = {
   withdrawal_reason: string | null;
   profile_url: string;
   completed_at: string | null;
+  review?: { id: number; rating: number; text: string; created_at: string } | null;
   created_at: string;
 };
 
@@ -818,6 +852,9 @@ export const mapBrandProposal = (p: ApiBrandProposal): Proposal => ({
   creatorPlatform: platformFromBackend(p.creator.platform),
   creatorFollowers: p.creator.followers ?? 0,
   creatorEngagement: p.creator.engagement_rate ? numFrom(p.creator.engagement_rate) : 0,
+  creatorRatingAvg: p.creator.rating_avg !== null && p.creator.rating_avg !== undefined ? numFrom(p.creator.rating_avg) : null,
+  creatorRatingCount: p.creator.rating_count ?? 0,
+  review: p.review ? { id: p.review.id, rating: p.review.rating, text: p.review.text } : null,
   coverMessage: p.cover_message,
   proposedRate: numFrom(p.proposed_rate),
   portfolio: proposalPortfolioFrom(p.portfolio_links ?? []),
@@ -846,7 +883,9 @@ export const listBrandCampaignProposals = async (
     { accepted_count: number; creators_needed: number }
   >('brand/campaigns/' + campaignId + '/proposals/', query);
   return {
-    results: items.map(mapBrandProposal),
+    // The server does not repeat the campaign on each proposal, but the caller asked for this campaign's list,
+    // so every proposal belongs to it. Without this the id was blank and later requests for it got a 404.
+    results: items.map((p) => ({ ...mapBrandProposal(p), campaignId: String(campaignId) })),
     acceptedCount: extra.accepted_count,
     creatorsNeeded: extra.creators_needed,
   };
@@ -1351,6 +1390,51 @@ export const fetchCampaignAnalytics = async (id: number | string): Promise<Campa
   };
 };
 
+/** A number from the platform, or "not_available" when it does not give it (or has not been fetched yet). */
+export type Metric = number | 'not_available';
+
+/** How one delivered post is doing. The numbers come from the last daily refresh, never from a live call. */
+export type ContentPerformanceRow = {
+  deliverableId: number;
+  proposalId: number;
+  creator: { id: number; name: string };
+  platform: Platform;
+  postUrl: string;
+  views: Metric;
+  likes: Metric;
+  comments: Metric;
+  /** (likes + comments) / views, as a percentage. */
+  engagementRate: Metric;
+  syncedAt: string | null;
+};
+
+export const fetchContentPerformance = async (id: number | string): Promise<ContentPerformanceRow[]> => {
+  const data = await request<Array<{
+    deliverable_id: number;
+    proposal_id: number;
+    creator: { id: number; name: string };
+    platform: string;
+    post_url: string;
+    views: Metric;
+    likes: Metric;
+    comments: Metric;
+    engagement_rate: string | 'not_available';
+    synced_at: string | null;
+  }>>('brand/campaigns/' + id + '/analytics/content/');
+  return data.map((r) => ({
+    deliverableId: r.deliverable_id,
+    proposalId: r.proposal_id,
+    creator: r.creator,
+    platform: platformFromBackend(r.platform),
+    postUrl: r.post_url,
+    views: r.views,
+    likes: r.likes,
+    comments: r.comments,
+    engagementRate: r.engagement_rate === 'not_available' ? 'not_available' : numFrom(r.engagement_rate),
+    syncedAt: r.synced_at,
+  }));
+};
+
 // ----- Deliverables + completion (FR-20) -----------------------------------
 
 export type Deliverable = {
@@ -1654,6 +1738,115 @@ export const reactivateAdminUser = async (userId: number | string, reason: strin
 
 export const deleteAdminUser = async (userId: number | string, reason: string) => {
   await request('admin/users/' + userId + '/', { method: 'DELETE', body: { reason } });
+};
+
+/** One page of an admin list, with the total so the screen can offer Previous / Next. */
+export type AdminPage<T> = { items: T[]; total: number; page: number; pageSize: number };
+
+type AdminPerson = { id: number; username: string; fullName: string };
+const mapAdminPerson = (p: { id: number; username: string; full_name: string }): AdminPerson => ({
+  id: p.id,
+  username: p.username,
+  fullName: p.full_name,
+});
+
+export type AdminCampaignRow = {
+  id: number;
+  title: string;
+  status: CampaignStatus;
+  brand: AdminPerson;
+  deadline: string;
+  creatorsNeeded: number;
+  /** Every proposal received, withdrawn ones included. */
+  proposalCount: number;
+  createdAt: string;
+  closedAt: string | null;
+};
+
+export const listAdminCampaigns = async (
+  params: { q?: string; status?: CampaignStatus } = {},
+  page = 1,
+  pageSize = 20,
+): Promise<AdminPage<AdminCampaignRow>> => {
+  const query: Record<string, string | number> = { page, page_size: pageSize };
+  if (params.q) query.q = params.q;
+  if (params.status) query.status = params.status;
+  const data = await request<{
+    count: number;
+    results: Array<{
+      id: number;
+      title: string;
+      status: CampaignStatus;
+      brand: { id: number; username: string; full_name: string };
+      deadline: string;
+      creators_needed: number;
+      proposal_count: number;
+      created_at: string;
+      closed_at: string | null;
+    }>;
+  }>('admin/campaigns/', { query });
+  return {
+    items: data.results.map((c) => ({
+      id: c.id,
+      title: c.title,
+      status: c.status,
+      brand: mapAdminPerson(c.brand),
+      deadline: c.deadline,
+      creatorsNeeded: c.creators_needed,
+      proposalCount: c.proposal_count,
+      createdAt: c.created_at,
+      closedAt: c.closed_at,
+    })),
+    total: data.count,
+    page,
+    pageSize,
+  };
+};
+
+export type AdminReviewRow = {
+  id: number;
+  rating: number;
+  text: string;
+  brand: AdminPerson;
+  creator: AdminPerson;
+  campaign: { id: number; title: string };
+  createdAt: string;
+};
+
+export const listAdminReviews = async (
+  params: { q?: string; rating?: number } = {},
+  page = 1,
+  pageSize = 20,
+): Promise<AdminPage<AdminReviewRow>> => {
+  const query: Record<string, string | number> = { page, page_size: pageSize };
+  if (params.q) query.q = params.q;
+  if (params.rating) query.rating = params.rating;
+  const data = await request<{
+    count: number;
+    results: Array<{
+      id: number;
+      rating: number;
+      text: string;
+      brand: { id: number; username: string; full_name: string };
+      creator: { id: number; username: string; full_name: string };
+      campaign: { id: number; title: string };
+      created_at: string;
+    }>;
+  }>('admin/reviews/', { query });
+  return {
+    items: data.results.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      text: r.text,
+      brand: mapAdminPerson(r.brand),
+      creator: mapAdminPerson(r.creator),
+      campaign: r.campaign,
+      createdAt: r.created_at,
+    })),
+    total: data.count,
+    page,
+    pageSize,
+  };
 };
 
 export const closeAdminCampaign = async (campaignId: number | string, reason: string) => {

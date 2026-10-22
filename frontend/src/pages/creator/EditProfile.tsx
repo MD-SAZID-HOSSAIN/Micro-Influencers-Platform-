@@ -148,13 +148,15 @@ export default function EditCreatorProfile() {
                 )
               }
             />
-            <FormField label="Niche" htmlFor="niche" required>
+            <FormField label="Niche" htmlFor="niche" optional>
               <Select id="niche" value={form.niche} onChange={(e) => set('niche', e.target.value as any)}>
+                <option value="">Choose a niche</option>
                 {NICHES.map((n) => <option key={n}>{n}</option>)}
               </Select>
             </FormField>
-            <FormField label="Primary platform" htmlFor="platform" required>
+            <FormField label="Primary platform" htmlFor="platform" optional>
               <Select id="platform" value={form.primaryPlatform} onChange={(e) => set('primaryPlatform', e.target.value as any)}>
+                <option value="">Choose a platform</option>
                 {PLATFORMS.map((p) => <option key={p}>{p}</option>)}
               </Select>
             </FormField>
@@ -192,25 +194,25 @@ export default function EditCreatorProfile() {
           <SectionHeader
             eyebrow="Rates"
             title="Pricing (USD)"
-            description="Set what you charge for each deliverable type. Brands see these on your profile."
+            description="Set what you charge for each deliverable type. Brands see these on your profile. Leave a box empty if you do not offer it."
           />
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <FormField label="Per post" htmlFor="r-post">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 text-sm">$</span>
-                <Input id="r-post" type="number" min={0} className="pl-6" value={form.ratePerPost} onChange={(e) => set('ratePerPost', Number(e.target.value))} />
+                <Input id="r-post" type="number" min={0} className="pl-6" placeholder="Not set" value={form.ratePerPost || ''} onChange={(e) => set('ratePerPost', Number(e.target.value) || 0)} />
               </div>
             </FormField>
             <FormField label="Per story" htmlFor="r-story">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 text-sm">$</span>
-                <Input id="r-story" type="number" min={0} className="pl-6" value={form.ratePerStory} onChange={(e) => set('ratePerStory', Number(e.target.value))} />
+                <Input id="r-story" type="number" min={0} className="pl-6" placeholder="Not set" value={form.ratePerStory || ''} onChange={(e) => set('ratePerStory', Number(e.target.value) || 0)} />
               </div>
             </FormField>
             <FormField label="Per video" htmlFor="r-video">
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 text-sm">$</span>
-                <Input id="r-video" type="number" min={0} className="pl-6" value={form.ratePerVideo} onChange={(e) => set('ratePerVideo', Number(e.target.value))} />
+                <Input id="r-video" type="number" min={0} className="pl-6" placeholder="Not set" value={form.ratePerVideo || ''} onChange={(e) => set('ratePerVideo', Number(e.target.value) || 0)} />
               </div>
             </FormField>
           </div>

@@ -16,12 +16,15 @@ type CampaignFilters = {
   niche: string;
   platform: string;
   minBudget: string;
+  maxBudget: string;
   deadlineBefore: string;
 };
 
+const NO_FILTERS: CampaignFilters = { q: '', niche: '', platform: '', minBudget: '', maxBudget: '', deadlineBefore: '' };
+
 export default function CampaignDiscovery() {
   const { campaigns, creator, loading, errors } = useStore();
-  const [filters, setFilters] = useState<CampaignFilters>({ q: '', niche: '', platform: '', minBudget: '', deadlineBefore: '' });
+  const [filters, setFilters] = useState<CampaignFilters>(NO_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function CampaignDiscovery() {
       niche: (filters.niche as any) || undefined,
       platform: (filters.platform as any) || undefined,
       minBudget: filters.minBudget ? Number(filters.minBudget) : undefined,
+      maxBudget: filters.maxBudget ? Number(filters.maxBudget) : undefined,
       deadlineBefore: filters.deadlineBefore || undefined,
     });
   };
@@ -52,20 +56,22 @@ export default function CampaignDiscovery() {
     const id = setTimeout(refresh, 250);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.q, filters.niche, filters.platform, filters.minBudget, filters.deadlineBefore]);
+  }, [filters.q, filters.niche, filters.platform, filters.minBudget, filters.maxBudget, filters.deadlineBefore]);
 
-  const reset = () => setFilters({ q: '', niche: '', platform: '', minBudget: '', deadlineBefore: '' });
+  const reset = () => setFilters(NO_FILTERS);
 
-  const isFiltered = Boolean(filters.q || filters.niche || filters.platform || filters.minBudget || filters.deadlineBefore);
+  const isFiltered = Boolean(
+    filters.q || filters.niche || filters.platform || filters.minBudget || filters.maxBudget || filters.deadlineBefore,
+  );
   const publishedCount = campaigns.filter((c) => c.status === 'published').length;
-  const sorted = useMemo(() => {
-    const isEligible = (c: typeof campaigns[number]) =>
-      c.requiredPlatform === creator?.primaryPlatform &&
-      (!c.minFollowers || (creator?.followers ?? 0) >= c.minFollowers);
-    return [...campaigns]
-      .filter((c) => c.status === 'published')
-      .sort((a, b) => (isEligible(b) ? 1 : 0) - (isEligible(a) ? 1 : 0));
-  }, [campaigns, creator]);
+  // "Eligible" is the server's answer (the creator's stats for the campaign's own platform). It is a hint only.
+  const sorted = useMemo(
+    () =>
+      [...campaigns]
+        .filter((c) => c.status === 'published')
+        .sort((a, b) => (b.eligible ? 1 : 0) - (a.eligible ? 1 : 0)),
+    [campaigns],
+  );
 
   return (
     <div className="container-page py-6 sm:py-8">
@@ -91,7 +97,7 @@ export default function CampaignDiscovery() {
               <Search className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 className="pl-10 h-11"
-                placeholder="Search by title, brand, or keyword"
+                placeholder="Search by title or description"
                 value={filters.q}
                 onChange={(e) => setFilters({ ...filters, q: e.target.value })}
               />
@@ -135,7 +141,7 @@ export default function CampaignDiscovery() {
           </div>
 
           {showFilters && (
-            <div className="border-t border-ink-200 p-4 sm:p-5 bg-mist-100/50 grid grid-cols-1 sm:grid-cols-3 gap-3 anim-fade-in">
+            <div className="border-t border-ink-200 p-4 sm:p-5 bg-mist-100/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 anim-fade-in">
               <div className="sm:hidden">
                 <FormField label="Niche">
                   <Select
@@ -172,6 +178,18 @@ export default function CampaignDiscovery() {
                   />
                 </div>
               </FormField>
+              <FormField label="Max budget per creator">
+                <div className="relative">
+                  <DollarSign className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Input
+                    type="number"
+                    className="pl-9"
+                    placeholder="5000"
+                    value={filters.maxBudget}
+                    onChange={(e) => setFilters({ ...filters, maxBudget: e.target.value })}
+                  />
+                </div>
+              </FormField>
               <FormField label="Apply by">
                 <div className="relative">
                   <Calendar className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -196,7 +214,7 @@ export default function CampaignDiscovery() {
               <span className="font-mono text-ink-900 font-semibold">{sorted.length}</span>
               {' '}live brief{sorted.length === 1 ? '' : 's'}
               {isFiltered && <span className="text-ink-400"> · filtered</span>}
-              {sorted[0] && sorted[0].requiredPlatform === creator?.primaryPlatform && (
+              {sorted[0]?.eligible && (
                 <>
                   <span className="text-ink-300 mx-1.5">·</span>
                   <span className="inline-flex items-center gap-1.5">
@@ -239,14 +257,8 @@ export default function CampaignDiscovery() {
         ) : (
           <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 stagger">
             {sorted.map((c) => {
-              const platformOk = c.requiredPlatform === creator?.primaryPlatform;
-              const followersOk = !c.minFollowers || (creator?.followers ?? 0) >= c.minFollowers;
-              const eligible = platformOk && followersOk;
-              const reason = !platformOk
-                ? `Requires ${c.requiredPlatform}`
-                : !followersOk
-                  ? `Needs ${c.minFollowers?.toLocaleString()}+ followers`
-                  : undefined;
+              const eligible = c.eligible === true;
+              const reason = eligible ? undefined : `Your ${c.requiredPlatform} stats do not match this brief. You can still apply.`;
               return (
                 <li key={c.id}>
                   <CampaignCard

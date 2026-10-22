@@ -26,6 +26,7 @@ import CampaignDiscovery from './pages/creator/CampaignDiscovery';
 import CampaignDetail from './pages/creator/CampaignDetail';
 import MyApplications from './pages/creator/MyApplications';
 import ApplicationDetail from './pages/creator/ApplicationDetail';
+import CreatorBrandProfile from './pages/creator/BrandProfile';
 
 import BrandDashboard from './pages/brand/Dashboard';
 import BrandProfile from './pages/brand/Profile';
@@ -52,6 +53,7 @@ import AdminOverview from './pages/admin/Overview';
 import AdminUsers from './pages/admin/Users';
 import AdminActions from './pages/admin/Actions';
 import AdminPlatformReviews from './pages/admin/PlatformReviews';
+import AdminModeration from './pages/admin/Moderation';
 
 function Protected({ role, children }: { role: 'creator' | 'brand'; children: JSX.Element }) {
   const { user, ready } = useAuth();
@@ -164,6 +166,7 @@ export default function App() {
         <Route path="accounts" element={<ConnectedAccounts />} />
         <Route path="campaigns" element={<CampaignDiscovery />} />
         <Route path="campaigns/:id" element={<CampaignDetail />} />
+        <Route path="brands/:id" element={<CreatorBrandProfile />} />
         <Route path="applications" element={<MyApplications />} />
         <Route path="applications/:id" element={<ApplicationDetail />} />
         <Route path="notifications" element={<NotificationsPage role="creator" />} />
@@ -201,6 +204,7 @@ export default function App() {
         <Route path="/admin/overview" element={<AdminOverview />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/platform-reviews" element={<AdminPlatformReviews />} />
+        <Route path="/admin/moderation" element={<AdminModeration />} />
         <Route path="/admin/actions" element={<AdminActions />} />
       </Route>
 

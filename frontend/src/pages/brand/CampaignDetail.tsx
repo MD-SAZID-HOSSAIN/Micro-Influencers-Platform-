@@ -77,7 +77,8 @@ export default function CampaignDetailBrand() {
 
       <header className="card overflow-hidden">
         <ChannelArt name={c.title} seed={c.id} height={96} className="rounded-none" />
-        <div className="p-5 sm:p-6 -mt-8 sm:-mt-10">
+        {/* No overlap with the cover image: the status, title and buttons used to sit under it, hidden (and the buttons unclickable). */}
+        <div className="p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -107,14 +108,6 @@ export default function CampaignDetailBrand() {
               {c.status === 'published' && (
                 <Button variant="secondary" size="sm" onClick={() => setConfirmClose(true)}>
                   Close campaign
-                </Button>
-              )}
-              {c.status === 'closed' && (
-                <Button size="sm" onClick={async () => {
-                  try { await setCampaignStatus(c.id, 'published'); push('Reopened', 'info'); }
-                  catch (err) { push(isApiError(err) ? err.message : 'Failed to reopen.', 'error'); }
-                }}>
-                  Reopen
                 </Button>
               )}
               <Link to={`/brand/campaigns/${c.id}/analytics`} className="btn btn-secondary btn-sm">

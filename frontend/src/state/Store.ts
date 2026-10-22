@@ -108,7 +108,9 @@ export const loadCreatorProfile = () =>
         const acc: ConnectedAccount = {
           id: 'yt',
           platform: 'YouTube',
-          handle: 'YouTube channel',
+          // The channel link comes with the creator's YouTube numbers, not with the connection status.
+          handle: me.connectedAccount?.handle ?? '',
+          url: me.connectedAccount?.url,
           verified: !yt.needsReconnect && !yt.belowMinimum,
           lastSyncedAt: yt.lastSyncedAt ?? new Date().toISOString(),
           status: yt.needsReconnect ? 'expired' : 'connected',
@@ -159,8 +161,8 @@ export const updateCreator = async (
   patch: Partial<{
     fullName: string;
     bio: string;
-    niche: Niche;
-    primaryPlatform: Platform;
+    niche: Niche | '';
+    primaryPlatform: Platform | '';
     city: string;
     country: string;
     ratePerPost: number;
@@ -312,8 +314,12 @@ export const deleteCampaign = async (id: string): Promise<void> => {
 
 // --- Brand discovery (creator search) --------------------------------------
 
-export const searchCreators = async (query: api.SearchCreatorsParams): Promise<CreatorProfile[]> => {
-  return api.searchCreators(query);
+export const searchCreators = async (
+  query: api.SearchCreatorsParams,
+  page = 1,
+  pageSize = 12,
+): Promise<api.CreatorPage> => {
+  return api.searchCreatorsPage(query, page, pageSize);
 };
 
 // --- Proposals -------------------------------------------------------------
@@ -377,6 +383,7 @@ export const loadCreatorCampaigns = async (filters: {
   niche?: Niche;
   platform?: Platform;
   minBudget?: number;
+  maxBudget?: number;
   deadlineBefore?: string;
 } = {}): Promise<Campaign[]> => {
   setLoading('creatorCampaigns', true);
@@ -456,6 +463,8 @@ export const pushNotification = (_n: Omit<AppNotification, 'id' | 'createdAt' | 
 
 export const connectYouTube = async (): Promise<void> => {
   const url = await api.startYouTubeConnect();
+  // The server answers with an empty address when no Google keys are configured. Say so instead of reloading the page.
+  if (!url) throw new Error('Google sign-in is not set up on this server yet, so YouTube cannot be connected.');
   window.location.assign(url);
 };
 
@@ -471,8 +480,9 @@ export const updateConnectedAccount = async (
   _id: string,
   _patch: Partial<ConnectedAccount>,
 ): Promise<void> => {
-  // "Refresh" maps to the backend's POST /social/youtube/refresh/.
-  await api.refreshYouTube().catch(() => undefined);
+  // "Refresh" maps to the backend's POST /social/youtube/refresh/. Its errors (for example the cooldown)
+  // are not swallowed: the caller shows the server's message.
+  await api.refreshYouTube();
   // Pull the latest status afterwards.
   try {
     const yt = await api.fetchYouTubeStatus();
@@ -480,7 +490,8 @@ export const updateConnectedAccount = async (
       const acc: ConnectedAccount = {
         id: 'yt',
         platform: 'YouTube',
-        handle: 'YouTube channel',
+        handle: state.creator?.connectedAccount?.handle ?? '',
+        url: state.creator?.connectedAccount?.url,
         verified: !yt.needsReconnect && !yt.belowMinimum,
         lastSyncedAt: yt.lastSyncedAt ?? new Date().toISOString(),
         status: yt.needsReconnect ? 'expired' : 'connected',

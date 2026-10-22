@@ -234,7 +234,7 @@ There is no payment and no chat inside the platform. It only handles finding eac
   directory and on proposals.
 
 **7. Campaign statistics**
-- **Views**: how many creators opened the campaign.
+- **Page views**: how many times creators opened the campaign page. Every opening counts, so the same creator can add more than one.
 - **Proposal funnel**: received, shortlisted, accepted, rejected and withdrawn.
 - **Accepted compared with needed**, the **total if every spot is filled** (the rate is fixed, so creators cannot
   negotiate it), and the **acceptance rate**.
