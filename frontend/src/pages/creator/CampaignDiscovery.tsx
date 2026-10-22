@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { CampaignCard } from '../../components/CampaignCard';
 import {
   EmptyState, Input, Select, Button, SectionHeader, PageHeader,
-  FormField, Label,
+  FormField, Label, PlatformIcon, ProfileTile,
 } from '../../components/ui';
 import { NICHES, PLATFORMS, currency } from '../../lib/shared';
 import {
-  Search, X, SlidersHorizontal, Megaphone, Calendar, DollarSign, Sparkles, Compass,
+  Search, X, SlidersHorizontal, Megaphone, Calendar, DollarSign, Sparkles, Compass, RefreshCw, ShieldCheck,
 } from 'lucide-react';
 import { useStore, loadCreatorCampaigns, loadCreatorProfile } from '../../state/Store';
 
@@ -77,19 +77,70 @@ export default function CampaignDiscovery() {
     <div className="container-page py-6 sm:py-8">
       <div className="space-y-6">
         <PageHeader
-          eyebrow="Marketplace"
+          eyebrow="Creator marketplace"
           title="Find work"
-          description={
-            sorted.length > 0
-              ? `${sorted.length} live brief${sorted.length === 1 ? '' : 's'}${isFiltered ? ' matching your filters' : ''}. Eligible ones surface first.`
-              : 'No live briefs right now. Check back soon.'
-          }
+          description="Browse open brand briefs, filter by your platform and niche, and apply to sponsorships that fit your audience."
           action={
-            <Link to="/creator/dashboard" className="btn btn-secondary btn-md self-start sm:self-auto">
-              <Compass className="w-4 h-4" /> Back to dashboard
-            </Link>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={refresh}
+                disabled={loading.creatorCampaigns}
+                className="hidden sm:inline-flex"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading.creatorCampaigns ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
+              <Link to="/creator/dashboard" className="btn btn-secondary btn-sm">
+                <Compass className="w-3.5 h-3.5" /> Dashboard
+              </Link>
+            </div>
           }
         />
+
+        {/* How well the creator fits the open briefs */}
+        <div className="card p-4 sm:p-5 bg-gradient-to-r from-paper-50 via-paper-100/50 to-ember-50/40">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <ProfileTile
+                name={creator?.fullName || 'Your profile'}
+                seed={creator?.id || 'me'}
+                imageUrl={creator?.avatarUrl}
+                height={48}
+                className="w-12 rounded-xl shrink-0 shadow-sm"
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-ink-900 text-sm">{creator?.fullName || 'Your profile'}</span>
+                  {creator?.primaryPlatform && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-700 bg-paper-200/80 px-2 py-0.5 rounded-full">
+                      <PlatformIcon platform={creator.primaryPlatform} className="w-3 h-3" />
+                      {creator.primaryPlatform}
+                    </span>
+                  )}
+                  {creator?.verified && (
+                    <span className="tag tag-green text-[10px]">
+                      <ShieldCheck className="w-3 h-3" /> Verified
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-ink-500 mt-0.5">
+                  {(creator?.followers ?? 0).toLocaleString()} reach ·
+                  <span className="text-emerald-700 font-semibold ml-1">
+                    You match {sorted.filter((c) => c.eligible).length} of {sorted.length} open briefs
+                  </span>
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/creator/profile/edit"
+              className="btn btn-ghost btn-xs text-ink-600 hover:text-ink-900 self-start md:self-auto"
+              title="Update your rates and platform handles"
+            >
+              Edit profile
+            </Link>
+          </div>
+        </div>
 
         <div className="card overflow-hidden">
           <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-3">
@@ -103,24 +154,6 @@ export default function CampaignDiscovery() {
               />
             </div>
             <div className="hidden sm:flex gap-2 shrink-0">
-              <Select
-                value={filters.niche}
-                onChange={(e) => setFilters({ ...filters, niche: e.target.value })}
-                className="min-w-[160px]"
-                aria-label="Niche"
-              >
-                <option value="">All niches</option>
-                {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
-              </Select>
-              <Select
-                value={filters.platform}
-                onChange={(e) => setFilters({ ...filters, platform: e.target.value })}
-                className="min-w-[160px]"
-                aria-label="Platform"
-              >
-                <option value="">All platforms</option>
-                {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </Select>
               <Button
                 variant={showFilters ? 'primary' : 'secondary'}
                 onClick={() => setShowFilters((v) => !v)}
@@ -140,32 +173,74 @@ export default function CampaignDiscovery() {
             </Button>
           </div>
 
+          <div className="px-4 sm:px-5 pb-3 space-y-2.5">
+            {/* Platform quick filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setFilters({ ...filters, platform: '' })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border shrink-0 transition-colors ${
+                  !filters.platform
+                    ? 'bg-ink-900 text-paper-50 border-ink-900'
+                    : 'bg-paper-50 text-ink-700 border-ink-200 hover:bg-paper-100'
+                }`}
+              >
+                All platforms
+              </button>
+              {PLATFORMS.map((pl) => {
+                const active = filters.platform === pl;
+                return (
+                  <button
+                    key={pl}
+                    type="button"
+                    onClick={() => setFilters({ ...filters, platform: active ? '' : pl })}
+                    aria-pressed={active}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border shrink-0 inline-flex items-center gap-1.5 transition-colors ${
+                      active
+                        ? 'bg-ink-900 text-paper-50 border-ink-900'
+                        : 'bg-paper-50 text-ink-700 border-ink-200 hover:bg-paper-100'
+                    }`}
+                  >
+                    <PlatformIcon platform={pl} className="w-3.5 h-3.5" />
+                    {pl}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Niche quick filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <span className="text-[11px] font-semibold text-ink-400 uppercase tracking-wider shrink-0 mr-1">Niche</span>
+              <button
+                type="button"
+                onClick={() => setFilters({ ...filters, niche: '' })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
+                  !filters.niche ? 'bg-ink-800 text-paper-50' : 'bg-paper-100 text-ink-600 hover:bg-paper-200'
+                }`}
+              >
+                All
+              </button>
+              {NICHES.map((n) => {
+                const active = filters.niche === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setFilters({ ...filters, niche: active ? '' : n })}
+                    aria-pressed={active}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
+                      active ? 'bg-ink-800 text-paper-50' : 'bg-paper-100 text-ink-600 hover:bg-paper-200'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {showFilters && (
             <div className="border-t border-ink-200 p-4 sm:p-5 bg-mist-100/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 anim-fade-in">
-              <div className="sm:hidden">
-                <FormField label="Niche">
-                  <Select
-                    value={filters.niche}
-                    onChange={(e) => setFilters({ ...filters, niche: e.target.value })}
-                    aria-label="Niche"
-                  >
-                    <option value="">All niches</option>
-                    {NICHES.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </Select>
-                </FormField>
-              </div>
-              <div className="sm:hidden">
-                <FormField label="Platform">
-                  <Select
-                    value={filters.platform}
-                    onChange={(e) => setFilters({ ...filters, platform: e.target.value })}
-                    aria-label="Platform"
-                  >
-                    <option value="">All platforms</option>
-                    {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </Select>
-                </FormField>
-              </div>
               <FormField label="Min budget per creator">
                 <div className="relative">
                   <DollarSign className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />

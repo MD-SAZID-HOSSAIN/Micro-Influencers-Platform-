@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Pencil, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useStore, loadBrandProfile, loadBrandCampaigns } from '../../state/Store';
-import { PageHeader, SectionHeader, StatRow, ChannelArt, ProfileTile } from '../../components/ui';
+import { PageHeader, SectionHeader, StatRow, ProfileTile } from '../../components/ui';
 
 export default function BrandProfile() {
   const { brand, campaigns } = useStore();
@@ -59,24 +59,22 @@ export default function BrandProfile() {
       />
 
       <div className="card overflow-hidden">
-        {brand.coverUrl ? (
+        {brand.coverUrl && (
           <img src={brand.coverUrl} alt="Cover" className="w-full h-[160px] sm:h-[200px] object-cover" />
-        ) : (
-          <ChannelArt name={brand.companyName} seed={brand.id} height={120} className="rounded-none w-full" />
         )}
-        <div className="p-5 sm:p-6 flex items-start gap-4">
+        <div className="p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-5">
           <ProfileTile
             name={brand.companyName}
             seed={brand.id}
             imageUrl={brand.logoUrl}
             height={96}
-            className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
+            className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-2xl ring-4 ring-paper-100 border border-ink-200 shrink-0 shadow-sm"
           />
-          <div className="min-w-0 flex-1 pt-0.5">
+          <div className="min-w-0 pb-1 flex-1">
             <h1 className="font-display text-2xl sm:text-3xl text-ink-900 leading-tight tracking-[-0.02em]">
               {brand.companyName}
             </h1>
-            <div className="text-sm text-ink-500 mt-1.5">{brand.industry}</div>
+            <div className="text-sm text-ink-600 font-medium mt-1">{brand.industry}</div>
             {brand.website && (
               <a href={brand.website} target="_blank" rel="noreferrer noopener" className="mt-2 text-sm text-brand-600 hover:text-brand-700 inline-flex items-center gap-1 font-semibold">
                 <ExternalLink className="w-3.5 h-3.5" /> {brand.website}

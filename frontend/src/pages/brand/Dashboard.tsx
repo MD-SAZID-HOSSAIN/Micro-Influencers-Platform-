@@ -131,8 +131,12 @@ export default function BrandDashboard() {
   return (
     <div className="container-page py-6 sm:py-8">
       <PageHeader
-        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}
-        title={<>Welcome back, <span className="font-medium">{brand?.companyName || user?.fullName}</span></>}
+        eyebrow={`Today · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}`}
+        title={
+          <>
+            {brand?.companyName || user?.fullName} <span className="text-ink-400">/</span> <span className="italic font-medium">control room</span>
+          </>
+        }
         description={summary}
         action={
           <Link to="/brand/campaigns/create" className="btn btn-primary btn-md self-start sm:self-auto">
@@ -142,6 +146,15 @@ export default function BrandDashboard() {
       />
 
       <div className="space-y-8">
+        <StatRow
+          items={[
+            { label: 'Live campaigns', value: activeCampaigns, hint: `${totalCampaigns} in total` },
+            { label: 'New proposals', value: pending, hint: 'waiting for you' },
+            { label: 'Shortlisted', value: shortlisted, hint: 'ready to accept' },
+            { label: 'Accepted', value: accepted, hint: 'creators hired' },
+          ]}
+        />
+
         <section aria-label="What needs your attention">
           <SectionHeader eyebrow="To do" title="What needs your attention" />
           <div className="mt-5">
@@ -164,15 +177,6 @@ export default function BrandDashboard() {
             )}
           </div>
         </section>
-
-        <StatRow
-          items={[
-            { label: 'Live campaigns', value: activeCampaigns, hint: `${totalCampaigns} in total` },
-            { label: 'New proposals', value: pending, hint: 'waiting for you' },
-            { label: 'Shortlisted', value: shortlisted, hint: 'ready to accept' },
-            { label: 'Accepted', value: accepted, hint: 'creators hired' },
-          ]}
-        />
 
         <section>
           <SectionHeader

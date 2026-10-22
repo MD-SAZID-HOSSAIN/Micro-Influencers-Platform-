@@ -59,7 +59,7 @@ function RoleCard({
           <p className="text-sm text-ink-500 mt-1 leading-relaxed">{body}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {points.map((b) => (
-              <span key={b} className="tag tag-mist">
+              <span key={b} className="tag tag-paper">
                 <Check className="w-3 h-3" /> {b}
               </span>
             ))}

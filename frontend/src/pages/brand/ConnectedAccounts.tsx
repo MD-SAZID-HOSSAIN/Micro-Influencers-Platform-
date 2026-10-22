@@ -24,7 +24,7 @@ const PLATFORMS: { key: BrandSocialPlatform; label: Platform; example?: string }
 
 const STATUS_TAG = {
   pending: { label: 'Waiting for admin', tone: 'tag-amber' },
-  approved: { label: 'Verified', tone: 'tag-brand' },
+  approved: { label: 'Verified', tone: 'tag-ember' },
   rejected: { label: 'Rejected', tone: 'tag-rose' },
 } as const;
 

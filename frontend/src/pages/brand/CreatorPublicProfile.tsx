@@ -3,7 +3,7 @@ import { ArrowLeft, ExternalLink, MapPin, Megaphone, Star } from 'lucide-react';
 import { useAsyncLoader } from '../../state/useEffectAsync';
 import { fetchCreatorDetail, listCreatorReviews, type Review } from '../../api/endpoints';
 import {
-  VerifiedBadge, ChannelArt, ProfileTile, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
+  VerifiedBadge, ProfileTile, PlatformIcon, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
 import { fmtNumber, currency, fmtDate, fmtRelativeTime } from '../../lib/shared';
 import { useEffect, useState } from 'react';
@@ -49,31 +49,32 @@ export default function CreatorPublicProfile() {
       </Link>
 
       {/* Identity */}
-      <div className="card overflow-hidden">
-        <ChannelArt name={creator.fullName} seed={creator.id} height={120} className="rounded-none" />
-        <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-start gap-4">
-          <ProfileTile
-            name={creator.fullName}
-            seed={creator.id}
-            imageUrl={creator.avatarUrl}
-            height={88}
-            className="w-20 sm:w-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
-          />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display text-2xl sm:text-3xl text-ink-900 tracking-[-0.02em] leading-tight">
-                {creator.fullName}
-              </h1>
-              <VerifiedBadge verified={creator.verified} />
-            </div>
-            <div className="text-sm text-ink-500 mt-2 flex items-center gap-1.5 flex-wrap">
-              {creator.primaryPlatform && <PlatformIcon platform={creator.primaryPlatform} />}
-              <span>{creator.niche || 'No niche yet'}</span>
-              <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {creator.location}</span>
-            </div>
-            <div className="mt-3">
-              <Rating value={creator.ratingAvg ?? null} count={creator.ratingCount ?? 0} size="md" />
+      <div className="card p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 min-w-0">
+            <ProfileTile
+              name={creator.fullName}
+              seed={creator.id}
+              imageUrl={creator.avatarUrl}
+              height={96}
+              className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-full ring-4 ring-paper-100 border border-ink-200 shrink-0 shadow-sm"
+            />
+            <div className="min-w-0 pb-1 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-display text-2xl sm:text-3xl text-ink-900 tracking-[-0.02em] leading-tight">
+                  {creator.fullName}
+                </h1>
+                <VerifiedBadge verified={creator.verified} />
+              </div>
+              <div className="text-sm text-ink-500 mt-2 flex items-center gap-1.5 flex-wrap">
+                {creator.primaryPlatform && <PlatformIcon platform={creator.primaryPlatform} />}
+                <span className="font-medium text-ink-700">{creator.niche || 'No niche yet'}</span>
+                <span className="text-ink-300">·</span>
+                <span className="inline-flex items-center gap-1 text-ink-600"><MapPin className="w-3.5 h-3.5 text-ink-400" /> {creator.location}</span>
+              </div>
+              <div className="mt-3">
+                <Rating value={creator.ratingAvg ?? null} count={creator.ratingCount ?? 0} size="md" />
+              </div>
             </div>
           </div>
         </div>

@@ -65,7 +65,7 @@ export function ProfilePictureEditor({
     <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
       <div
         className={clsx(
-          'relative w-24 h-24 shrink-0 overflow-hidden border border-ink-200 bg-gradient-to-br from-nest-400 to-brand-400',
+          'relative w-24 h-24 shrink-0 overflow-hidden border border-ink-200 bg-gradient-to-br from-ember-300 to-ember-500',
           frame,
         )}
       >

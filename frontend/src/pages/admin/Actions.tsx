@@ -41,7 +41,7 @@ export default function Actions() {
             {list.map((a) => (
               <div key={a.id} className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="tag tag-mist font-mono text-[10px]">{a.action}</span>
+                  <span className="tag tag-paper font-mono text-[10px]">{a.action}</span>
                   <span className="text-xs text-ink-500">{fmtRelativeTime(a.createdAt)}</span>
                 </div>
                 <div className="text-xs text-ink-500">
@@ -73,7 +73,7 @@ export default function Actions() {
                   <tr key={a.id}>
                     <td className="text-xs text-ink-500 whitespace-nowrap">{fmtRelativeTime(a.createdAt)}</td>
                     <td>@{a.admin.username}</td>
-                    <td><span className="tag tag-mist font-mono text-[10px]">{a.action}</span></td>
+                    <td><span className="tag tag-paper font-mono text-[10px]">{a.action}</span></td>
                     <td className="text-ink-700 text-sm">
                       <span className="text-ink-500">{a.targetType}#{a.targetId}</span>
                       {a.targetLabel && <div className="text-xs text-ink-500 truncate max-w-[200px]">{a.targetLabel}</div>}

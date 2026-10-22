@@ -76,28 +76,29 @@ function LogoArt({
       height={height}
       aria-hidden
       focusable="false"
-      className={variant === 'invert' ? 'text-white' : 'text-ink-700'}
+      // The logo keeps its own navy (#212F41) whatever the page palette is.
+      style={{ color: variant === 'invert' ? '#FFFFFF' : '#212F41' }}
     >
       <defs>
         <linearGradient id={swoosh} gradientUnits="userSpaceOnUse" x1="290" y1="0" x2="425" y2="0">
-          <stop offset="0" stopColor="#06CAB5" />
-          <stop offset="0.2" stopColor="#0BCBBB" />
-          <stop offset="0.45" stopColor="#11C8C4" />
-          <stop offset="0.6" stopColor="#14C1CC" />
-          <stop offset="0.78" stopColor="#13B5D3" />
-          <stop offset="1" stopColor="#0FACD0" />
+          <stop offset="0" stopColor="#d9906c" />
+          <stop offset="0.2" stopColor="#d2835f" />
+          <stop offset="0.45" stopColor="#ca734f" />
+          <stop offset="0.6" stopColor="#c56a45" />
+          <stop offset="0.78" stopColor="#bf5e3a" />
+          <stop offset="1" stopColor="#b8502b" />
         </linearGradient>
         <linearGradient id={arc} gradientUnits="userSpaceOnUse" x1="557" y1="0" x2="800" y2="0">
-          <stop offset="0" stopColor="#09CFB2" />
-          <stop offset="0.247" stopColor="#15C9C3" />
-          <stop offset="0.494" stopColor="#17BFD3" />
-          <stop offset="0.741" stopColor="#16B5E0" />
-          <stop offset="0.988" stopColor="#0FA3F7" />
+          <stop offset="0" stopColor="#e9b294" />
+          <stop offset="0.247" stopColor="#dd997a" />
+          <stop offset="0.494" stopColor="#d0815f" />
+          <stop offset="0.741" stopColor="#c46845" />
+          <stop offset="0.988" stopColor="#b8502b" />
         </linearGradient>
         <linearGradient id={bird} gradientUnits="userSpaceOnUse" x1="880" y1="292" x2="932" y2="258">
-          <stop offset="0" stopColor="#0C9CFF" />
-          <stop offset="0.5" stopColor="#14A8F0" />
-          <stop offset="1" stopColor="#17C0D0" />
+          <stop offset="0" stopColor="#d0815f" />
+          <stop offset="0.5" stopColor="#c46845" />
+          <stop offset="1" stopColor="#b8502b" />
         </linearGradient>
       </defs>
 
@@ -110,7 +111,7 @@ function LogoArt({
           <path fill="currentColor" fillRule="evenodd" d={L2} />
           <path fill="currentColor" fillRule="evenodd" d={A} />
           <path fill="currentColor" fillRule="evenodd" d={B} />
-          <path fill="#0DA0FD" d={N_STEM} />
+          <path fill="#b8502b" d={N_STEM} />
           <path fill={`url(#${arc})`} d={N_ARC} />
           <path fill={`url(#${bird})`} fillRule="evenodd" d={BIRD} />
           <path fill="currentColor" fillRule="evenodd" d={E} />
@@ -126,7 +127,7 @@ function LogoArt({
 export const Logo = Wordmark;
 export const LogoMark = Mark;
 
-/* Path data, copied unchanged from collabnest-logo.svg. */
+/* Path data, copied unchanged from collabnest-logo.svg (only the gradient colours were changed, from cyan and blue to e9b294 to b8502b). */
 const O_NAVY =
   'M346.1 418.6L365.6 394.2C365.8 394.7 366.2 395.2 366.5 395.7C367.1 396.9 366.9 398.9 367.1 400.2C368.2 407 372.1 413 377 417.6C391 430.7 414.5 424.4 421.6 407.2C426.5 395.4 425.3 380.9 417 370.9C414.5 367.9 411.1 366 408.1 363.8C410 362.8 412.1 362.4 414 361.5C419.7 358.9 428.1 353.7 430.7 348C438.5 352.7 443.9 361.7 447.3 370C458.4 396.8 447.8 432 420.1 443.9C397.6 453.6 368.6 449.4 352.7 429.6C350 426.3 347.2 422.7 346.1 418.6Z';
 const SWOOSH =

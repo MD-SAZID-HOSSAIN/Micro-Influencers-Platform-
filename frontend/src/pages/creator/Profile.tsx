@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useStore, loadCreatorProfile, profileCompletion } from '../../state/Store';
 import { fmtNumber, fmtDate, currency } from '../../lib/shared';
 import {
-  PlatformIcon, ChannelArt, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader, Rating,
+  PlatformIcon, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
 import { CheckCircle2, MapPin, ArrowUpRight, Pencil, Link as LinkIcon, Plus, Sparkles, Youtube } from 'lucide-react';
 
@@ -65,62 +65,64 @@ export default function CreatorProfile() {
         />
 
         {/* Hero / identity */}
-        <article className="card overflow-hidden">
-          {creator.coverUrl ? (
+        <article className="card p-6 sm:p-8">
+          {creator.coverUrl && (
             <img
               src={creator.coverUrl}
               alt="Cover"
-              className="w-full h-[160px] sm:h-[200px] object-cover"
+              className="w-full h-[160px] sm:h-[200px] object-cover rounded-xl mb-6"
             />
-          ) : (
-            <ChannelArt name={creator.fullName} seed={creator.id} height={120} className="rounded-none w-full" />
           )}
-          <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 min-w-0">
               <ProfileTile
                 name={creator.fullName}
                 seed={creator.id}
                 imageUrl={creator.avatarUrl}
                 height={96}
-                className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-2xl ring-4 ring-white shadow-md shrink-0 -mt-12 sm:-mt-14 relative z-10"
+                className="w-20 sm:w-24 !h-20 sm:!h-24 rounded-full ring-4 ring-paper-100 border border-ink-200 shrink-0 shadow-sm"
               />
-              <div className="min-w-0 pt-0.5">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-display text-xl sm:text-2xl md:text-3xl text-ink-900 tracking-[-0.02em] leading-tight break-words">
+                  <h1 className="font-display text-2xl sm:text-3xl text-ink-900 tracking-[-0.02em] leading-tight break-words">
                     {creator.fullName}
                   </h1>
                   {isVerified && <CheckCircle2 className="w-5 h-5 text-brand-500 shrink-0" />}
                 </div>
-                <div className="text-sm text-ink-500 mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <span className="inline-flex items-center gap-1">
+                <div className="text-sm text-ink-500 mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="inline-flex items-center gap-1 font-medium text-ink-700">
                     {creator.primaryPlatform ? (
                       <>
-                        <PlatformIcon platform={creator.primaryPlatform} className="w-3.5 h-3.5" />
+                        <PlatformIcon platform={creator.primaryPlatform} className="w-4 h-4" />
                         {creator.primaryPlatform}
                       </>
                     ) : (
-                      <span className="text-ink-400">No main platform yet</span>
+                      <span className="text-ink-400 font-normal">No main platform yet</span>
                     )}
                   </span>
                   <span className="text-ink-300">·</span>
-                  <span>{creator.niche || <span className="text-ink-400">No niche yet</span>}</span>
-                  <span className="text-ink-300">·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {creator.location}
-                  </span>
+                  <span className="font-medium text-ink-700">{creator.niche || <span className="text-ink-400 font-normal">No niche yet</span>}</span>
+                  {creator.location && (
+                    <>
+                      <span className="text-ink-300">·</span>
+                      <span className="inline-flex items-center gap-1 text-ink-600">
+                        <MapPin className="w-3.5 h-3.5 text-ink-400" />
+                        {creator.location}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="mt-2">
                   <Rating value={creator.ratingAvg} count={creator.ratingCount} />
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap sm:self-center">
               {isVerified
                 ? <VerifiedBadge verified />
                 : <span className="tag tag-amber">Verification pending</span>
               }
-              <span className="tag tag-mist">
+              <span className="tag tag-paper">
                 {isComplete ? 'Profile complete' : `Profile ${completion}%`}
               </span>
             </div>

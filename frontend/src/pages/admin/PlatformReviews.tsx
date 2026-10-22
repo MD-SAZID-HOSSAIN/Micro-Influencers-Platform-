@@ -181,7 +181,7 @@ export default function PlatformReviews() {
                   <span className="text-sm text-ink-600">
                     {r.who.fullName} <span className="text-ink-400">@{r.who.username}</span>
                   </span>
-                  <span className="tag tag-mist text-[10px]">{kind === 'creators' ? 'Creator' : 'Brand'}</span>
+                  <span className="tag tag-paper text-[10px]">{kind === 'creators' ? 'Creator' : 'Brand'}</span>
                 </div>
                 <div className="text-sm text-ink-700 flex flex-wrap gap-x-4 gap-y-1">
                   {r.followers !== undefined && (

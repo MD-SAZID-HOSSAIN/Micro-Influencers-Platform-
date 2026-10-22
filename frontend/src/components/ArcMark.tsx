@@ -10,9 +10,9 @@ export function ArcMark({ className }: { className?: string }) {
     <svg viewBox="0 0 700 420" fill="none" aria-hidden focusable="false" className={className}>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#06CAB5" />
-          <stop offset="0.55" stopColor="#14B5E0" />
-          <stop offset="1" stopColor="#0DA0FD" />
+          <stop offset="0" stopColor="#DC8A66" />
+          <stop offset="0.55" stopColor="#CC6A42" />
+          <stop offset="1" stopColor="#B8502B" />
         </linearGradient>
       </defs>
       <path

@@ -82,7 +82,7 @@ export default function ConnectedAccounts() {
 
   return (
     <div className="container-page py-6 sm:py-8">
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-4xl mx-auto">
         <PageHeader
           eyebrow="Account"
           title="Connected accounts"
@@ -93,13 +93,13 @@ export default function ConnectedAccounts() {
         <article className="card overflow-hidden">
           <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-start gap-4">
             <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
-              <div className="w-12 h-12 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100 shadow-xs">
                 <Youtube className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold text-ink-900">YouTube</h3>
-                  <span className="tag tag-brand">
+                  <span className="tag tag-ember">
                     <Sparkles className="w-3 h-3" /> Core integration
                   </span>
                 </div>

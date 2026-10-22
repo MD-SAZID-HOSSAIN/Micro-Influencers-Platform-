@@ -325,7 +325,7 @@ function MobileDrawer({
           >
             <Mark size="md" />
             <span className="font-display text-[20px] font-semibold tracking-[-0.035em] text-ink-900">
-              Micro<span className="text-brand-600 font-medium">·</span>work
+              Collab<span className="text-brand-600 italic font-medium">Nest</span>
             </span>
           </Link>
           <button

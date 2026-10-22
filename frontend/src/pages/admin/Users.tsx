@@ -117,7 +117,7 @@ export default function Users() {
                       <div className="text-xs text-ink-500 truncate">@{u.username} · {u.email}</div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="tag tag-mist capitalize text-[10px]">{u.role}</span>
+                      <span className="tag tag-paper capitalize text-[10px]">{u.role}</span>
                       {u.status === 'active'
                         ? <span className="tag tag-green text-[10px]">Active</span>
                         : <span className="tag tag-amber text-[10px]">Suspended</span>}
@@ -186,7 +186,7 @@ export default function Users() {
                         <div className="font-semibold text-ink-900">{u.fullName}</div>
                         <div className="text-xs text-ink-500">@{u.username} · {u.email}</div>
                       </td>
-                      <td><span className="tag tag-mist capitalize">{u.role}</span></td>
+                      <td><span className="tag tag-paper capitalize">{u.role}</span></td>
                       <td>
                         {u.status === 'active'
                           ? <span className="tag tag-green">Active</span>

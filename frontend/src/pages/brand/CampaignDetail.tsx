@@ -4,7 +4,7 @@ import {
   setCampaignStatus, deleteCampaign, useStore, loadBrandCampaigns, loadBrandProfile,
 } from '../../state/Store';
 import {
-  Button, CampaignStatusBadge, EmptyState, ChannelArt, StatRow, SectionHeader,
+  Button, CampaignStatusBadge, EmptyState, StatRow, SectionHeader,
   PageHeader, ProposalStatusBadge, Avatar,
 } from '../../components/ui';
 import { currency, fmtDate } from '../../lib/shared';
@@ -75,48 +75,44 @@ export default function CampaignDetailBrand() {
         <ArrowLeft className="w-4 h-4" /> Back to campaigns
       </Link>
 
-      <header className="card overflow-hidden">
-        <ChannelArt name={c.title} seed={c.id} height={96} className="rounded-none" />
-        {/* No overlap with the cover image: the status, title and buttons used to sit under it, hidden (and the buttons unclickable). */}
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CampaignStatusBadge status={c.status} />
-                <span className="text-[11px] text-ink-500 font-mono uppercase tracking-[0.12em]">
-                  {c.category} · {c.requiredPlatform}
-                </span>
-              </div>
-              <h1 className="mt-1.5 font-display text-2xl sm:text-3xl text-ink-900 leading-[1.1] tracking-[-0.02em]">
-                {c.title}
-              </h1>
+      <header className="card p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CampaignStatusBadge status={c.status} />
+              <span className="text-[11px] text-ink-500 font-mono uppercase tracking-[0.12em]">
+                {c.category} · {c.requiredPlatform}
+              </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {c.status === 'draft' && (
-                <>
-                  <Link to={`/brand/campaigns/${c.id}/edit`} className="btn btn-secondary btn-sm">
-                    <Pencil className="w-3.5 h-3.5" /> Edit
-                  </Link>
-                  <Button size="sm" onClick={() => setConfirmPublish(true)}>
-                    <Megaphone className="w-3.5 h-3.5" /> Publish
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} aria-label="Delete">
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  </Button>
-                </>
-              )}
-              {c.status === 'published' && (
-                <Button variant="secondary" size="sm" onClick={() => setConfirmClose(true)}>
-                  Close campaign
-                </Button>
-              )}
-              <Link to={`/brand/campaigns/${c.id}/analytics`} className="btn btn-secondary btn-sm">
-                <BarChart3 className="w-3.5 h-3.5" /> Analytics
-              </Link>
-            </div>
+            <h1 className="mt-1.5 font-display text-2xl sm:text-3xl text-ink-900 leading-[1.1] tracking-[-0.02em]">
+              {c.title}
+            </h1>
           </div>
-          <p className="text-[15px] text-ink-700 mt-4 whitespace-pre-line leading-relaxed">{c.description}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {c.status === 'draft' && (
+              <>
+                <Link to={`/brand/campaigns/${c.id}/edit`} className="btn btn-secondary btn-sm">
+                  <Pencil className="w-3.5 h-3.5" /> Edit
+                </Link>
+                <Button size="sm" onClick={() => setConfirmPublish(true)}>
+                  <Megaphone className="w-3.5 h-3.5" /> Publish
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} aria-label="Delete">
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                </Button>
+              </>
+            )}
+            {c.status === 'published' && (
+              <Button variant="secondary" size="sm" onClick={() => setConfirmClose(true)}>
+                Close campaign
+              </Button>
+            )}
+            <Link to={`/brand/campaigns/${c.id}/analytics`} className="btn btn-secondary btn-sm">
+              <BarChart3 className="w-3.5 h-3.5" /> Analytics
+            </Link>
+          </div>
         </div>
+        <p className="text-[15px] text-ink-700 mt-4 whitespace-pre-line leading-relaxed">{c.description}</p>
       </header>
 
       <MediaGallery media={c.media} />

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 
 const PUBLIC_NAV = [
   { href: '/#how',      label: 'How it works' },
+  { href: '/#marketplace', label: 'Marketplace' },
   { href: '/#creators', label: 'For creators' },
   { href: '/#brands',   label: 'For brands' },
 ] as const;
@@ -66,7 +67,7 @@ export default function PublicLayout() {
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50
-                   focus:bg-ink-700 focus:text-white focus:px-3 focus:py-2 focus:rounded-md
+                   focus:bg-ink-900 focus:text-paper-50 focus:px-3 focus:py-2 focus:rounded-sm
                    focus:text-sm focus:font-semibold"
       >
         Skip to main content
@@ -153,8 +154,8 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="bg-ink-800 text-ink-200">
-        <div className="container-page py-14 sm:py-16">
+      <footer className="bg-ink-900 text-ink-200 mt-16 sm:mt-24">
+        <div className="container-page py-14 sm:py-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-5">
               <Logo variant="invert" size="md" />
@@ -164,24 +165,25 @@ export default function PublicLayout() {
               </p>
             </div>
 
-            <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-8 text-sm">
               <div>
-                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-400">Product</h4>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-300">Product</h4>
                 <ul className="mt-4 space-y-2.5">
                   <li><Link to="/#how" className="hover:text-white transition-colors">How it works</Link></li>
+                  <li><Link to="/#marketplace" className="hover:text-white transition-colors">Marketplace</Link></li>
                   <li><Link to="/#creators" className="hover:text-white transition-colors">For creators</Link></li>
                   <li><Link to="/#brands" className="hover:text-white transition-colors">For brands</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-400">Account</h4>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-300">Account</h4>
                 <ul className="mt-4 space-y-2.5">
                   <li><Link to="/login" className="hover:text-white transition-colors">Log in</Link></li>
                   <li><Link to="/register/role" className="hover:text-white transition-colors">Create an account</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-400">Legal</h4>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-300">Legal</h4>
                 <ul className="mt-4 space-y-2.5">
                   <li><Link to="/terms" className="hover:text-white transition-colors">Terms</Link></li>
                   <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
@@ -190,7 +192,7 @@ export default function PublicLayout() {
             </div>
           </div>
 
-          <div className="mt-12 pt-6 border-t border-ink-600/60 text-xs text-ink-400">
+          <div className="mt-14 pt-6 border-t border-ink-700/70 text-xs text-ink-300">
             © 2026 CollabNest
           </div>
         </div>

@@ -162,8 +162,8 @@ import type { CampaignStatus as CS, ProposalStatus as PS } from '../types';
 
 const CAMPAIGN_STATUS: Record<CS, { label: string; cls: string; dot: string }> = {
   draft:     { label: 'Draft',     cls: 'tag-gray',    dot: 'bg-ink-300' },
-  published: { label: 'Published', cls: 'tag-brand',   dot: 'bg-brand-500' },
-  closed:    { label: 'Closed',    cls: 'tag-mist',   dot: 'bg-ink-500' },
+  published: { label: 'Published', cls: 'tag-ember',   dot: 'bg-ember-500' },
+  closed:    { label: 'Closed',    cls: 'tag-paper',   dot: 'bg-ink-500' },
 };
 
 const PROPOSAL_STATUS: Record<PS, { label: string; cls: string; dot: string }> = {
@@ -212,7 +212,7 @@ export function EligibilityChip({ eligible, reason }: { eligible: boolean; reaso
 export function VerifiedBadge({ verified }: { verified: boolean }) {
   if (verified) {
     return (
-      <span className="tag tag-brand" title="Stats verified via YouTube">
+      <span className="tag tag-ember" title="Stats verified via YouTube">
         <CheckCircle2 className="w-3 h-3" /> Verified
       </span>
     );
@@ -280,15 +280,14 @@ export function initialsOf(name: string): string {
 }
 
 /**
- * Colour sets for generated pictures: a calm gradient (from, to) and a soft glow colour. All are muted blues, teals and
- * slates, so a page never looks loud. The same seed always picks the same set.
+ * Colour sets for generated pictures: a deep warm ink base and a terracotta accent. The same seed always picks the same set.
  */
 const ART_PALETTE = [
-  ['#1E2B3C', '#2F4560', '#7FA8D1'],
-  ['#1B2A38', '#27495A', '#6FB7B0'],
-  ['#232E45', '#38476B', '#93A9E0'],
-  ['#1D2B33', '#2D4A4F', '#7DB9B2'],
-  ['#2A3446', '#46566F', '#A3B6CE'],
+  ['#1B1814', '#B8502B'],
+  ['#13110E', '#DC8A66'],
+  ['#2A2620', '#F4D6C2'],
+  ['#0B0A08', '#CC6A42'],
+  ['#3F3A2E', '#E9B294'],
 ];
 
 /** A small stable number from some text: picks colours and shapes without storing anything. */
@@ -321,13 +320,13 @@ export function ProfileTile({
       />
     );
   }
-  const [from, to] = ART_PALETTE[hashSeed(String(seed)) % ART_PALETTE.length];
+  const [bg, accent] = ART_PALETTE[hashSeed(String(seed)) % ART_PALETTE.length];
   return (
     <div
       role="img"
       aria-label={name}
-      className={clsx('flex items-center justify-center font-semibold text-white/95 tracking-wide select-none overflow-hidden', className)}
-      style={{ height, background: `linear-gradient(145deg, ${from}, ${to})`, fontSize: Math.max(12, Math.round(height * 0.34)) }}
+      className={clsx('flex items-center justify-center font-semibold text-paper-50 tracking-wide select-none overflow-hidden', className)}
+      style={{ height, background: `linear-gradient(145deg, ${bg} 35%, ${accent})`, fontSize: Math.max(12, Math.round(height * 0.34)) }}
     >
       {initialsOf(name)}
     </div>
@@ -364,7 +363,7 @@ export function Avatar({
         src={src}
         alt=""
         onError={() => setFailed(true)}
-        className={clsx('rounded-sm shrink-0 object-cover bg-ink-100', sizeCls.split(' ').slice(0, 2).join(' '), className)}
+        className={clsx('rounded-full shrink-0 object-cover bg-ink-100 border border-ink-200/60 shadow-sm', sizeCls.split(' ').slice(0, 2).join(' '), className)}
       />
     );
   }
@@ -372,7 +371,7 @@ export function Avatar({
     <div
       aria-hidden
       className={clsx(
-        'inline-flex items-center justify-center font-semibold rounded-sm shrink-0 select-none',
+        'inline-flex items-center justify-center font-semibold rounded-full shrink-0 select-none shadow-sm',
         sizeCls, toneCls, className
       )}
     >
@@ -397,30 +396,36 @@ export function ChannelArt({
   rounded?: 'sm' | 'md' | 'lg' | 'full';
 }) {
   const r = rounded === 'full' ? 'rounded-full' : rounded === 'sm' ? 'rounded-sm' : rounded === 'md' ? 'rounded-md' : 'rounded-lg';
-  const [from, to, glow] = ART_PALETTE[hashSeed(seed) % ART_PALETTE.length];
+  const [bg, accent] = ART_PALETTE[hashSeed(seed) % ART_PALETTE.length];
   const id = `art-${String(seed).replace(/[^a-zA-Z0-9]/g, '')}-${height}`;
-  // Where the soft light sits changes a little per seed, so covers differ without any hard shapes.
-  const gx = 70 + (hashSeed(seed + 'x') % 25);
-  const gy = 10 + (hashSeed(seed + 'y') % 40);
+  const angle = (hashSeed(seed + 'a') % 24) - 12;
+  const cx1 = 20 + (hashSeed(seed + 'b') % 30);
+  const cy1 = 30 + (hashSeed(seed + 'c') % 20);
+  const cx2 = 60 + (hashSeed(seed + 'd') % 30);
+  const cy2 = 40 + (hashSeed(seed + 'e') % 30);
   return (
     <div
       className={clsx('relative overflow-hidden', r, className)}
-      style={{ height, background: `linear-gradient(120deg, ${from} 0%, ${to} 100%)` }}
+      style={{ height, background: bg }}
       aria-label={`${name} cover`}
       role="img"
     >
-      <svg viewBox="0 0 100 40" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
+      <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" aria-hidden>
         <defs>
-          <radialGradient id={`${id}-glow`} cx={`${gx}%`} cy={`${gy}%`} r="65%">
-            <stop offset="0%" stopColor={glow} stopOpacity="0.38" />
-            <stop offset="100%" stopColor={glow} stopOpacity="0" />
-          </radialGradient>
-          <pattern id={`${id}-lines`} width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-            <line x1="0" y1="0" x2="0" y2="3" stroke="#fff" strokeOpacity="0.045" strokeWidth="0.35" />
-          </pattern>
+          <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={accent} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={accent} stopOpacity="0.25" />
+          </linearGradient>
         </defs>
-        <rect width="100" height="40" fill={`url(#${id}-glow)`} />
-        <rect width="100" height="40" fill={`url(#${id}-lines)`} />
+        <g transform={`rotate(${angle} 50 25)`}>
+          <circle cx={cx1} cy={cy1} r="20" fill={`url(#${id}-g)`} />
+          <circle cx={cx2} cy={cy2} r="14" fill={accent} fillOpacity="0.4" />
+          <path
+            d={`M -10 ${40 + (hashSeed(seed + 'f') % 10)} Q 50 ${20 + (hashSeed(seed + 'g') % 15)} 110 ${45 + (hashSeed(seed + 'h') % 10)} L 110 60 L -10 60 Z`}
+            fill={accent}
+            fillOpacity="0.18"
+          />
+        </g>
       </svg>
     </div>
   );
@@ -511,9 +516,10 @@ export function PageHeader({
 // ---------- StatRow (compact, used in profile/campaign headers) ----------
 export function StatRow({ items }: { items: { label: string; value: ReactNode; hint?: ReactNode }[] }) {
   return (
-    <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px border border-ink-200 bg-ink-200 rounded-md overflow-hidden">
+    // The dividers are borders on the cells (not a coloured gap), so an unused slot in the last row stays blank.
+    <dl className="grid grid-cols-2 sm:grid-cols-4 border border-ink-200 bg-paper-50 rounded-md overflow-hidden">
       {items.map((it) => (
-        <div key={it.label} className="bg-mist-50 p-2.5 sm:p-4 min-w-0">
+        <div key={it.label} className="bg-paper-50 p-2.5 sm:p-4 min-w-0 -mr-px -mb-px border-r border-b border-ink-200">
           <dt className="eyebrow truncate">{it.label}</dt>
           <dd className="num-display text-lg sm:text-xl mt-1 sm:mt-1.5 truncate">{it.value}</dd>
           {it.hint && <div className="text-[10px] sm:text-[11px] text-ink-500 mt-0.5 truncate">{it.hint}</div>}

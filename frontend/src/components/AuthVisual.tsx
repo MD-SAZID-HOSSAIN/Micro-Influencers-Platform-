@@ -31,7 +31,7 @@ const COPY: Record<
   },
 };
 
-/** Navy panel shown beside the auth forms: the logo's arc, a role-specific message, three facts. */
+/** Dark panel shown beside the auth forms: the logo's arc, a role-specific message, three facts. */
 export default function AuthVisual({ variant = 'neutral' }: { variant?: Variant }) {
   const c = COPY[variant];
   return (
@@ -43,7 +43,7 @@ export default function AuthVisual({ variant = 'neutral' }: { variant?: Variant 
       </div>
 
       <div className="relative mt-24">
-        <span className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-nest-400">
+        <span className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-ember-300">
           {c.icon}
           {c.kicker}
         </span>
@@ -55,7 +55,7 @@ export default function AuthVisual({ variant = 'neutral' }: { variant?: Variant 
         <ul className="mt-7 space-y-3">
           {c.points.map((p) => (
             <li key={p} className="flex items-center gap-3 text-[14px] text-ink-100">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-nest-400/15 text-nest-400">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-ember-400/20 text-ember-300">
                 <Check className="w-3 h-3" />
               </span>
               {p}
