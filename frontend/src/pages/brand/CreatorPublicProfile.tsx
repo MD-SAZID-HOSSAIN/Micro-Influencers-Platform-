@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, MapPin, Megaphone, Star } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ExternalLink, MapPin, Megaphone, Star } from 'lucide-react';
 import { useAsyncLoader } from '../../state/useEffectAsync';
 import { fetchCreatorDetail, listCreatorReviews, type Review } from '../../api/endpoints';
 import {
@@ -50,6 +50,18 @@ export default function CreatorPublicProfile() {
 
       {/* Identity */}
       <div className="card p-6 sm:p-8">
+        {!creator.verified && (
+          <div
+            role="status"
+            className="-mx-6 -mt-6 sm:-mx-8 sm:-mt-8 mb-6 px-5 sm:px-8 py-3 bg-amber-50 border-b border-amber-300 rounded-t-[inherit] flex items-start gap-3 text-amber-900"
+          >
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-sm leading-relaxed">
+              <div className="font-semibold text-base">Not verified</div>
+              <div>This creator’s stats are manually entered and have not been verified through YouTube.</div>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5 min-w-0">
             <ProfileTile

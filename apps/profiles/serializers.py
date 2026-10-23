@@ -1,6 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.accounts.verification import creator_is_verified
 from apps.core.choices import Niche, Platform
 from apps.core.fields import OptionalUrlField, SafeCharField
 from apps.core.validators import validate_safe_url
@@ -35,6 +36,7 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
     rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True, read_only=True)
     rating_count = serializers.IntegerField(read_only=True)
     completion_percent = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
     stats = PlatformStatsSerializer(source="user.platform_stats", many=True, read_only=True)
 
     class Meta:
@@ -55,11 +57,15 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
             "rating_avg",
             "rating_count",
             "completion_percent",
+            "is_verified",
             "stats",
         ]
 
     def get_completion_percent(self, profile) -> int:
         return completion_percent(profile)
+
+    def get_is_verified(self, profile) -> bool:
+        return creator_is_verified(profile.user)
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})
@@ -136,6 +142,7 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
     portfolio = PortfolioItemSerializer(source="user.portfolio_items", many=True, read_only=True)
     rating_avg = serializers.DecimalField(max_digits=3, decimal_places=2, allow_null=True, read_only=True)
     rating_count = serializers.IntegerField(read_only=True)
+    is_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = CreatorProfile
@@ -152,12 +159,16 @@ class CreatorDetailSerializer(serializers.ModelSerializer):
             "rate_post",
             "rate_story",
             "rate_video",
+            "is_verified",
             "stats",
             "portfolio",
             "rating_avg",
             "rating_count",
         ]
         read_only_fields = fields
+
+    def get_is_verified(self, profile) -> bool:
+        return creator_is_verified(profile.user)
 
     @extend_schema_field(PublicPlatformStatsSerializer(many=True))
     def get_stats(self, profile):

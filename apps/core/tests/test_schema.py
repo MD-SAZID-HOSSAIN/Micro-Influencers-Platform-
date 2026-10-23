@@ -124,54 +124,14 @@ def test_readme_documents_every_variable():
 # ---- packaging --------------------------------------------------------------------------------------
 
 
-def test_dockerfile_runs_gunicorn_as_a_non_root_user_with_production_settings():
-    dockerfile = (BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
-
-    assert re.search(r"^USER\s+(?!root)\S+", dockerfile, flags=re.MULTILINE)
-    assert re.search(r"^ENV.*DJANGO_SETTINGS_MODULE=config\.settings\.prod", dockerfile, flags=re.MULTILINE | re.DOTALL)
-    assert "gunicorn" in dockerfile
-    assert "requirements/base.txt" in dockerfile and "requirements/dev.txt" not in dockerfile
+def test_the_repository_ships_no_container_files():
+    """The project runs on a locally installed PostgreSQL; there is deliberately no Docker setup."""
+    for name in ("Dockerfile", "docker-compose.yml", ".dockerignore"):
+        assert not (BASE_DIR / name).exists(), name
 
 
-def test_the_image_has_no_web_health_check_because_the_worker_and_beat_share_it():
-    """A HEALTHCHECK in the image is inherited by every container started from it. The Celery worker and
-    beat listen on no port, so they would be reported unhealthy forever (and restarted, by hosts that do that)."""
-    dockerfile = (BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
-
-    assert not re.search(r"^HEALTHCHECK", dockerfile, flags=re.MULTILINE)
-
-
-def test_compose_defines_the_full_stack():
-    compose = yaml.safe_load((BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8"))
-    services = compose["services"]
-
-    assert {"db", "redis", "web", "worker", "beat"} <= set(services)
-    assert "celery" in " ".join(services["worker"]["command"]) and "worker" in " ".join(services["worker"]["command"])
-    assert "beat" in " ".join(services["beat"]["command"])
-    assert services["web"]["build"] == services["worker"]["build"] == services["beat"]["build"] == "."
-
-
-def test_only_the_web_service_has_the_http_health_check():
-    services = yaml.safe_load((BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8"))["services"]
-
-    probe = " ".join(services["web"]["healthcheck"]["test"])
-    assert "/api/v1/health/" in probe
-    assert "healthcheck" not in services["worker"] and "healthcheck" not in services["beat"]
-
-
-def test_every_app_container_is_forced_onto_production_settings():
-    """env_file values override the image's ENV, so a copied .env.example (development) must not win."""
-    services = yaml.safe_load((BASE_DIR / "docker-compose.yml").read_text(encoding="utf-8"))["services"]
-
-    for name in ("web", "worker", "beat"):
-        assert services[name]["environment"]["DJANGO_SETTINGS_MODULE"] == "config.settings.prod", name
-
-
-def test_dockerignore_keeps_secrets_and_junk_out_of_the_image():
-    ignored = (BASE_DIR / ".dockerignore").read_text(encoding="utf-8").split()
-
-    for entry in (".env", ".git", ".venv", ".superpowers"):
-        assert entry in ignored
+def test_production_server_gunicorn_is_a_dependency():
+    assert "gunicorn" in (BASE_DIR / "requirements" / "base.txt").read_text(encoding="utf-8")
 
 
 def test_deployment_guide_exists_and_covers_the_essentials():

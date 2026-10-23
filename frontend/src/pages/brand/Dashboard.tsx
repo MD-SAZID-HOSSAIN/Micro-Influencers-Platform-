@@ -82,7 +82,7 @@ export default function BrandDashboard() {
       title: user.platformStatus === 'pending' ? 'An admin is checking your link' : 'Connect a platform to publish and accept',
       text: user.platformStatus === 'pending'
         ? 'You can publish campaigns and accept proposals once an admin approves your Instagram, TikTok or Facebook link.'
-        : 'Connect YouTube with Google, or add your Instagram, TikTok or Facebook link for an admin to approve.',
+        : 'Add your official Instagram, TikTok or Facebook link for an admin to approve.',
       to: '/brand/accounts',
       cta: user.platformStatus === 'pending' ? 'See status' : 'Connect account',
     });
@@ -131,12 +131,8 @@ export default function BrandDashboard() {
   return (
     <div className="container-page py-6 sm:py-8">
       <PageHeader
-        eyebrow={`Today · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}`}
-        title={
-          <>
-            {brand?.companyName || user?.fullName} <span className="text-ink-400">/</span> <span className="italic font-medium">control room</span>
-          </>
-        }
+        eyebrow={`Dashboard · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}`}
+        title={brand?.companyName || user?.fullName || 'Your dashboard'}
         description={summary}
         action={
           <Link to="/brand/campaigns/create" className="btn btn-primary btn-md self-start sm:self-auto">
@@ -147,9 +143,10 @@ export default function BrandDashboard() {
 
       <div className="space-y-8">
         <StatRow
+          size="lg"
           items={[
             { label: 'Live campaigns', value: activeCampaigns, hint: `${totalCampaigns} in total` },
-            { label: 'New proposals', value: pending, hint: 'waiting for you' },
+            { label: 'New proposals', value: pending, hint: 'waiting for you', attention: pending > 0 },
             { label: 'Shortlisted', value: shortlisted, hint: 'ready to accept' },
             { label: 'Accepted', value: accepted, hint: 'creators hired' },
           ]}

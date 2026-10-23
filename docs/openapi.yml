@@ -1351,7 +1351,7 @@ paths:
   /api/v1/brands/me/social/:
     get:
       operationId: brands_me_social_list
-      description: The platforms the signed-in brand has connected. One, of any kind,
+      description: The platforms the signed-in brand has added. One approved link
         completes its verification.
       tags:
       - Social
@@ -1369,7 +1369,7 @@ paths:
   /api/v1/brands/me/social/{platform}/:
     put:
       operationId: brands_me_social_update
-      description: Add a typed link (Instagram, TikTok, Facebook) or remove any connected
+      description: Add a typed link (Instagram, TikTok, Facebook) or remove a connected
         platform.
       parameters:
       - in: path
@@ -1402,7 +1402,7 @@ paths:
           description: ''
     delete:
       operationId: brands_me_social_destroy
-      description: Add a typed link (Instagram, TikTok, Facebook) or remove any connected
+      description: Add a typed link (Instagram, TikTok, Facebook) or remove a connected
         platform.
       parameters:
       - in: path
@@ -1417,63 +1417,6 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/brands/me/social/youtube/complete/:
-    post:
-      operationId: brands_me_social_youtube_complete_create
-      description: Finish connecting YouTube for a brand. Send back the ``state``
-        and ``code`` the callback redirect carried.
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      tags:
-      - Social
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CompleteConnect'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CompleteConnect'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CompleteConnect'
-        required: true
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedBrandSocialAccountList'
-          description: ''
-  /api/v1/brands/me/social/youtube/connect/:
-    get:
-      operationId: brands_me_social_youtube_connect_retrieve
-      description: 'Start the Google sign-in for a brand: returns the Google URL to
-        send the browser to.'
-      tags:
-      - Social
-      security:
-      - bearerAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthorizationUrl'
-          description: ''
   /api/v1/campaigns/:
     get:
       operationId: campaigns_list
@@ -3623,6 +3566,9 @@ components:
           pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
           readOnly: true
           nullable: true
+        is_verified:
+          type: boolean
+          readOnly: true
         stats:
           type: array
           items:
@@ -3648,6 +3594,7 @@ components:
       - country
       - full_name
       - id
+      - is_verified
       - niche
       - photo_url
       - portfolio
@@ -3721,6 +3668,9 @@ components:
         completion_percent:
           type: integer
           readOnly: true
+        is_verified:
+          type: boolean
+          readOnly: true
         stats:
           type: array
           items:
@@ -3730,6 +3680,7 @@ components:
       - completion_percent
       - full_name
       - id
+      - is_verified
       - rating_avg
       - rating_count
       - stats
@@ -4283,29 +4234,6 @@ components:
         creators_needed:
           type: integer
           example: 3
-    PaginatedBrandSocialAccountList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/BrandSocialAccount'
     PaginatedCampaignCardList:
       type: object
       required:
@@ -4625,6 +4553,9 @@ components:
           readOnly: true
         completion_percent:
           type: integer
+          readOnly: true
+        is_verified:
+          type: boolean
           readOnly: true
         stats:
           type: array

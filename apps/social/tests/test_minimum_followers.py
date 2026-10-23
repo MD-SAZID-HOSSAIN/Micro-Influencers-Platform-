@@ -196,6 +196,6 @@ def test_no_stats_can_be_marked_verified_by_typing_them(creator, auth_client):
         format="json",
     )
 
-    assert response.status_code == 200
-    assert PlatformStats.objects.get(creator=creator, platform="youtube").is_verified is False
+    assert response.status_code == 400
+    assert not PlatformStats.objects.filter(creator=creator, platform="youtube").exists()
     assert apply(auth_client, creator).status_code == 403

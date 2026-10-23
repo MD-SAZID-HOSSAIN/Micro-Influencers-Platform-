@@ -174,7 +174,7 @@ def test_item_shows_everything_the_brand_needs_to_decide(brand, campaign, auth_c
             "platform": "instagram",
             "followers": 4200,
             "engagement_rate": "5.25",
-            "is_verified": True,
+            "is_verified": False,  # approved Instagram numbers show, but only YouTube plus a confirmed email verifies
             "rating_avg": None,
             "rating_count": 0,
         },
@@ -189,6 +189,17 @@ def test_item_shows_everything_the_brand_needs_to_decide(brand, campaign, auth_c
         "review": None,
         "created_at": item["created_at"],
     }
+
+
+def test_a_creator_with_verified_youtube_and_a_confirmed_email_is_shown_as_verified(brand, campaign, auth_client):
+    creator = make_creator(platform="youtube", followers=5000)
+    creator.email_verified = True
+    creator.save(update_fields=["email_verified"])
+    ProposalFactory(campaign=campaign, creator=creator)
+
+    item = fetch(auth_client, brand, campaign).json()["results"][0]
+
+    assert item["creator"]["is_verified"] is True
 
 
 def test_creator_without_stats_has_null_numbers(brand, campaign, auth_client):

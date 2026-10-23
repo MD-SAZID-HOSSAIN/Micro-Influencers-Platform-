@@ -287,18 +287,16 @@ export default function CreatorDiscovery() {
                   <div className="flex items-start gap-3">
                     <ProfileTile name={c.fullName} seed={c.id} imageUrl={c.avatarUrl} height={48} className="w-12 rounded-full shrink-0 border border-ink-200 shadow-xs" />
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
-                        {c.fullName}
-                      </div>
+                      <div className="font-semibold text-ink-900 truncate">{c.fullName}</div>
                       <div className="text-xs text-ink-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {c.primaryPlatform && <PlatformIcon platform={c.primaryPlatform} className="w-3 h-3" />}
                         <span>{c.niche || 'No niche yet'}</span>
                       </div>
-                      <div className="mt-1.5">
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <VerifiedBadge verified={c.verified} />
                         <Rating value={c.ratingAvg} count={c.ratingCount} />
                       </div>
                     </div>
-                    <VerifiedBadge verified={c.verified} />
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-px bg-ink-200 border border-ink-200 rounded-md overflow-hidden">
                     <Stat label="Followers" value={fmtNumber(c.followers)} />

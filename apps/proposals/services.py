@@ -4,6 +4,8 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.accounts.models import User
 from apps.accounts.verification import require_verified_brand, require_verified_creator
+from apps.campaigns.discovery import followers_by_platform
+from apps.campaigns.eligibility import minimum_followers_problem
 from apps.campaigns.models import Campaign
 from apps.core.exceptions import Conflict, DomainError
 from apps.notifications.models import Kind
@@ -75,6 +77,8 @@ def submit_proposal(
             raise NotFound("Campaign not found.")
         if campaign.status != Campaign.Status.PUBLISHED or campaign.deadline <= timezone.now():
             raise CampaignClosed()
+        if problem := minimum_followers_problem(campaign, followers_by_platform(creator)):
+            raise NotEligible(problem)  # the brand's minimum followers is a requirement, not a hint
 
         history = Proposal.objects.filter(campaign=campaign, creator=creator)
         if history.filter(status__in=ACTIVE_STATUSES).exists():
@@ -154,6 +158,17 @@ def withdraw_proposal(*, creator: User, proposal_id: int, reason: str | None) ->
     return proposal
 
 
+class NotEligible(DomainError):
+    status_code = 403
+    default_code = "not_eligible"
+    default_detail = "You do not meet this campaign's requirements."
+
+
+class CreatorUnavailable(Conflict):
+    default_code = "creator_unavailable"
+    default_detail = "This creator's account is no longer active, so the proposal cannot be accepted."
+
+
 class CampaignFull(Conflict):
     default_code = "campaign_full"
     default_detail = "All creators for this campaign have already been selected."
@@ -175,6 +190,8 @@ def _transition(
             return proposal  # accepting twice (a double click) changes nothing and is not an error
         if proposal.status not in allowed_from:
             raise InvalidTransition()
+        if to == Proposal.Status.ACCEPTED and not proposal.creator.is_active:
+            raise CreatorUnavailable()  # a suspended creator must not use up one of the limited places
         if check_capacity:
             taken = Proposal.objects.filter(campaign=campaign, status=Proposal.Status.ACCEPTED).count()
             if taken >= campaign.creators_needed:

@@ -1,8 +1,18 @@
 import { Link } from 'react-router-dom';
 import type { Campaign } from '../types';
 import { EligibilityChip, CampaignStatusBadge, ProfileTile, PlatformIcon } from './ui';
-import { fmtDate, currency } from '../lib/shared';
+import { currency } from '../lib/shared';
 import { ArrowRight, Flame } from 'lucide-react';
+
+/** "Nov 5" for this year, "Nov 5, 2027" for another, so it fits the narrow deadline cell. */
+const fmtShortDate = (iso: string): string => {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(d.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }),
+  });
+};
 
 export function CampaignCard({
   campaign,
@@ -81,7 +91,7 @@ export function CampaignCard({
           <Cell label="Creators" value={String(campaign.creatorsNeeded)} hint="needed" />
           <Cell
             label="Deadline"
-            value={fmtDate(campaign.applicationDeadline)}
+            value={fmtShortDate(campaign.applicationDeadline)}
             hint={diffDays > 0 ? `${diffDays}d left` : 'Ending'}
           />
         </div>

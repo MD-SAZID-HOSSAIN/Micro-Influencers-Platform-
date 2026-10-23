@@ -66,6 +66,18 @@ class YouTubeConnection(models.Model):
     last_manual_refresh_at = models.DateTimeField(null=True, blank=True)
     last_error = models.CharField(max_length=100, blank=True, default="")
     connected_at = models.DateTimeField(auto_now_add=True)
+    # Google's id for the channel. One channel can be connected to one account only; blank until a legacy
+    # connection has synced once.
+    channel_id = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["channel_id"],
+                condition=~models.Q(channel_id=""),
+                name="uniq_youtube_channel",
+            )
+        ]
 
     def __str__(self):
         return f"YouTubeConnection({self.creator_id}, {self.status})"

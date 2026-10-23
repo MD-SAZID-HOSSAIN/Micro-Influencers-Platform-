@@ -6,7 +6,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core import signing
 from django.core.cache import cache
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
@@ -37,9 +37,10 @@ OAUTH_STATE_MAX_AGE = 600
 OAUTH_NONCE_KEY = "youtube-oauth-nonce:{}"
 
 
-class StatsVerified(Conflict):
-    default_code = "stats_verified"
-    default_detail = "These stats come from a connected account and cannot be edited manually."
+class YouTubeFromGoogleOnly(DomainError):
+    status_code = 400
+    default_code = "youtube_from_google_only"
+    default_detail = "YouTube numbers come from your connected channel and cannot be typed. Use Connect YouTube."
 
 
 def set_manual_stats(
@@ -50,17 +51,15 @@ def set_manual_stats(
     engagement_rate: Decimal,
     handle_url: str | None = None,
 ) -> PlatformStats:
-    """Create or update stats entered by hand; refuses to overwrite Verified YouTube ones.
+    """Create or update stats entered by hand for Instagram, TikTok or Facebook. YouTube is never typed.
 
+    YouTube numbers come only from Google sign-in, so typing them is refused (whatever is already stored).
     Instagram, TikTok and Facebook need a link an admin can check. Every save, including an edit, goes back to
     "pending": the numbers are Unverified and hidden from the public profile until an admin approves them.
     """
-    existing = PlatformStats.objects.filter(creator=creator, platform=platform).first()
-    if existing is not None and existing.is_verified and platform == "youtube":
-        raise StatsVerified()
-    typed = platform != "youtube"
-    if typed:
-        handle_url = clean_profile_link(platform, handle_url)
+    if platform == "youtube":
+        raise YouTubeFromGoogleOnly()
+    handle_url = clean_profile_link(platform, handle_url)
     stats, _ = PlatformStats.objects.update_or_create(
         creator=creator,
         platform=platform,
@@ -69,7 +68,7 @@ def set_manual_stats(
             "engagement_rate": engagement_rate,
             "handle_url": handle_url,
             "is_verified": False,
-            "review_status": PlatformStats.Review.PENDING if typed else PlatformStats.Review.APPROVED,
+            "review_status": PlatformStats.Review.PENDING,
             "review_note": "",
             "is_outdated": False,
             "last_synced_at": timezone.now(),
@@ -190,6 +189,18 @@ def sync_connection(connection: YouTubeConnection) -> None:
         # Transient errors are retried by the task; anything else ends here, so say what happened.
         logger.warning("YouTube sync failed for creator %s: %s", connection.creator_id, exc)
         raise
+    if snapshot.channel_id and snapshot.channel_id != connection.channel_id:
+        # A connection made before channels were recorded: remember its channel now. If another account already
+        # has that channel, this one cannot be trusted as proof, so it stays unverified until reconnected.
+        if YouTubeConnection.objects.filter(channel_id=snapshot.channel_id).exclude(pk=connection.pk).exists():
+            logger.warning("Creator %s shares a YouTube channel with another account", connection.creator_id)
+            PlatformStats.objects.filter(creator_id=connection.creator_id, platform="youtube").update(
+                is_verified=False
+            )
+            _flag_unusable_channel(connection, "channel_in_use")
+            return
+        connection.channel_id = snapshot.channel_id
+        connection.save(update_fields=["channel_id"])
     apply_snapshot(connection, snapshot)
 
 
@@ -223,6 +234,7 @@ _CONNECT_MESSAGES = {
     "no_channel": (
         "That Google account has no YouTube channel. Sign in with an account that has one, or connect another platform."
     ),
+    "channel_in_use": "This YouTube channel is already connected to another CollabNest account.",
 }
 
 
@@ -287,13 +299,28 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
 
     claim_state(user, state)
 
+    client = get_youtube_client()
     try:
-        tokens = get_youtube_client().exchange_code(code)
+        tokens = client.exchange_code(code)
     except YouTubeError as exc:
         # The creator only sees "try again"; the real reason (bad client secret, redirect mismatch,
         # an expired code...) is what a developer needs, so it goes in the log.
         logger.warning("YouTube sign-in could not be completed for creator %s: %s", user.id, exc)
         raise ConnectError("exchange_failed")
+
+    # One channel verifies one account: refuse a channel that another account already has.
+    try:
+        channel_id = client.fetch_channel_id(tokens.access_token)
+    except ChannelNotFound:
+        schedule_token_revoke(tokens.refresh_token or tokens.access_token, user.id)
+        raise ConnectError("no_channel")
+    except YouTubeError as exc:
+        logger.warning("YouTube channel lookup failed for creator %s: %s", user.id, exc)
+        schedule_token_revoke(tokens.refresh_token or tokens.access_token, user.id)
+        raise ConnectError("exchange_failed")
+    if YouTubeConnection.objects.filter(channel_id=channel_id).exclude(creator=user).exists():
+        schedule_token_revoke(tokens.refresh_token or tokens.access_token, user.id)
+        raise ConnectError("channel_in_use")
 
     existing = YouTubeConnection.objects.filter(creator=user).first()
     if tokens.refresh_token:
@@ -303,16 +330,22 @@ def complete_connect(*, user: User, state: str, code: str) -> YouTubeConnection:
     else:
         raise ConnectError("no_refresh_token")
 
-    connection, _ = YouTubeConnection.objects.update_or_create(
-        creator=user,
-        defaults={
-            "access_token_enc": encrypt(tokens.access_token),
-            "refresh_token_enc": encrypt(refresh_token),
-            "access_expires_at": timezone.now() + timedelta(seconds=tokens.expires_in),
-            "status": YouTubeConnection.Status.CONNECTED,
-            "last_error": "",
-        },
-    )
+    try:
+        with transaction.atomic():  # savepoint: a lost race on the unique channel must not poison the request
+            connection, _ = YouTubeConnection.objects.update_or_create(
+                creator=user,
+                defaults={
+                    "access_token_enc": encrypt(tokens.access_token),
+                    "refresh_token_enc": encrypt(refresh_token),
+                    "access_expires_at": timezone.now() + timedelta(seconds=tokens.expires_in),
+                    "status": YouTubeConnection.Status.CONNECTED,
+                    "last_error": "",
+                    "channel_id": channel_id,
+                },
+            )
+    except IntegrityError:
+        schedule_token_revoke(tokens.refresh_token or tokens.access_token, user.id)
+        raise ConnectError("channel_in_use")
     # The link is already saved. If the queue is down, the first sync simply waits for the next daily run.
     transaction.on_commit(lambda: enqueue(tasks.sync_connection_task, connection.id))
     return connection

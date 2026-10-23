@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Logo } from './Logo';
+import { useAuth } from '../state/AuthContext';
 import clsx from 'clsx';
 
 const PUBLIC_NAV = [
@@ -18,6 +19,11 @@ const FOCUSED_ROUTES =
 export default function PublicLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  // Signed-in people get a way back to their dashboard instead of Log in / Get started.
+  const dashboardLink = user
+    ? user.role === 'creator' ? '/creator/dashboard' : user.role === 'admin' ? '/admin/overview' : '/brand/dashboard'
+    : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -97,13 +103,22 @@ export default function PublicLayout() {
           </nav>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <Link to="/login" className="btn btn-ghost btn-sm sm:btn-md hidden sm:inline-flex">
-              Log in
-            </Link>
-            <button onClick={() => navigate('/register/role')} className="btn btn-primary btn-sm sm:btn-md">
-              Get started
-              <ArrowRight className="w-3.5 h-3.5 hidden sm:inline" />
-            </button>
+            {dashboardLink ? (
+              <Link to={dashboardLink} className="btn btn-primary btn-sm sm:btn-md">
+                My dashboard
+                <ArrowRight className="w-3.5 h-3.5 hidden sm:inline" />
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn-ghost btn-sm sm:btn-md hidden sm:inline-flex">
+                  Log in
+                </Link>
+                <button onClick={() => navigate('/register/role')} className="btn btn-primary btn-sm sm:btn-md">
+                  Get started
+                  <ArrowRight className="w-3.5 h-3.5 hidden sm:inline" />
+                </button>
+              </>
+            )}
 
             <button
               type="button"
@@ -140,11 +155,11 @@ export default function PublicLayout() {
               </Link>
             ))}
             <Link
-              to="/login"
+              to={dashboardLink ?? '/login'}
               onClick={closeMenu}
               className="py-3 font-semibold hover:text-ink-900 transition-colors"
             >
-              Log in
+              {dashboardLink ? 'My dashboard' : 'Log in'}
             </Link>
           </nav>
         </div>
@@ -178,8 +193,14 @@ export default function PublicLayout() {
               <div>
                 <h4 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-300">Account</h4>
                 <ul className="mt-4 space-y-2.5">
-                  <li><Link to="/login" className="hover:text-white transition-colors">Log in</Link></li>
-                  <li><Link to="/register/role" className="hover:text-white transition-colors">Create an account</Link></li>
+                  {dashboardLink ? (
+                    <li><Link to={dashboardLink} className="hover:text-white transition-colors">My dashboard</Link></li>
+                  ) : (
+                    <>
+                      <li><Link to="/login" className="hover:text-white transition-colors">Log in</Link></li>
+                      <li><Link to="/register/role" className="hover:text-white transition-colors">Create an account</Link></li>
+                    </>
+                  )}
                 </ul>
               </div>
               <div>

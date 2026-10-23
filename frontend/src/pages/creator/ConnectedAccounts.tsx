@@ -19,6 +19,8 @@ const YOUTUBE_FAILURES: Record<string, string> = {
   exchange_failed: 'Google did not accept the sign-in. Try connecting again.',
   no_refresh_token:
     'Google did not grant lasting access. Remove CollabNest under your Google account permissions, then connect again.',
+  no_channel: 'That Google account has no YouTube channel. Sign in with the account that owns your channel.',
+  channel_in_use: 'This YouTube channel is already connected to another CollabNest account.',
 };
 
 const youTubeFailure = (code: string | null | undefined) =>

@@ -60,18 +60,26 @@ def test_manual_entry_updates_existing_unverified_stat(creator, auth_client):
     assert PlatformStats.objects.get(creator=creator, platform="instagram").followers == 15000
 
 
-def test_manual_entry_blocked_on_verified_platform(creator, auth_client):
+def test_youtube_numbers_cannot_be_typed_over_verified_ones(creator, auth_client):
     PlatformStats.objects.create(
         creator=creator, platform="youtube", followers=5000, engagement_rate="3.00", is_verified=True
     )
 
     response = put(auth_client(creator), "youtube", followers=999999)
 
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "stats_verified"
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "youtube_from_google_only"
     stat = PlatformStats.objects.get(creator=creator, platform="youtube")
     assert stat.followers == 5000
     assert stat.is_verified is True
+
+
+def test_youtube_numbers_cannot_be_typed_at_all(creator, auth_client):
+    response = put(auth_client(creator), "youtube", followers=999999)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "youtube_from_google_only"
+    assert not PlatformStats.objects.filter(creator=creator).exists()
 
 
 @pytest.mark.parametrize("rate, ok", [("0", True), ("100", True), ("100.01", False), ("-0.5", False)])

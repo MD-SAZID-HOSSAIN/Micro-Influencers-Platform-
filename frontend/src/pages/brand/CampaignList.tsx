@@ -99,7 +99,7 @@ export default function CampaignList() {
               )}
             >
               {t}
-              <span className="ml-1.5 text-[10px] font-mono text-ink-400">{counts[t]}</span>
+              <span className="ml-1.5 text-[11px] font-mono text-ink-400">{counts[t]}</span>
             </button>
           ))}
         </div>
@@ -143,15 +143,16 @@ export default function CampaignList() {
                       <span>·</span>
                       <span>{currency(c.budgetPerCreator)} / creator</span>
                       <span>·</span>
-                      <span>{c.creatorsNeeded} creators</span>
+                      <span>{c.creatorsNeeded} {c.creatorsNeeded === 1 ? 'creator' : 'creators'} needed</span>
                     </div>
                   </div>
                   <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0.5 shrink-0">
                     <div className="text-sm font-mono font-semibold text-ink-900 inline-flex items-center gap-1">
                       <Users className="w-3.5 h-3.5 text-ink-500" />
                       {pc.accepted} / {c.creatorsNeeded}
+                      <span className="font-sans font-normal text-xs text-ink-500 ml-0.5">accepted</span>
                     </div>
-                    <div className="text-[11px] text-ink-500">
+                    <div className="text-xs text-ink-500">
                       {pc.total} proposal{pc.total === 1 ? '' : 's'}
                     </div>
                   </div>

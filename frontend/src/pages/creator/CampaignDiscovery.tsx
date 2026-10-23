@@ -333,7 +333,7 @@ export default function CampaignDiscovery() {
           <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 stagger">
             {sorted.map((c) => {
               const eligible = c.eligible === true;
-              const reason = eligible ? undefined : `Your ${c.requiredPlatform} stats do not match this brief. You can still apply.`;
+              const reason = eligible ? undefined : `Your ${c.requiredPlatform} numbers may not match this brief.`;
               return (
                 <li key={c.id}>
                   <CampaignCard

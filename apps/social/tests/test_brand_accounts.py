@@ -1,21 +1,17 @@
-"""A brand connects any of YouTube, Instagram, TikTok or Facebook; one verified platform is enough.
+"""A brand adds an Instagram, TikTok or Facebook link; one link approved by an admin is enough.
 
-YouTube is connected with Google sign-in (the only proof of ownership available). The other three are links
-the brand types: they wait for an admin ("pending") and are Verified only once the admin approves them.
+The links are typed by the brand: they wait for an admin ("pending") and count only once the admin approves them.
+YouTube does not verify a brand.
 """
-from urllib.parse import parse_qs, urlparse
-
 import pytest
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Role
 from apps.accounts.tests.factories import UserFactory
+from apps.accounts.verification import brand_has_platform, brand_platform_status
 from apps.social.models import BrandSocialAccount
-from apps.social.youtube_client import ChannelNotFound
 
 BASE = "/api/v1/brands/me/social/"
-YOUTUBE_CONNECT = BASE + "youtube/connect/"
-YOUTUBE_COMPLETE = BASE + "youtube/complete/"
 
 
 def error_code(response):
@@ -92,11 +88,11 @@ def test_saving_again_replaces_the_link(brand, auth_client):
     assert accounts.count() == 1 and accounts.get().handle_url == "https://instagram.com/new"
 
 
-def test_youtube_cannot_be_typed_in_it_needs_google_sign_in(brand, auth_client):
+def test_youtube_cannot_be_added_it_does_not_verify_a_brand(brand, auth_client):
     response = put(auth_client(brand), "youtube", "https://www.youtube.com/@acme")
 
     assert response.status_code == 400
-    assert error_code(response) == "google_signin_required"
+    assert error_code(response) == "youtube_not_for_brands"
     assert not BrandSocialAccount.objects.filter(brand=brand).exists()
 
 
@@ -131,77 +127,31 @@ def test_only_brands_can_use_these_endpoints(db, auth_client):
     assert APIClient().get(BASE).status_code == 401
 
 
-# ---- YouTube with Google sign-in -----------------------------------------------------------------------------
+# ---- YouTube does not verify a brand ------------------------------------------------------------------------
 
 
-def state_from(client):
-    url = client.get(YOUTUBE_CONNECT).json()["authorization_url"]
-    return parse_qs(urlparse(url).query)["state"][0]
-
-
-def test_connecting_youtube_saves_a_verified_account_and_revokes_the_google_access(
-    brand, auth_client, fake_youtube, run_on_commit
-):
-    client = auth_client(brand)
-    state = state_from(client)
-
-    with run_on_commit():  # the revoke is a background job that runs once the account is saved
-        response = client.post(YOUTUBE_COMPLETE, {"state": state, "code": "auth-code"}, format="json")
-
-    assert response.status_code == 200
-    account = BrandSocialAccount.objects.get(brand=brand, platform="youtube")
-    assert account.is_verified is True and account.handle_url == "https://www.youtube.com/@brandchannel"
-    body = response.json()
-    assert len(body) == 1
-    assert (body[0]["platform"], body[0]["handle_url"], body[0]["is_verified"]) == (
-        "youtube",
-        "https://www.youtube.com/@brandchannel",
-        True,
+def test_a_legacy_youtube_row_is_hidden_and_never_counts(brand, auth_client):
+    BrandSocialAccount.objects.create(
+        brand=brand, platform="youtube", handle_url="https://www.youtube.com/@acme", is_verified=True
     )
-    assert fake_youtube.exchange_calls == ["auth-code"]
-    assert fake_youtube.revoked  # a brand needs no ongoing access, so none is kept
-
-
-def test_another_brands_state_cannot_be_used(brand, auth_client, fake_youtube):
-    other = UserFactory(role=Role.BRAND, platform_connected=False)
-    state = state_from(auth_client(other))
-
-    response = auth_client(brand).post(YOUTUBE_COMPLETE, {"state": state, "code": "x"}, format="json")
-
-    assert response.status_code == 400 and error_code(response) == "invalid_state"
-    assert not BrandSocialAccount.objects.exists()
-
-
-def test_a_state_can_only_be_used_once(brand, auth_client, fake_youtube):
-    client = auth_client(brand)
-    state = state_from(client)
-    assert client.post(YOUTUBE_COMPLETE, {"state": state, "code": "x"}, format="json").status_code == 200
-
-    again = client.post(YOUTUBE_COMPLETE, {"state": state, "code": "x"}, format="json")
-
-    assert again.status_code == 400 and error_code(again) == "invalid_state"
-
-
-def test_a_google_account_with_no_channel_is_a_clear_error(brand, auth_client, fake_youtube):
-    fake_youtube.channel_link_result = ChannelNotFound()
     client = auth_client(brand)
 
-    response = client.post(YOUTUBE_COMPLETE, {"state": state_from(client), "code": "x"}, format="json")
+    assert client.get(BASE).json() == []
+    assert brand_has_platform(brand) is False
+    assert brand_platform_status(brand) == "none"
 
-    assert response.status_code == 400 and error_code(response) == "no_channel"
-    assert not BrandSocialAccount.objects.exists()
 
-
-def test_removing_youtube_deletes_it(brand, auth_client, fake_youtube):
+def test_the_brand_youtube_google_sign_in_endpoints_are_gone(brand, auth_client):
     client = auth_client(brand)
-    client.post(YOUTUBE_COMPLETE, {"state": state_from(client), "code": "x"}, format="json")
 
-    assert client.delete(f"{BASE}youtube/").status_code == 204
-    assert not BrandSocialAccount.objects.filter(brand=brand).exists()
+    assert client.get(BASE + "youtube/connect/").status_code == 404
+    assert client.post(BASE + "youtube/complete/", {"state": "x", "code": "y"}, format="json").status_code == 404
 
 
-def test_creators_cannot_use_the_brand_youtube_flow(db, auth_client):
-    creator = UserFactory(role=Role.CREATOR)
+def test_only_an_approved_link_verifies_a_brand(brand, auth_client):
+    put(auth_client(brand), "instagram", "https://instagram.com/acme")
+    assert brand_has_platform(brand) is False and brand_platform_status(brand) == "pending"
 
-    assert auth_client(creator).get(YOUTUBE_CONNECT).status_code == 403
-    assert auth_client(creator).post(YOUTUBE_COMPLETE, {"state": "x", "code": "y"}, format="json").status_code == 403
+    BrandSocialAccount.objects.filter(brand=brand).update(is_verified=True, review_status="approved")
+
+    assert brand_has_platform(brand) is True and brand_platform_status(brand) == "verified"

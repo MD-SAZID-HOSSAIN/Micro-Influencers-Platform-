@@ -13,10 +13,16 @@ from apps.proposals.deliverable_stats import NOT_AVAILABLE, content_performance,
 from apps.proposals.models import Deliverable, Proposal
 from apps.proposals.tasks import sync_deliverable_stats
 from apps.proposals.tests.factories import ProposalFactory
-from apps.social.tests.fakes import FakeYouTubeClient
+from apps.social.tests.fakes import FakeYouTubeClient, make_connection
 from apps.social.youtube_client import QuotaExceeded, TransientApiError, VideoStats
 
 S = Proposal.Status
+CHANNEL = "UC-owner"  # the channel the accepted creator connected
+
+
+def owned(*args, **kwargs) -> VideoStats:
+    """Statistics of a video that is on the creator's own channel."""
+    return VideoStats(*args, channel_id=CHANNEL, **kwargs)
 
 
 def vid(n: int) -> str:
@@ -41,7 +47,9 @@ def fake(monkeypatch):
 @pytest.fixture
 def accepted(db):
     campaign = CampaignFactory(status=Campaign.Status.PUBLISHED, creators_needed=5)
-    return ProposalFactory(campaign=campaign, status=S.ACCEPTED)
+    proposal = ProposalFactory(campaign=campaign, status=S.ACCEPTED)
+    make_connection(proposal.creator, channel_id=CHANNEL, with_stats=False)
+    return proposal
 
 
 def deliver(proposal, url, platform="youtube", **kwargs):
@@ -58,7 +66,7 @@ def reload(deliverable):
 
 def test_sync_stores_views_likes_and_comments(accepted, fake):
     first = deliver(accepted, watch(1))
-    fake.video_results[vid(1)] = VideoStats(views=2000, likes=150, comments=30)
+    fake.video_results[vid(1)] = owned(views=2000, likes=150, comments=30)
 
     updated = refresh_deliverable_stats()
 
@@ -71,7 +79,7 @@ def test_sync_stores_views_likes_and_comments(accepted, fake):
 
 def test_hidden_counts_are_stored_as_unknown(accepted, fake):
     item = deliver(accepted, watch(1))
-    fake.video_results[vid(1)] = VideoStats(views=500, likes=None, comments=None)
+    fake.video_results[vid(1)] = owned(views=500, likes=None, comments=None)
 
     refresh_deliverable_stats()
 
@@ -94,7 +102,7 @@ def test_only_youtube_deliverables_of_accepted_proposals_with_a_video_id_are_loo
     deliver(accepted, "https://www.youtube.com/@channel")  # not a video
     for status in (S.WITHDRAWN, S.REJECTED, S.PENDING):
         deliver(ProposalFactory(campaign=accepted.campaign, status=status), watch(9))
-    fake.video_results[vid(1)] = VideoStats(1, 1, 1)
+    fake.video_results[vid(1)] = owned(1, 1, 1)
 
     refresh_deliverable_stats()
 
@@ -105,7 +113,7 @@ def test_only_youtube_deliverables_of_accepted_proposals_with_a_video_id_are_loo
 def test_lookups_are_batched_in_fifties(accepted, fake):
     for n in range(120):
         deliver(accepted, watch(n))
-        fake.video_results[vid(n)] = VideoStats(n, 0, 0)
+        fake.video_results[vid(n)] = owned(n, 0, 0)
 
     updated = refresh_deliverable_stats()
 
@@ -113,15 +121,39 @@ def test_lookups_are_batched_in_fifties(accepted, fake):
     assert [len(ids) for ids, _ in fake.video_calls] == [50, 50, 20]
 
 
-def test_a_video_delivered_twice_is_looked_up_once_and_both_rows_are_updated(accepted, fake):
+def test_a_video_delivered_twice_is_looked_up_once_and_only_the_owner_gets_the_numbers(accepted, fake):
     other = ProposalFactory(campaign=accepted.campaign, status=S.ACCEPTED)
+    make_connection(other.creator, channel_id="UC-someone-else", with_stats=False)
     one, two = deliver(accepted, watch(1)), deliver(other, f"https://youtu.be/{vid(1)}")
-    fake.video_results[vid(1)] = VideoStats(10, 2, 1)
+    fake.video_results[vid(1)] = owned(10, 2, 1)
 
     refresh_deliverable_stats()
 
     assert len(fake.video_calls) == 1
-    assert reload(one).views_count == reload(two).views_count == 10
+    assert reload(one).views_count == 10
+    assert reload(two).views_count is None and reload(two).stats_synced_at is None
+
+
+def test_someone_elses_video_gets_no_numbers_and_earlier_ones_are_cleared(accepted, fake):
+    item = deliver(accepted, watch(1), views_count=999, likes_count=9, comments_count=1, stats_synced_at=timezone.now())
+    fake.video_results[vid(1)] = VideoStats(5_000_000, 100_000, 9_000, channel_id="UC-a-big-channel")
+
+    refresh_deliverable_stats()
+
+    item = reload(item)
+    assert (item.views_count, item.likes_count, item.comments_count, item.stats_synced_at) == (None, None, None, None)
+    assert content_performance(accepted.campaign)[0]["views"] == NOT_AVAILABLE
+
+
+def test_a_creator_whose_channel_is_not_known_yet_gets_no_numbers(db, fake):
+    campaign = CampaignFactory(status=Campaign.Status.PUBLISHED, creators_needed=5)
+    proposal = ProposalFactory(campaign=campaign, status=S.ACCEPTED)  # no YouTube connection at all
+    item = deliver(proposal, watch(1))
+    fake.video_results[vid(1)] = owned(10, 2, 1)
+
+    refresh_deliverable_stats()
+
+    assert reload(item).views_count is None
 
 
 @pytest.mark.parametrize("error", [TransientApiError("503"), QuotaExceeded("quota")])
@@ -129,7 +161,7 @@ def test_a_failed_batch_keeps_the_previous_numbers_and_the_next_batch_still_runs
     old = deliver(accepted, watch(1), views_count=111, likes_count=11, comments_count=1, stats_synced_at=timezone.now())
     for n in range(2, 62):  # 60 more videos -> a second batch
         deliver(accepted, watch(n))
-        fake.video_results[vid(n)] = VideoStats(n, 0, 0)
+        fake.video_results[vid(n)] = owned(n, 0, 0)
     fake.video_batch_errors = [error, None]  # the first batch fails, the second succeeds
 
     refresh_deliverable_stats()
@@ -185,7 +217,7 @@ def test_the_sync_runs_daily_and_is_registered_with_celery(settings):
 
 def test_the_task_returns_how_many_were_updated(accepted, fake):
     deliver(accepted, watch(1))
-    fake.video_results[vid(1)] = VideoStats(1, 1, 1)
+    fake.video_results[vid(1)] = owned(1, 1, 1)
 
     assert sync_deliverable_stats() == 1
 

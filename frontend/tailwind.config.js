@@ -11,7 +11,8 @@ export default {
           50:  '#F4F2EC',
           100: '#E8E4D9',
           200: '#CFC8B7',
-          300: '#A89F88',
+          // 300 is for icons, separators and borders: 3.7:1 on the paper canvas (it was 2.5:1).
+          300: '#8A816A',
           400: '#6B6452',
           500: '#3F3A2E',
           600: '#2A2620',

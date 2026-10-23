@@ -244,9 +244,9 @@ def test_sync_all_continues_after_one_creator_fails(db, fake_youtube):  # RF5
     make_connection(first, access="at-a", followers=1)
     make_connection(middle, access="at-b", followers=2)
     make_connection(last, access="at-c", followers=3)
-    fake_youtube.fetch_results["at-a"] = snapshot(subscribers=1111)
+    fake_youtube.fetch_results["at-a"] = snapshot(subscribers=1111, channel_id="UC-a")
     fake_youtube.fetch_results["at-b"] = RuntimeError("unexpected Google weirdness")
-    fake_youtube.fetch_results["at-c"] = snapshot(subscribers=3333)
+    fake_youtube.fetch_results["at-c"] = snapshot(subscribers=3333, channel_id="UC-c")
 
     enqueued = sync_all_youtube()
 

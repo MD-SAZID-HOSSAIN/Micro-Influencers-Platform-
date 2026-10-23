@@ -362,7 +362,7 @@ def test_disconnect_is_idempotent(creator, auth_client):
     assert client.delete(BASE).status_code == 204
 
 
-def test_after_disconnect_manual_entry_is_allowed_again(creator, auth_client):
+def test_after_disconnect_typing_youtube_numbers_is_still_refused(creator, auth_client):
     make_connection(creator)
     client = auth_client(creator)
     client.delete(BASE)
@@ -373,7 +373,7 @@ def test_after_disconnect_manual_entry_is_allowed_again(creator, auth_client):
         format="json",
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 400 and response.json()["error"]["code"] == "youtube_from_google_only"
 
 
 def test_status_when_not_connected(creator, auth_client):

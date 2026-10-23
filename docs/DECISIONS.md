@@ -118,13 +118,11 @@ line of code, and the tests that pin them sit next to the code.
   stats, channels linked by handle, and Verified channels under the minimum. Numbers are never changed.
 - **A brand also needs one connected platform.** `publish_campaign` and `accept_proposal` check the email first
   (`brand_email_unverified`), then that the brand has at least one `BrandSocialAccount` (`brand_platform_required`).
-  Any of YouTube, Instagram, TikTok or Facebook counts. YouTube is connected with Google sign-in (the brand's channel
-  link is read once and the Google access is given back in a background job; `is_verified = true`). Instagram, TikTok and Facebook
+  (Superseded: YouTube no longer counts for a brand, see the last verification entry below.) Instagram, TikTok and Facebook
   are a link the brand types, checked to be on that platform's website; nothing proves ownership (that needs Meta or
   TikTok approval), so they are stored with `is_verified = false` ("Added") but still count as connected. Existing
   email-verified brands must connect a platform before they can publish or accept again. Endpoints:
-  `GET /brands/me/social/`, `PUT|DELETE /brands/me/social/{platform}/`, `GET .../youtube/connect/`,
-  `POST .../youtube/complete/`. `/auth/me/` reports `platform_connected` for brands.
+  `GET /brands/me/social/`, `PUT|DELETE /brands/me/social/{platform}/`. `/auth/me/` reports `platform_connected` for brands.
 - **Brands and creators both confirm their email with a 6-digit code** sent after sign-up (`POST /auth/email/verify/`,
   `/auth/email/resend/`). For a creator this is a separate check from YouTube: it does not let them apply (only a
   connected YouTube channel does), and it makes them eligible for notification emails (FR-24).
@@ -181,9 +179,21 @@ line of code, and the tests that pin them sit next to the code.
   sets it back to pending. A pending or rejected link does not count, so `brand_has_platform` now means "has a verified
   platform". `/auth/me/` keeps `platform_connected` (true only when verified) and adds `platform_status`. YouTube accounts
   are not reviewed (the admin endpoints return 404 for them). Existing typed links became pending in migration
-  `social.0006`; the demo seeder treats its demo Instagram links as approved. Assumption (the rules list names only the typed links): a YouTube channel a
-  brand connects with Google still counts without an admin, because Google proves it is theirs — cost if wrong: also
-  require `review_status = approved` for YouTube in `brand_has_platform`.
+  `social.0006`; the demo seeder treats its demo Instagram links as approved. Superseded by the next entry.
+
+- **YouTube no longer verifies a brand; the creator Verified badge follows the creator rule everywhere** — a brand is
+  verified only by a confirmed email AND an Instagram, TikTok or Facebook link an admin approved. The brand YouTube
+  Google sign-in endpoints (`/brands/me/social/youtube/connect|complete/`) and `fetch_channel_link` were removed, a typed
+  `youtube` link is refused (400 `youtube_not_for_brands`), and any old brand YouTube rows are kept but hidden and ignored by
+  `brand_has_platform` / `brand_platform_status`. Separately, `primary_verified` (the `is_verified` on directory cards
+  and brand proposal lists) used to be the primary platform's own flag, so a creator whose primary platform was an
+  approved Instagram showed "Verified". It now means `creator_is_verified`: a confirmed email AND Google-proven YouTube with
+  at least `MIN_CREATOR_FOLLOWERS`, whatever the primary platform; approved Instagram, TikTok and Facebook numbers still
+  show, with their own per-platform tag. `GET /creators/me/` and `GET /creators/{id}/` gain an `is_verified` field with the same meaning.
+
+- **YouTube numbers can no longer be typed** — `PUT /creators/me/stats/youtube/` used to save typed numbers as Unverified
+  and show them publicly without an admin check. It now returns 400 `youtube_from_google_only` (it replaces the 409
+  `stats_verified`). Instagram, TikTok and Facebook are unchanged: typed, pending, hidden until an admin approves.
 
 - **No negotiation: the rate is fixed by the brand.** A creator no longer sends a rate when applying. The proposal's
   `proposed_rate` is copied from the campaign's `budget` (per creator) at the moment of applying, and sending
@@ -200,3 +210,22 @@ line of code, and the tests that pin them sit next to the code.
   (`campaign.allow_withdrawal`). The brand can still reject a proposal; only the creator's own withdrawal is blocked —
   cost if wrong: one check in `proposals.services.withdraw_proposal`.
 
+- **Docker removed; PostgreSQL is installed locally** — the Dockerfile, docker-compose.yml and .dockerignore were deleted,
+  and the README and docs/DEPLOYMENT.md now describe a local PostgreSQL (plus optional Redis) and running gunicorn, the
+  Celery worker and beat directly. Older entries above that mention Docker are history. The compose file had also
+  published Postgres and Redis on every interface with default credentials, which a server deployment must never do —
+  cost if wrong: anyone who wants containers writes their own files.
+
+- **Review fixes: one channel per account, current proof, own videos, minimum followers, suspended creators** —
+  (1) `YouTubeConnection.channel_id` (unique when set) is read at connect time (`channels?part=id`), so a channel
+  another account uses is refused (`channel_in_use`); older connections fill it in at their next sync and a duplicate is
+  left unverified. (2) A creator is Verified only while the proof is current: stats with `is_outdated` (access ended,
+  subscribers hidden) no longer count in `creator_is_verified`, the directory flag or applying, and applying says
+  `creator_youtube_reconnect`. (3) A YouTube deliverable must be a video on the creator's own channel: checked when it is
+  saved (needs `YOUTUBE_API_KEY`; skipped when Google cannot answer or the channel is not known yet) and again before
+  the daily sync stores any number, which also clears numbers stored earlier for someone else's video. (4) The campaign's
+  minimum followers is enforced when the creator has numbers for the campaign's platform (`not_eligible`); a creator
+  with no numbers on that platform is NOT blocked, because a verified YouTube creator may apply to any platform
+  (earlier decision above) — cost if wrong: require numbers on the campaign's platform in
+  `campaigns.eligibility.minimum_followers_problem`. (5) `accept_proposal` refuses a suspended creator
+  (`creator_unavailable`); rejecting still works.

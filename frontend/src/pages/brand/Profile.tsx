@@ -85,6 +85,7 @@ export default function BrandProfile() {
       </div>
 
       <StatRow
+        size="lg"
         items={[
           { label: 'Campaigns', value: mine.length, hint: 'all time' },
           { label: 'Live', value: published, hint: 'accepting' },

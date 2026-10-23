@@ -8,6 +8,7 @@ from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 
 from apps.campaigns.models import Campaign
@@ -26,6 +27,9 @@ NOT_AVAILABLE = "not_available"
 def refresh_deliverable_stats() -> int:
     """Fetch current statistics for every YouTube deliverable of an accepted proposal.
 
+    A video's numbers are stored only when the video belongs to the channel the creator connected. Anyone else's
+    video (or a creator whose channel is not known yet) gets no numbers, and any stored earlier are cleared.
+
     Returns how many deliverables were updated. A failed batch keeps its previous numbers and the
     other batches still run; the next daily run tries again. With no ``YOUTUBE_API_KEY`` it does nothing.
     """
@@ -34,9 +38,11 @@ def refresh_deliverable_stats() -> int:
         return 0
 
     by_video: dict[str, list[Deliverable]] = defaultdict(list)
-    for deliverable in Deliverable.objects.filter(
-        platform=Platform.YOUTUBE, proposal__status=Proposal.Status.ACCEPTED
-    ).only("id", "post_url"):
+    for deliverable in (
+        Deliverable.objects.filter(platform=Platform.YOUTUBE, proposal__status=Proposal.Status.ACCEPTED)
+        .annotate(owner_channel=F("proposal__creator__youtube_connection__channel_id"))
+        .only("id", "post_url", "views_count", "likes_count", "comments_count", "stats_synced_at")
+    ):
         if video_id := youtube_video_id(deliverable.post_url):
             by_video[video_id].append(deliverable)
 
@@ -53,6 +59,13 @@ def refresh_deliverable_stats() -> int:
             continue
         for video_id, video in stats.items():
             for deliverable in by_video[video_id]:
+                if not video.channel_id or video.channel_id != (deliverable.owner_channel or ""):
+                    # Not the creator's own video: show nothing rather than someone else's numbers.
+                    if deliverable.stats_synced_at is not None:
+                        deliverable.views_count = deliverable.likes_count = deliverable.comments_count = None
+                        deliverable.stats_synced_at = None
+                        changed.append(deliverable)
+                    continue
                 deliverable.views_count = video.views
                 deliverable.likes_count = video.likes
                 deliverable.comments_count = video.comments

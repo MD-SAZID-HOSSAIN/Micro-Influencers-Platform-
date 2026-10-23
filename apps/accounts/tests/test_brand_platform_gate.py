@@ -1,6 +1,6 @@
 """A brand is fully verified only with a confirmed email AND one verified platform.
 
-A verified platform is YouTube proven by Google sign-in, or an Instagram, TikTok or Facebook link an admin approved.
+A verified platform is an Instagram, TikTok or Facebook link an admin approved. YouTube never counts for a brand.
 A typed link that is still waiting for an admin does not count. Until the brand is verified it cannot publish a
 campaign or accept a proposal; saving drafts, shortlisting and rejecting stay open.
 """
@@ -67,8 +67,8 @@ def test_a_brand_with_a_verified_email_but_no_platform_cannot_accept(brand_witho
     assert proposal.status == Proposal.Status.PENDING
 
 
-@pytest.mark.parametrize("platform", ["youtube", "instagram", "tiktok", "facebook"])
-def test_any_one_verified_platform_is_enough(brand_without_platform, auth_client, platform):
+@pytest.mark.parametrize("platform", ["instagram", "tiktok", "facebook"])
+def test_any_one_approved_link_is_enough(brand_without_platform, auth_client, platform):
     connect(brand_without_platform, platform)
     draft = CampaignFactory(brand=brand_without_platform)
 
@@ -77,6 +77,15 @@ def test_any_one_verified_platform_is_enough(brand_without_platform, auth_client
     assert response.status_code == 200
     draft.refresh_from_db()
     assert draft.status == Campaign.Status.PUBLISHED
+
+
+def test_youtube_does_not_verify_a_brand(brand_without_platform, auth_client):
+    connect(brand_without_platform, "youtube")
+    draft = CampaignFactory(brand=brand_without_platform)
+
+    response = publish(auth_client, brand_without_platform, draft)
+
+    assert response.status_code == 403 and error_code(response) == "brand_platform_required"
 
 
 def test_a_typed_link_waiting_for_an_admin_does_not_count(brand_without_platform, auth_client):
@@ -148,7 +157,11 @@ def test_the_me_payload_says_whether_a_brand_has_a_platform(brand_without_platfo
     me = client.get("/api/v1/auth/me/").json()
     assert (me["platform_connected"], me["platform_status"]) == (False, "pending")
 
-    connect(brand_without_platform, "youtube")
+    connect(brand_without_platform, "youtube")  # does not count
+    me = client.get("/api/v1/auth/me/").json()
+    assert (me["platform_connected"], me["platform_status"]) == (False, "pending")
+
+    connect(brand_without_platform, "facebook")
     me = client.get("/api/v1/auth/me/").json()
     assert (me["platform_connected"], me["platform_status"]) == (True, "verified")
 

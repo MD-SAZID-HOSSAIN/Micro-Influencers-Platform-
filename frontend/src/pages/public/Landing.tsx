@@ -25,7 +25,7 @@ const STRIP = [...NICHES, 'YouTube', 'Instagram', 'TikTok', 'Facebook'];
 /** The rules of the marketplace, in the words the product uses. */
 const GROUND_RULES = [
   ['Creators are verified on YouTube', 'A confirmed email and a channel with at least 1,000 subscribers, connected with Google sign-in.'],
-  ['Brands are checked too', 'A confirmed email and one platform an admin has approved, or a YouTube channel.'],
+  ['Brands are checked too', 'A confirmed email and an Instagram, TikTok or Facebook link an admin has approved.'],
   ['One fixed price', 'The brand sets the budget per creator. There is no bidding and no haggling.'],
   ['Typed numbers wait for an admin', 'Instagram, TikTok and Facebook numbers stay hidden until they are approved.'],
 ] as const;
@@ -55,7 +55,7 @@ const SAMPLE_BRIEFS: {
 export default function Landing() {
   const { user } = useAuth();
   const dashboardLink = user
-    ? user.role === 'creator' ? '/creator/dashboard' : '/brand/dashboard'
+    ? user.role === 'creator' ? '/creator/dashboard' : user.role === 'admin' ? '/admin/overview' : '/brand/dashboard'
     : null;
 
   return (
@@ -238,7 +238,7 @@ function Strip() {
               </span>
               <span className="font-display text-[15px] font-medium tracking-[-0.015em] whitespace-nowrap">{name}</span>
               <span className="font-mono text-[10px] text-ink-400 ml-1 hidden md:inline">
-                0{(i % STRIP.length) + 1}
+                {String((i % STRIP.length) + 1).padStart(2, '0')}
               </span>
             </div>
           ))}

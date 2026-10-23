@@ -30,14 +30,13 @@ Click a title to jump to that section. Every section ends with a "Back to conten
 - **[The idea in one minute](#the-idea-in-one-minute)**: what the platform is, in four steps
 - **[Run the project](#run-the-project)**: copy-and-paste steps for Windows
   - [Before you start (install once)](#before-you-start-install-once)
-  - [Step 1: Start the database](#step-1-start-the-database)
+  - [Step 1: Set up the database](#step-1-set-up-the-database)
   - [Step 2: Start the API](#step-2-start-the-api-terminal-1)
   - [Step 3: Start the website](#step-3-start-the-website-terminal-2)
   - [Step 4: Open the site](#step-4-open-the-site)
   - [Next time you start it](#next-time-you-start-it)
   - [Check that it works](#check-that-it-works)
   - [If it does not start](#if-it-does-not-start)
-  - [No Docker (your own PostgreSQL)](#no-docker-your-own-postgresql)
 - **[Demo data](#demo-data)**: example accounts to log in with
 
 ### What it does
@@ -126,7 +125,11 @@ There is no payment and no chat inside the platform. It only handles finding eac
   again every day (and when you press Refresh), so you become Verified once you pass the minimum, and lose it if you drop
   below. The minimum is the setting `MIN_CREATOR_FOLLOWERS`.
 - Stats refresh by themselves every day. You can also press **Refresh** (once every 15 minutes).
-- If Google access ends, you get a "please reconnect" notification. Your last numbers stay visible, marked **outdated**.
+- If Google access ends (or the channel hides its subscribers), you get a "please reconnect" notification. Your last
+  numbers stay visible, marked **outdated**, and **you are not Verified and cannot apply until you reconnect or
+  refresh** (403 `creator_youtube_reconnect`).
+- **One YouTube channel can be connected to one account only.** A channel another account already uses is refused
+  (400 `channel_in_use`).
 - **Disconnect** deletes the stored access and gives it back at Google. Your last numbers stay but become Unverified.
 - **Instagram, TikTok and Facebook:** on **Accounts**, each one has a small form. Type your followers, your engagement
   rate (0 to 100) and your profile link (it must be a page on that website), then press Add. You can Edit or Remove it
@@ -138,12 +141,16 @@ There is no payment and no chat inside the platform. It only handles finding eac
   - Changing the numbers later sends them back to the admin.
   - They never count towards being a Verified creator or applying to campaigns. Only a confirmed email and a connected
     YouTube channel do.
+  - **YouTube numbers cannot be typed.** They only come from Google sign-in (the API answers 400
+    `youtube_from_google_only` to a typed YouTube entry).
 
 **3. Finding work**
 - **Find work** lists published campaigns. Filter by keyword, niche, platform, budget range and deadline.
 - Every card shows brand, category, budget per creator, platform, deadline and how many creators are needed.
-- An **Eligible** or **Check fit** tag compares the campaign's platform and minimum followers with your stats. It is
-  only a hint. It never stops you from applying.
+- An **Eligible** or **Check fit** tag compares the campaign's platform and minimum followers with your stats. A
+  verified YouTube creator may apply to a campaign on any platform, but if you have numbers on the campaign's platform
+  and they are **under the brand's minimum followers**, applying is refused (403 `not_eligible`) and the message says
+  how many are needed.
 - The campaign page shows the full details and any photos or video. It says "Brand has selected all creators" when the
   places are full.
 
@@ -165,6 +172,8 @@ There is no payment and no chat inside the platform. It only handles finding eac
 **5. After you are accepted**
 - Add **deliverables**: the link to each post you published, the platform, and an optional note. You can change them
   until the brand marks the work completed.
+- A **YouTube** deliverable must be a video on **your own connected channel** (400 `video_not_yours` otherwise), and
+  the brand only sees views, likes and comments for videos on that channel.
 
 **6. Home page (dashboard)**
 - One clear **next step** (for example "Connect YouTube", "Finish your profile" or "Find your next campaign").
@@ -178,12 +187,10 @@ There is no payment and no chat inside the platform. It only handles finding eac
 
 **2. Two steps to be fully verified**
 - **Confirm your email** with the 6-digit code.
-- **Get one platform verified** on **Accounts**. Any one is enough.
-  - **YouTube** is connected with Google sign-in. The platform reads the channel link once, then gives the Google access
-    back. It is tagged **Verified** at once.
-  - **Instagram, TikTok and Facebook** are your official page link. The platform checks it is on that site, then an
-    **admin opens it and approves or rejects it**. It shows **Waiting for admin**, then **Verified**, or **Rejected**
-    with the admin's reason (remove it and add the correct link). A waiting link does not count.
+- **Get one platform verified** on **Accounts**. Add your official **Instagram, TikTok or Facebook** page link. The
+  platform checks it is on that site, then an **admin opens it and approves or rejects it**. It shows **Waiting for
+  admin**, then **Verified**, or **Rejected** with the admin's reason (remove it and add the correct link). A waiting
+  link does not count. **YouTube does not verify a brand.**
 - Until both steps are done, a brand can still browse, save drafts, shortlist and reject. It **cannot publish a
   campaign or accept a proposal**.
 
@@ -191,8 +198,11 @@ There is no payment and no chat inside the platform. It only handles finding eac
 - **Find creators** is a searchable directory of creator profiles. Filters: name or username, niche, platform,
   followers (from and to), engagement rate, location, rate range, **Verified accounts only**, and minimum rating.
 - Sort by followers, engagement, rate or rating. Results come in pages.
-- A creator's page shows their profile, rates, stats with the Verified badge and last update time, portfolio and
-  reviews.
+- A creator's page shows their profile, rates, stats with last update time, portfolio and reviews.
+- The **Verified** badge on a creator means a confirmed email **and** a YouTube channel connected with Google sign-in
+  with at least 1,000 subscribers. It is the same everywhere (directory, creator page, proposals). Instagram, TikTok and
+  Facebook numbers an admin approved are shown with their own **Verified** tag, but they never make the creator
+  Verified. A creator without the badge shows **Unverified**, with a notice on their page.
 
 **4. Campaigns**
 - Fields: title, description, niche, platform, **budget per creator**, **deadline**, deliverables (for example
@@ -305,7 +315,7 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
 
 | | Checks | Can do only after verification |
 |---|---|---|
-| **Brand** | **Email** (a 6-digit code emailed after sign-up) and **one verified platform**: YouTube (Google sign-in), or an Instagram, TikTok or Facebook link **an admin approved** | Publish a campaign, accept a proposal |
+| **Brand** | **Email** (a 6-digit code emailed after sign-up) and **one verified platform**: an Instagram, TikTok or Facebook link **an admin approved** (YouTube does not verify a brand) | Publish a campaign, accept a proposal |
 | **Creator** | **Email** (a 6-digit code emailed after sign-up) **and** **YouTube** (connect a channel with Google sign-in, with **at least 1,000 subscribers**: Verified stats) | Apply to a campaign (needs both) |
 
 - Unverified accounts can still log in, browse, edit their profile and (brands) save drafts, shortlist and reject.
@@ -314,9 +324,8 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
   email **and** a connected YouTube channel with **at least 1,000 subscribers** (the setting `MIN_CREATOR_FOLLOWERS`),
   and **cannot apply until both are true**.
 - **Forgot password** works for every account, verified or not.
-- **A brand is fully verified only with both**: a confirmed email *and* one verified platform. YouTube is connected with
-  Google sign-in (proven, *Verified* at once). Instagram, TikTok and Facebook are the brand's official page link; it
-  counts only after an **admin approves it** (Admin, Platform reviews, Brand links). Waiting and rejected links do not
+- **A brand is fully verified only with both**: a confirmed email *and* one verified platform. Instagram, TikTok and
+  Facebook are the brand's official page link; it counts only after an **admin approves it** (Admin, Platform reviews, Brand links). Waiting and rejected links do not
   count. Removing the last verified platform blocks the brand again. Brands manage this on **Connected accounts**
   (`/brand/<your username>/accounts`).
 - The errors are 403 `brand_email_unverified`, 403 `brand_platform_required` (no verified platform; a link waiting for
@@ -331,7 +340,7 @@ Admins cannot sign up. They are created with a command (see "Admin accounts") an
 
 - Python 3.12 or newer
 - Node 20 or newer (for the website)
-- PostgreSQL 16 and Redis 7. Docker is the easiest way to get both; native installs also work (see below)
+- PostgreSQL 16, installed on your computer. Redis 7 is needed for rate limiting and Connect YouTube, but you can run without it while developing (see Step 1)
 
 The test suite needs a real PostgreSQL, because the "accepted never exceeds Creators Needed" guarantee relies on
 row locks that SQLite does not have.
@@ -353,17 +362,40 @@ window. The default settings in `.env.example` work as they are, so you do not n
 |---|---|---|
 | **Python 3.12 or newer** | runs the API | `python --version` |
 | **Node 20 or newer** | runs the website | `node --version` |
-| **Docker Desktop** | runs the database (PostgreSQL) and Redis for you | `docker --version` |
+| **PostgreSQL 16** | the database | `& "C:\Program Files\PostgreSQL\16\bin\psql.exe" --version` |
 
-No Docker? Use [No Docker](#no-docker-your-own-postgresql) instead of Step 1.
+### Step 1: Set up the database
 
-### Step 1: Start the database
+Do this once. PostgreSQL normally starts with Windows, so you will not need to start it again.
 
-Open **Docker Desktop** and wait until it says it is running. Then, in a terminal in the project folder:
+1. **Install PostgreSQL 16** and remember the password you choose for the `postgres` user.
+2. **Create the database.** In a terminal:
 
-```powershell
-docker compose up -d db redis
-```
+   ```powershell
+   & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE microinfluencers;"
+   ```
+
+3. **Match the password.** In the `.env` file (created in Step 2), the line `DATABASE_URL` must use your password:
+   `DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/microinfluencers`. If your password is `postgres`,
+   leave it as it is.
+4. **Redis.** Either install Redis 7 (through WSL, or a Redis-compatible server such as Memurai), or run
+   **without Redis**. Without it the site works except for two things: rate limiting is skipped, and
+   **Connect YouTube** only works while the server is not restarted during the sign-in. To run without it, create a
+   file `config\settings\local.py` with exactly this:
+
+   ```python
+   from .dev import *  # noqa: F401,F403
+
+   CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+   ```
+
+   then change this line in `.env` to:
+
+   ```
+   DJANGO_SETTINGS_MODULE=config.settings.local
+   ```
+
+   Do not commit that file. Use it only while running a single API window.
 
 ### Step 2: Start the API (Terminal 1)
 
@@ -409,12 +441,11 @@ emails are printed there while you test. To make an admin account, see [Admin ac
 
 ### Next time you start it
 
-The first-time setup is done. Next time you only need these. Open Docker Desktop first.
+The first-time setup is done. Next time you only need these. Make sure PostgreSQL is running (it normally starts with Windows).
 
 **Terminal 1**, in the project folder:
 
 ```powershell
-docker compose up -d db redis
 .venv\Scripts\activate
 python manage.py runserver
 ```
@@ -426,7 +457,7 @@ cd frontend
 npm run dev
 ```
 
-To stop, press `Ctrl + C` in each window. To stop the database too, run `docker compose stop`.
+To stop, press `Ctrl + C` in each window.
 
 ### Check that it works
 
@@ -442,46 +473,14 @@ To stop, press `Ctrl + C` in each window. To stop the database too, run `docker 
 
 | What you see | What to do |
 |---|---|
-| `docker: ... daemon is not running` or "cannot connect" | Open Docker Desktop and wait until it says it is running, then run the command again. |
+| `password authentication failed` | The password in `DATABASE_URL` (in `.env`) is not the one you chose when installing PostgreSQL. |
 | `python` is not found | Try `py -3.12 -m venv .venv` instead of `python -m venv .venv`. |
 | PowerShell says running scripts is disabled | Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then the `.venv\Scripts\activate` line again. |
-| The health page says the database is not OK | The database is not running. Run `docker compose up -d db redis` (or start PostgreSQL). |
+| The health page says the database is not OK | PostgreSQL is not running (start the "postgresql-x64-16" service) or the `DATABASE_URL` password is wrong. |
 | "port already in use" | Something else uses port 8000 or 5173. Close it, or stop the old copy of this project with `Ctrl + C`. |
 | `.env` is missing | Run the copy line again: `copy .env.example .env`. |
 
 More fixes are in [Troubleshooting](#troubleshooting).
-
-### No Docker (your own PostgreSQL)
-
-Use this if you cannot install Docker. Do these **instead of Step 1**, then follow Steps 2 to 4 as written.
-
-1. **Install PostgreSQL 16** and remember the password you choose for the `postgres` user.
-2. **Create the database.** In a terminal:
-
-   ```powershell
-   & "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE microinfluencers;"
-   ```
-
-3. **Match the password.** In the `.env` file (created in Step 2), the line `DATABASE_URL` must use your password:
-   `DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/microinfluencers`. If your password is `postgres`,
-   leave it as it is.
-4. **Redis.** Either install Redis 7 (through WSL, or a Redis-compatible server such as Memurai), or run
-   **without Redis**. Without it the site works except for two things: rate limiting is skipped, and
-   **Connect YouTube** does not work. To run without it, create a file `config\settings\local.py` with exactly this:
-
-   ```python
-   from .dev import *  # noqa: F401,F403
-
-   CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-   ```
-
-   then change this line in `.env` to:
-
-   ```
-   DJANGO_SETTINGS_MODULE=config.settings.local
-   ```
-
-   Do not commit that file. Use it only while running a single API window.
 
 [↑ Back to contents](#contents)
 
@@ -728,12 +727,12 @@ Business rules live in each app's `services.py`; views stay thin.
 
 | Problem | Cause and fix |
 |---|---|
-| `docker compose` cannot connect, or "docker engine not running" | Docker Desktop is not running yet. Start it and wait until it says it is running, or use native PostgreSQL and Redis. |
+| `psql` is not found | Your PostgreSQL version or install folder is different. Change the path in the command (for example `...\PostgreSQL\17\bin\psql.exe`). |
 | "Invalid line" warnings when the backend starts | `.env` has a blank line containing a space, or was saved with a byte-order mark. Save it as plain UTF-8 and remove blank-space lines. |
-| Connecting YouTube returns 503 or an empty link | Redis is not reachable (see "Without Docker"), or the Google variables are empty. |
+| Connecting YouTube returns 503 or an empty link | Redis is not reachable (see Step 1, item 4), or the Google variables are empty. |
 | After Google sign-in the browser lands on a dead page | `FRONTEND_URL` is wrong. Use `http://localhost:5173` in development. |
 | No email arrives (or it is in Spam) | See "Emails landing in Spam" in the email section. With the console backend, read the code in the backend terminal. With SMTP, check the sender is verified at the provider. Brevo needs its SMTP login, not your account email; Resend without a verified domain only delivers to your own address. |
-| A brand cannot publish or accept (403 `brand_platform_required`) | Connect YouTube on **Connected accounts**, or add an Instagram, TikTok or Facebook link and wait for an admin to approve it (Admin, Platform reviews, Brand links). |
+| A brand cannot publish or accept (403 `brand_platform_required`) | Add an Instagram, TikTok or Facebook link on **Connected accounts** and wait for an admin to approve it (Admin, Platform reviews, Brand links). |
 | A brand cannot publish or accept (403 `brand_email_unverified`) | Verify the email with the code (shown in the backend terminal in development). |
 | A creator cannot apply (403 `creator_youtube_required`) | Connect YouTube. Manually typed stats do not count. |
 | A creator cannot apply (403 `creator_email_unverified`) | Confirm the email with the 6-digit code. |

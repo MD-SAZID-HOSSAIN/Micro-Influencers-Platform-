@@ -9,7 +9,7 @@ from apps.social.models import PlatformStats, YouTubeConnection
 from apps.social.youtube_client import ChannelSnapshot, TokenSet
 
 
-def snapshot(*, subscribers=10000, engagement="4.20", handle="@amina") -> ChannelSnapshot:
+def snapshot(*, subscribers=10000, engagement="4.20", handle="@amina", channel_id="UC-amina") -> ChannelSnapshot:
     return ChannelSnapshot(
         handle_url=f"https://www.youtube.com/{handle}",
         subscribers=subscribers,
@@ -22,6 +22,7 @@ def snapshot(*, subscribers=10000, engagement="4.20", handle="@amina") -> Channe
                 "published_at": "2026-10-01T10:00:00Z",
             }
         ],
+        channel_id=channel_id,
     )
 
 
@@ -34,7 +35,7 @@ class FakeYouTubeClient:
 
     def __init__(self):
         self.default_snapshot = snapshot()
-        self.channel_link_result: object = "https://www.youtube.com/@brandchannel"  # used by brand sign-in
+        self.channel_id_result: object = "UC-amina"  # what the connect step reads before saving the connection
         self.fetch_results: dict[str, object] = {}
         self.refresh_result: object = TokenSet("refreshed-at", None, 3600)
         self.exchange_result: object = TokenSet("exchanged-at", "exchanged-rt", 3600)
@@ -68,8 +69,8 @@ class FakeYouTubeClient:
         self.fetch_calls.append(access_token)
         return self._result(self.fetch_results.get(access_token, self.default_snapshot))
 
-    def fetch_channel_link(self, access_token):
-        return self._result(self.channel_link_result)
+    def fetch_channel_id(self, access_token):
+        return self._result(self.channel_id_result)
 
     def fetch_video_stats(self, video_ids, api_key):
         self.video_calls.append((list(video_ids), api_key))
@@ -95,6 +96,7 @@ def make_connection(
     status=YouTubeConnection.Status.CONNECTED,
     with_stats=True,
     followers=100,
+    channel_id="",
 ) -> YouTubeConnection:
     """A connected creator, as left behind by a previous sync."""
     if with_stats:
@@ -112,4 +114,5 @@ def make_connection(
         refresh_token_enc=encrypt(refresh),
         access_expires_at=timezone.now() + timedelta(seconds=expires_in),
         status=status,
+        channel_id=channel_id,
     )

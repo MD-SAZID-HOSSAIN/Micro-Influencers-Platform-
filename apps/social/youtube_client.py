@@ -60,6 +60,7 @@ class ChannelSnapshot:
     subscribers: int
     engagement_rate: Decimal
     recent_content: list[dict] = field(default_factory=list)
+    channel_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class VideoStats:
     views: int | None
     likes: int | None
     comments: int | None
+    channel_id: str | None = None  # the channel the video belongs to, so a creator cannot claim someone else's video
 
 
 _VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -172,7 +174,7 @@ class YouTubeClient:
         uploads = channel.get("contentDetails", {}).get("relatedPlaylists", {}).get("uploads")
         video_ids = self._recent_video_ids(access_token, uploads) if uploads else []
         if not video_ids:
-            return ChannelSnapshot(handle_url, subscribers, Decimal("0.00"), [])
+            return ChannelSnapshot(handle_url, subscribers, Decimal("0.00"), [], channel["id"])
 
         videos = self._api_get(
             "videos", access_token, part="snippet,statistics", id=",".join(video_ids)
@@ -190,22 +192,15 @@ class YouTubeClient:
                 }
                 for v in videos
             ],
+            channel_id=channel["id"],
         )
 
-    def fetch_channel_link(self, access_token: str) -> str:
-        """The link to the signed-in account's channel, and nothing else (used to prove a brand owns one).
-
-        Unlike ``fetch_channel`` it ignores subscriber counts and videos, so a channel that hides its audience
-        still works.
-        """
-        channels = self._api_get("channels", access_token, part="snippet", mine="true").get("items", [])
+    def fetch_channel_id(self, access_token: str) -> str:
+        """The id of the signed-in account's channel, and nothing else (used to stop one channel verifying two accounts)."""
+        channels = self._api_get("channels", access_token, part="id", mine="true").get("items", [])
         if not channels:
             raise ChannelNotFound()
-        channel = channels[0]
-        custom_url = channel.get("snippet", {}).get("customUrl")
-        if custom_url:
-            return f"https://www.youtube.com/{custom_url}"
-        return f"https://www.youtube.com/channel/{channel['id']}"
+        return channels[0]["id"]
 
     def fetch_video_stats(self, video_ids: list[str], api_key: str) -> dict[str, VideoStats]:
         """Public statistics for up to 50 videos, using the server's API key (no creator login needed).
@@ -217,7 +212,7 @@ class YouTubeClient:
         response = self._send(
             "GET",
             f"{API_URL}/videos",
-            params={"part": "statistics", "id": ",".join(video_ids), "key": api_key},
+            params={"part": "statistics,snippet", "id": ",".join(video_ids), "key": api_key},
         )
         self._raise_for_status(response)
         found = {}
@@ -227,6 +222,7 @@ class YouTubeClient:
                 views=_count(stats.get("viewCount")),
                 likes=_count(stats.get("likeCount")),
                 comments=_count(stats.get("commentCount")),
+                channel_id=item.get("snippet", {}).get("channelId"),
             )
         return found
 

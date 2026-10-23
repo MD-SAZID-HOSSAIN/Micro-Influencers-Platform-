@@ -39,6 +39,7 @@ def make_creator(
         full_name=name or f"Creator {n}",
         username=username or f"creator{n}",
         is_active=is_active,
+        email_verified=verified is True,  # a Verified creator also has a confirmed email
     )
     CreatorProfile.objects.filter(user=user).update(
         niche=niche,
@@ -133,11 +134,20 @@ def test_filter_by_rate_range_matches_when_any_rate_is_inside(brand, auth_client
 
 
 def test_filter_verified_only(brand, auth_client):
-    verified = make_creator(verified=True)
-    make_creator(verified=False)
+    verified = make_creator(platform="youtube", followers=5000, verified=True)
+    make_creator(platform="youtube", followers=5000, verified=False)
     make_creator(with_stats=False)
 
     assert ids(search(auth_client, brand, verified_only="true")) == [verified.id]
+
+
+def test_an_approved_instagram_creator_is_not_verified(brand, auth_client):
+    make_creator(platform="instagram", followers=90000)  # admin-approved numbers show, but do not verify
+
+    card = search(auth_client, brand).json()["results"][0]
+
+    assert card["followers"] == 90000 and card["is_verified"] is False
+    assert ids(search(auth_client, brand, verified_only="true")) == []
 
 
 def test_keyword_matches_name_and_username(brand, auth_client):

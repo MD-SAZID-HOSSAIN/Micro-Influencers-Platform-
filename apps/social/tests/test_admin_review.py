@@ -113,7 +113,8 @@ def test_a_pending_primary_platform_shows_no_followers_in_the_directory(creator,
 
     auth_client(admin).post(approve_url(PlatformStats.objects.get(creator=creator).id), {}, format="json")
 
-    assert card()["followers"] == 12000 and card()["is_verified"] is True
+    assert card()["followers"] == 12000  # the approved numbers show
+    assert card()["is_verified"] is False  # but they never make the creator Verified
 
 
 def test_approved_instagram_does_not_make_a_creator_verified(creator, admin, auth_client):

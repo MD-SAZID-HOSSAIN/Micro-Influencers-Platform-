@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useStore, loadCreatorProfile, profileCompletion } from '../../state/Store';
+import { useAuth } from '../../state/AuthContext';
 import { fmtNumber, fmtDate, currency } from '../../lib/shared';
 import {
   PlatformIcon, ProfileTile, VerifiedBadge, StatRow, SectionHeader, PageHeader, Rating,
 } from '../../components/ui';
-import { CheckCircle2, MapPin, ArrowUpRight, Pencil, Link as LinkIcon, Plus, Sparkles, Youtube } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, MapPin, ArrowUpRight, Pencil, Link as LinkIcon, Plus, Sparkles, Youtube } from 'lucide-react';
 
 export default function CreatorProfile() {
   const { creator, connectedAccounts, loading, errors } = useStore();
+  const { user } = useAuth();
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +50,24 @@ export default function CreatorProfile() {
   const yt = connectedAccounts.find((a) => a.platform === 'YouTube');
   const completion = profileCompletion(creator);
   const isComplete = completion === 100;
-  const isVerified = isComplete && (yt?.verified ?? false);
+  // Verified follows the server's rule: a confirmed email AND YouTube with enough subscribers. Nothing else counts.
+  const isVerified = creator.verified;
+  const emailDone = user?.emailVerified !== false;
+
+  let unverifiedReason: string;
+  if (!emailDone) {
+    unverifiedReason = 'Confirm your email with the 6-digit code we sent you. You also need a YouTube channel with enough subscribers to be Verified and apply to campaigns.';
+  } else if (!yt) {
+    unverifiedReason = 'Connect your YouTube channel so brands can trust your stats. Unverified creators cannot apply to campaigns.';
+  } else if (yt.status === 'expired') {
+    unverifiedReason = 'Your YouTube connection expired. Reconnect to get Verified again.';
+  } else if (yt.belowMinimum) {
+    unverifiedReason = `Your channel has ${(yt.followers ?? 0).toLocaleString()} subscribers; you need at least ${(yt.minimumFollowers ?? 1000).toLocaleString()} to be Verified and apply to campaigns.`;
+  } else if (yt.problem) {
+    unverifiedReason = 'We could not verify your channel. Open Connected accounts to see what to fix.';
+  } else {
+    unverifiedReason = 'Your YouTube stats have not been verified yet. Try refreshing your connection.';
+  }
 
   return (
     <div className="container-page py-6 sm:py-8">
@@ -66,6 +85,34 @@ export default function CreatorProfile() {
 
         {/* Hero / identity */}
         <article className="card p-6 sm:p-8">
+          {!isVerified && (
+            <div
+              role="status"
+              className="-mx-6 -mt-6 sm:-mx-8 sm:-mt-8 mb-6 px-5 sm:px-8 py-4 bg-amber-50 border-b border-amber-300 rounded-t-[inherit] flex flex-col sm:flex-row sm:items-center gap-3 text-amber-900"
+            >
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="text-sm leading-relaxed">
+                  <div className="font-semibold text-base">Your profile is not verified</div>
+                  <div>{unverifiedReason}</div>
+                </div>
+              </div>
+              {emailDone ? (
+                <Link to="/creator/accounts" className="btn btn-primary btn-sm self-start sm:self-center shrink-0">
+                  <Youtube className="w-3.5 h-3.5" />
+                  {yt ? 'Fix verification' : 'Connect YouTube'}
+                </Link>
+              ) : (
+                <Link
+                  to="/verify-email"
+                  state={{ email: user?.email, sendCode: true }}
+                  className="btn btn-primary btn-sm self-start sm:self-center shrink-0"
+                >
+                  Verify email
+                </Link>
+              )}
+            </div>
+          )}
           {creator.coverUrl && (
             <img
               src={creator.coverUrl}
@@ -120,7 +167,7 @@ export default function CreatorProfile() {
             <div className="flex items-center gap-2 flex-wrap sm:self-center">
               {isVerified
                 ? <VerifiedBadge verified />
-                : <span className="tag tag-amber">Verification pending</span>
+                : <span className="tag tag-amber font-semibold ring-1 ring-amber-400"><AlertTriangle className="w-3 h-3" /> Not verified</span>
               }
               <span className="tag tag-paper">
                 {isComplete ? 'Profile complete' : `Profile ${completion}%`}
@@ -196,6 +243,7 @@ export default function CreatorProfile() {
 
           <aside className="lg:col-span-4 space-y-5">
             <StatRow
+              cols={2}
               items={[
                 { label: 'Followers',  value: fmtNumber(creator.followers) },
                 { label: 'Engagement', value: `${creator.engagementRate}%` },

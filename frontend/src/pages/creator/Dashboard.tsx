@@ -11,9 +11,9 @@ import { fetchCreatorDashboard, type CreatorDashboardData } from '../../api/endp
 import { fmtNumber, fmtRelativeTime, currency } from '../../lib/shared';
 import { useAuth } from '../../state/AuthContext';
 import {
-  SectionHeader, CampaignStatusBadge, EligibilityChip,
   ProfileTile, StatRow, ProposalStatusBadge, PageHeader,
 } from '../../components/ui';
+import { CampaignCard } from '../../components/CampaignCard';
 import AttentionList, { type AttentionItem } from '../../components/AttentionList';
 import type { CreatorProfile, MyProposal } from '../../types';
 
@@ -165,7 +165,7 @@ export default function CreatorDashboard() {
   return (
     <div className="container-page py-6 sm:py-8">
       <PageHeader
-        eyebrow={`Today · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}`}
+        eyebrow={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
         title={
           <>
             Welcome back, <span className="italic font-medium">{user?.fullName.split(' ')[0]}.</span>
@@ -179,299 +179,265 @@ export default function CreatorDashboard() {
         }
       />
 
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <article className="card p-5 sm:p-6">
-            <div className="eyebrow">Profile</div>
-            <div className="mt-1.5 font-display text-xl text-ink-900 tracking-[-0.01em]">
-              {completion === 100 ? 'Profile complete' : `${completion}% complete`}
-            </div>
-            <div className="text-xs text-ink-500 mt-1">
-              {completion === 100
-                ? 'Brands see the full picture when you apply.'
-                : 'Brands can filter creators by these fields.'}
-            </div>
-            <div className="mt-4 h-1.5 bg-mist-100 rounded-sm overflow-hidden">
-              <div
-                className="h-full bg-ink-900 transition-all duration-700 ease-out-quint"
-                style={{ width: completion + '%' }}
-              />
-            </div>
-            {completion < 100 ? (
-              <Link to="/creator/profile/edit" className="btn btn-secondary btn-sm mt-4">
-                Complete profile <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            ) : (
-              <Link to="/creator/profile" className="btn btn-secondary btn-sm mt-4">
-                View profile <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </article>
-
-          <article className="card p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="eyebrow">YouTube</div>
-                <div className="mt-1.5 font-display text-xl text-ink-900 tracking-[-0.01em]">
-                  {yt ? (yt.handle || 'Connected') : 'Not connected'}
-                </div>
-                <div className="text-xs text-ink-500 mt-1">
-                  {yt
-                    ? `Last synced ${fmtRelativeTime(yt.lastSyncedAt)}`
-                    : 'You need YouTube connected to apply to campaigns.'}
-                </div>
-              </div>
-              <Youtube className="w-5 h-5 text-rose-600" />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {yt?.status === 'connected' && ytStatus?.belowMinimum && (
-                <span className="tag tag-amber">
-                  <AlertTriangle className="w-3 h-3" /> Not verified · needs {ytStatus.minimumFollowers.toLocaleString()} subscribers
-                </span>
-              )}
-              {yt?.status === 'connected' && !ytStatus?.belowMinimum && (
-                <>
-                  <span className="tag tag-ember"><CheckCircle2 className="w-3 h-3" /> Verified</span>
-                  <span className="text-xs text-ink-500">
-                    {fmtNumber(creator?.followers ?? 0)} followers · {creator?.engagementRate ?? 0}% engagement
-                  </span>
-                </>
-              )}
-              {yt?.status === 'expired' && (
-                <span className="tag tag-amber">
-                  <AlertTriangle className="w-3 h-3" /> Reconnect needed
-                </span>
-              )}
-              {ytStatus?.isOutdated && (
-                <span className="tag tag-amber"><AlertTriangle className="w-3 h-3" /> Stats outdated</span>
-              )}
-              {!yt && <span className="tag tag-amber">Not connected</span>}
-            </div>
-            <Link to="/creator/accounts" className="btn btn-secondary btn-sm mt-4">
-              {yt ? 'Manage connection' : 'Connect YouTube'}
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </article>
-        </div>
+      <div className="space-y-6">
+        {/* The one thing to do next */}
+        <section aria-label="Your next step">
+          {!data ? <div className="card p-5 text-sm text-ink-500">Loading…</div> : <AttentionList items={[next]} />}
+        </section>
 
         <StatRow
+          size="lg"
           items={[
             { label: 'Proposals sent', value: perf.proposalsSent, hint: 'all time' },
-            { label: 'Acceptance', value: perf.acceptanceRate !== null ? `${acceptancePct}%` : '—', hint: 'from sent' },
-            { label: 'In flight', value: counts.pending + counts.shortlisted, hint: 'pending + shortlisted' },
+            { label: 'Acceptance rate', value: perf.acceptanceRate !== null ? `${acceptancePct}%` : '—', hint: 'of proposals sent' },
+            { label: 'In flight', value: counts.pending + counts.shortlisted, hint: 'pending or shortlisted' },
             { label: 'Accepted', value: perf.accepted, hint: 'collaborations won' },
           ]}
         />
 
-        <section aria-label="Your next step">
-          <SectionHeader
-            eyebrow="Next step"
-            title="Up next"
-            description="The action that matters most right now, and three places to go from here."
-            action={
-              <Link to="/creator/campaigns" className="btn btn-secondary btn-sm">
-                See all briefs <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            }
-          />
-          <div className="mt-5">
-            {!data ? <div className="card p-5 text-sm text-ink-500">Loading…</div> : <AttentionList items={[next]} />}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-8 space-y-8 min-w-0">
+            <section>
+              <BlockHeader
+                title="Briefs you might be a fit for"
+                to="/creator/campaigns"
+                linkLabel="See all briefs"
+              />
+              {available.length === 0 ? (
+                <div className="card p-10 mt-4 text-center">
+                  <Megaphone className="w-8 h-8 text-ink-300 mx-auto mb-3" />
+                  <div className="text-sm font-semibold text-ink-900">No open campaigns right now</div>
+                  <div className="text-xs text-ink-500 mt-1">Check back soon. New campaigns appear as brands publish them.</div>
+                </div>
+              ) : (
+                <ul className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 stagger">
+                  {available.slice(0, 4).map((c) => {
+                    // The server's answer, so this screen and the campaign page always agree.
+                    const eligible = c.eligible === true;
+                    return (
+                      <li key={c.id}>
+                        <CampaignCard
+                          campaign={c}
+                          to={`/creator/campaigns/${c.id}`}
+                          eligibility={{ eligible }}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            {accepted.length > 0 && (
+              <section>
+                <BlockHeader title="Active collaborations" to="/creator/applications" linkLabel="All proposals" />
+                <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 stagger">
+                  {accepted.slice(0, 4).map((p) => (
+                    <li key={p.id}>
+                      <Link to={`/creator/applications/${p.id}`} className="card card-hover p-4 sm:p-5 group block h-full">
+                        <div className="flex items-start gap-3">
+                          <ProfileTile name={p.brandName} seed={p.brandId} height={44} className="w-11 rounded-lg shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-ink-500 truncate">{p.brandName}</div>
+                            <div className="font-semibold text-ink-900 line-clamp-2 leading-snug">{p.campaignTitle}</div>
+                            <div className="mt-2 text-xs text-ink-500">Your rate <span className="font-semibold text-ink-900 num-display">{currency(p.proposedRate)}</span></div>
+                          </div>
+                          <ProposalStatusBadge status={p.status} />
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section>
+              <BlockHeader title="My proposals" to="/creator/applications" linkLabel="View all" />
+              {myProposals.length === 0 ? (
+                <div className="card p-10 mt-4 text-center">
+                  <ListChecks className="w-8 h-8 text-ink-300 mx-auto mb-3" />
+                  <div className="text-sm font-semibold text-ink-900">No proposals yet</div>
+                  <div className="text-xs text-ink-500 mt-1">When you apply to a campaign, it shows up here with its status.</div>
+                  <Link to="/creator/campaigns" className="btn btn-primary btn-sm mt-4">
+                    Browse campaigns <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="card mt-4 overflow-hidden">
+                  {/* Mobile card view */}
+                  <div className="sm:hidden divide-y divide-ink-200/60">
+                    {myProposals.slice(0, 6).map((p) => (
+                      <Link
+                        key={p.id}
+                        to={`/creator/applications/${p.id}`}
+                        className="p-4 block hover:bg-mist-100/60 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-ink-900 line-clamp-1">{p.campaignTitle}</div>
+                            <div className="text-xs text-ink-500 mt-0.5">{p.brandName}</div>
+                          </div>
+                          <ProposalStatusBadge status={p.status} />
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between text-xs">
+                          <span className="text-ink-500">{fmtRelativeTime(p.submittedAt)}</span>
+                          <span className="num-display text-ink-900">{currency(p.proposedRate)}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* Tablet/desktop table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="table-quiet min-w-[560px]">
+                      <thead>
+                        <tr>
+                          <th>Campaign</th>
+                          <th>Sent</th>
+                          <th>Rate</th>
+                          <th className="text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {myProposals.slice(0, 6).map((p) => (
+                          <tr key={p.id}>
+                            <td>
+                              <Link
+                                to={`/creator/applications/${p.id}`}
+                                className="font-semibold text-ink-900 hover:text-brand-600 transition-colors line-clamp-1"
+                              >
+                                {p.campaignTitle}
+                              </Link>
+                              <div className="text-xs text-ink-500">{p.brandName}</div>
+                            </td>
+                            <td className="text-ink-500 whitespace-nowrap">{fmtRelativeTime(p.submittedAt)}</td>
+                            <td className="text-ink-900 num-display whitespace-nowrap">{currency(p.proposedRate)}</td>
+                            <td className="text-right"><ProposalStatusBadge status={p.status} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
           </div>
-          <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger">
-            {[
-              { to: '/creator/campaigns', icon: <Compass className="w-4 h-4" />, title: 'Browse new briefs', hint: `${available.length} live`, accent: 'ember' as const },
-              { to: '/creator/applications', icon: <ListChecks className="w-4 h-4" />, title: 'Check proposal status', hint: `${counts.pending} pending`, accent: 'amber' as const },
-              { to: '/creator/accounts', icon: <Youtube className="w-4 h-4" />, title: 'Verify your stats', hint: yt ? 'Connected' : 'Not connected', accent: 'rose' as const },
-            ].map((a) => (
-              <li key={a.to}>
-                <Link to={a.to} className="card card-hover p-5 flex items-center gap-3 group h-full">
-                  <span className={
-                    a.accent === 'ember' ? 'w-10 h-10 rounded-md bg-brand-50 text-brand-700 flex items-center justify-center shrink-0'
-                    : a.accent === 'amber' ? 'w-10 h-10 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center shrink-0'
-                    : 'w-10 h-10 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0'
-                  }>{a.icon}</span>
+
+          <aside className="lg:col-span-4 space-y-5 lg:sticky lg:top-24">
+            <article className="card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="eyebrow">Profile</div>
+                <span className="num-display text-sm text-ink-900">{completion}%</span>
+              </div>
+              <div className="mt-1.5 text-[15px] font-semibold text-ink-900">
+                {completion === 100 ? 'Profile complete' : 'Finish your profile'}
+              </div>
+              <div className="text-sm text-ink-500 mt-0.5">
+                {completion === 100
+                  ? 'Brands see the full picture when you apply.'
+                  : 'Brands can filter creators by these fields.'}
+              </div>
+              <div
+                className="mt-4 h-2 bg-paper-200 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-valuenow={completion}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Profile completion"
+              >
+                <div
+                  className="h-full bg-brand-500 rounded-full transition-all duration-700 ease-out-quint"
+                  style={{ width: completion + '%' }}
+                />
+              </div>
+              {completion < 100 ? (
+                <Link to="/creator/profile/edit" className="btn btn-secondary btn-sm mt-4 w-full">
+                  Complete profile <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <Link to="/creator/profile" className="btn btn-secondary btn-sm mt-4 w-full">
+                  View profile <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              )}
+            </article>
+
+            <article className="card p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="eyebrow">YouTube</div>
+                  <div className="mt-1.5 text-[15px] font-semibold text-ink-900 truncate">
+                    {yt ? (yt.handle || 'Connected') : 'Not connected'}
+                  </div>
+                  <div className="text-sm text-ink-500 mt-0.5">
+                    {yt
+                      ? `Last synced ${fmtRelativeTime(yt.lastSyncedAt)}`
+                      : 'You need YouTube connected to apply to campaigns.'}
+                  </div>
+                </div>
+                <span className="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Youtube className="w-[18px] h-[18px]" />
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {yt?.status === 'connected' && ytStatus?.belowMinimum && (
+                  <span className="tag tag-amber">
+                    <AlertTriangle className="w-3 h-3" /> Not verified · needs {ytStatus.minimumFollowers.toLocaleString()} subscribers
+                  </span>
+                )}
+                {yt?.status === 'connected' && !ytStatus?.belowMinimum && (
+                  <>
+                    <span className="tag tag-green"><CheckCircle2 className="w-3 h-3" /> Verified</span>
+                    <span className="text-xs text-ink-500">
+                      {fmtNumber(creator?.followers ?? 0)} followers · {creator?.engagementRate ?? 0}% engagement
+                    </span>
+                  </>
+                )}
+                {yt?.status === 'expired' && (
+                  <span className="tag tag-amber">
+                    <AlertTriangle className="w-3 h-3" /> Reconnect needed
+                  </span>
+                )}
+                {ytStatus?.isOutdated && (
+                  <span className="tag tag-amber"><AlertTriangle className="w-3 h-3" /> Stats outdated</span>
+                )}
+                {!yt && <span className="tag tag-amber">Not connected</span>}
+              </div>
+              <Link to="/creator/accounts" className="btn btn-secondary btn-sm mt-4 w-full">
+                {yt ? 'Manage connection' : 'Connect YouTube'}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </article>
+
+            <nav aria-label="Shortcuts" className="card divide-y divide-ink-200/60 overflow-hidden">
+              {[
+                { to: '/creator/campaigns', icon: <Compass className="w-4 h-4" />, title: 'Browse new briefs', hint: `${available.length} live`, tint: 'bg-brand-50 text-brand-700' },
+                { to: '/creator/applications', icon: <ListChecks className="w-4 h-4" />, title: 'Check proposal status', hint: `${counts.pending} pending`, tint: 'bg-amber-50 text-amber-700' },
+                { to: '/creator/accounts', icon: <Youtube className="w-4 h-4" />, title: 'Verify your stats', hint: yt ? 'Connected' : 'Not connected', tint: 'bg-rose-50 text-rose-600' },
+              ].map((a) => (
+                <Link key={a.to} to={a.to} className="p-3.5 flex items-center gap-3 group hover:bg-paper-100/70 transition-colors">
+                  <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${a.tint}`}>{a.icon}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-ink-900 truncate">{a.title}</div>
                     <div className="text-xs text-ink-500 mt-0.5">{a.hint}</div>
                   </div>
-                  <ArrowUpRight className="w-4 h-4 text-ink-300 group-hover:text-brand-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  <ArrowUpRight className="w-4 h-4 text-ink-300 group-hover:text-brand-600 transition-colors shrink-0" />
                 </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section>
-          <SectionHeader
-            eyebrow="Latest"
-            title="Briefs you might be a fit for"
-            action={
-              <Link to="/creator/campaigns" className="text-sm link-accent inline-flex items-center gap-1">
-                See all <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            }
-          />
-          {available.length === 0 ? (
-            <div className="card p-10 mt-5 text-center">
-              <Megaphone className="w-8 h-8 text-ink-300 mx-auto mb-3" />
-              <div className="text-sm font-semibold text-ink-900">No open campaigns right now</div>
-              <div className="text-xs text-ink-500 mt-1">Check back soon. New campaigns appear as brands publish them.</div>
-            </div>
-          ) : (
-            <ul className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 stagger">
-              {available.slice(0, 4).map((c) => {
-                // The server's answer, so this screen and the campaign page always agree.
-                const eligible = c.eligible === true;
-                return (
-                  <li key={c.id}>
-                    <Link to={`/creator/campaigns/${c.id}`} className="card card-hover p-4 sm:p-5 group block">
-                      <div className="flex items-start gap-3">
-                        <ProfileTile name={c.brandName} seed={c.brandId} height={48} className="w-12 rounded-md shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-ink-500 truncate">{c.brandName} · {c.category} · {c.requiredPlatform}</div>
-                          <div className="mt-1 font-semibold text-ink-900 line-clamp-2 leading-snug">{c.title}</div>
-                        </div>
-                      </div>
-                      <div className="mt-4 grid grid-cols-3 gap-px bg-ink-200 rounded-md overflow-hidden border border-ink-200">
-                        <Cell label="Budget" value={currency(c.budgetPerCreator)} hint="/ creator" />
-                        <Cell label="Deadline" value={fmtRelativeTime(c.applicationDeadline)} />
-                        <Cell label="Need" value={`${c.creatorsNeeded}`} hint="creators" />
-                      </div>
-                      <div className="mt-4 flex items-center justify-between">
-                        <EligibilityChip eligible={eligible} />
-                        <CampaignStatusBadge status={c.status} />
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {accepted.length > 0 && (
-          <section>
-            <SectionHeader
-              eyebrow="Accepted"
-              title="Active collaborations"
-              description="Campaigns where a brand accepted you."
-              action={
-                <Link to="/creator/applications" className="text-sm link-accent inline-flex items-center gap-1">
-                  All proposals <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              }
-            />
-            <ul className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 stagger">
-              {accepted.slice(0, 4).map((p) => (
-                <li key={p.id}>
-                  <Link to={`/creator/applications/${p.id}`} className="card card-hover p-4 sm:p-5 group block h-full">
-                    <div className="flex items-start gap-3">
-                      <ProfileTile name={p.brandName} seed={p.brandId} height={48} className="w-12 rounded-md shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs text-ink-500 truncate">{p.brandName}</div>
-                        <div className="font-semibold text-ink-900 line-clamp-2 leading-snug">{p.campaignTitle}</div>
-                        <div className="mt-2 text-xs text-ink-500">Rate {currency(p.proposedRate)}</div>
-                      </div>
-                      <ProposalStatusBadge status={p.status} />
-                    </div>
-                  </Link>
-                </li>
               ))}
-            </ul>
-          </section>
-        )}
-
-        <section>
-          <SectionHeader
-            eyebrow="Applications"
-            title="My proposals"
-            action={
-              <Link to="/creator/applications" className="text-sm link-accent inline-flex items-center gap-1">
-                View all <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            }
-          />
-          {myProposals.length === 0 ? (
-            <div className="card p-10 mt-5 text-center">
-              <ListChecks className="w-8 h-8 text-ink-300 mx-auto mb-3" />
-              <div className="text-sm font-semibold text-ink-900">No proposals yet</div>
-              <div className="text-xs text-ink-500 mt-1">When you apply to a campaign, it shows up here with its status.</div>
-              <Link to="/creator/campaigns" className="btn btn-primary btn-sm mt-4">
-                Browse campaigns <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          ) : (
-            <div className="card mt-5 overflow-hidden">
-              {/* Mobile card view */}
-              <div className="sm:hidden divide-y divide-ink-200/60">
-                {myProposals.slice(0, 6).map((p) => (
-                  <Link
-                    key={p.id}
-                    to={`/creator/applications/${p.id}`}
-                    className="p-4 block hover:bg-mist-100/60 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-ink-900 line-clamp-1">{p.campaignTitle}</div>
-                        <div className="text-xs text-ink-500 mt-0.5">{p.brandName}</div>
-                      </div>
-                      <ProposalStatusBadge status={p.status} />
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-between text-xs">
-                      <span className="text-ink-500">{fmtRelativeTime(p.submittedAt)}</span>
-                      <span className="font-mono font-semibold text-ink-900">{currency(p.proposedRate)}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-
-              {/* Tablet/desktop table */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="table-quiet min-w-[600px]">
-                  <thead>
-                    <tr>
-                      <th>Campaign</th>
-                      <th>Sent</th>
-                      <th>Rate</th>
-                      <th className="text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {myProposals.slice(0, 6).map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          <Link
-                            to={`/creator/applications/${p.id}`}
-                            className="font-semibold text-ink-900 hover:text-brand-600 transition-colors line-clamp-1"
-                          >
-                            {p.campaignTitle}
-                          </Link>
-                          <div className="text-xs text-ink-500">{p.brandName}</div>
-                        </td>
-                        <td className="text-ink-500 whitespace-nowrap">{fmtRelativeTime(p.submittedAt)}</td>
-                        <td className="text-ink-700 font-mono whitespace-nowrap">{currency(p.proposedRate)}</td>
-                        <td className="text-right"><ProposalStatusBadge status={p.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </section>
+            </nav>
+          </aside>
+        </div>
       </div>
     </div>
   );
 }
 
-function Cell({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function BlockHeader({ title, to, linkLabel }: { title: string; to: string; linkLabel: string }) {
   return (
-    <div className="bg-mist-50 py-2 px-1.5 sm:px-3 text-center min-w-0 overflow-hidden">
-      <div className="eyebrow !text-[9px] truncate">{label}</div>
-      <div className="num-display text-xs sm:text-sm mt-0.5 truncate">
-        {value}
-        {hint && <span className="text-[10px] text-ink-500 font-sans font-normal ml-0.5 sm:ml-1 hidden sm:inline">{hint}</span>}
-      </div>
+    <div className="flex items-center justify-between gap-4">
+      <h2 className="font-display text-xl text-ink-900 tracking-[-0.015em]">{title}</h2>
+      <Link to={to} className="text-sm link-accent inline-flex items-center gap-1 shrink-0">
+        {linkLabel} <ArrowRight className="w-3.5 h-3.5" />
+      </Link>
     </div>
   );
 }

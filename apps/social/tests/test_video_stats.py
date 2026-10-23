@@ -46,7 +46,11 @@ def test_fetch_video_stats_sends_one_request_with_the_server_key_and_no_user_tok
         VIDEOS,
         json={
             "items": [
-                {"id": "aaaaaaaaaaa", "statistics": {"viewCount": "1500", "likeCount": "90", "commentCount": "12"}},
+                {
+                    "id": "aaaaaaaaaaa",
+                    "snippet": {"channelId": "UC-one"},
+                    "statistics": {"viewCount": "1500", "likeCount": "90", "commentCount": "12"},
+                },
                 {"id": "bbbbbbbbbbb", "statistics": {"viewCount": "700"}},  # likes and comments hidden
             ]
         },
@@ -55,7 +59,7 @@ def test_fetch_video_stats_sends_one_request_with_the_server_key_and_no_user_tok
     stats = YouTubeClient().fetch_video_stats(["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"], "my-api-key")
 
     assert stats == {
-        "aaaaaaaaaaa": VideoStats(views=1500, likes=90, comments=12),
+        "aaaaaaaaaaa": VideoStats(views=1500, likes=90, comments=12, channel_id="UC-one"),
         "bbbbbbbbbbb": VideoStats(views=700, likes=None, comments=None),
     }  # a video Google does not return (deleted, private) is simply absent
     assert len(responses.calls) == 1
@@ -63,7 +67,7 @@ def test_fetch_video_stats_sends_one_request_with_the_server_key_and_no_user_tok
     query = parse_qs(urlparse(request.url).query)
     assert query["id"] == ["aaaaaaaaaaa,bbbbbbbbbbb,ccccccccccc"]
     assert query["key"] == ["my-api-key"]
-    assert query["part"] == ["statistics"]
+    assert query["part"] == ["statistics,snippet"]
     assert "Authorization" not in request.headers
 
 

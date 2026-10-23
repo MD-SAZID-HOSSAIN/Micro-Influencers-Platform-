@@ -188,6 +188,8 @@ type ApiCreatorMe = {
   rating_avg: string | null;
   rating_count: number;
   completion_percent: number;
+  /** The creator is Verified: a confirmed email AND YouTube with enough subscribers. Decided by the server. */
+  is_verified?: boolean;
   stats: Array<{
     platform: string;
     handle_url: string | null;
@@ -242,7 +244,7 @@ export const mapCreatorMe = (p: ApiCreatorMe): CreatorProfile => {
     ratePerVideo: numFrom(p.rate_video),
     followers,
     engagementRate: engagement,
-    verified: !!yt?.is_verified,
+    verified: !!p.is_verified,
     portfolio: [],
     // Best-effort: the verified flag is the YouTube verified status. The
     // dashboard reads it via the separate /social/youtube/ endpoint for the
@@ -1306,14 +1308,14 @@ export const fetchBrandDashboard = async (): Promise<BrandDashboardData> => {
 
 // ----- Brand connected platforms ---------------------------------------------
 
-export type BrandSocialPlatform = 'youtube' | 'instagram' | 'tiktok' | 'facebook';
+export type BrandSocialPlatform = 'instagram' | 'tiktok' | 'facebook';
 
 export type BrandSocialAccount = {
   platform: BrandSocialPlatform;
   handleUrl: string;
-  /** YouTube connected with Google sign-in, or a typed link an admin approved. */
+  /** A typed link an admin approved. */
   isVerified: boolean;
-  /** A typed link waits for an admin ("pending"), then is "approved" or "rejected". YouTube is always approved. */
+  /** A typed link waits for an admin ("pending"), then is "approved" or "rejected". */
   reviewStatus: 'pending' | 'approved' | 'rejected';
   reviewNote?: string;
   connectedAt: string;
@@ -1340,7 +1342,7 @@ const mapBrandSocial = (a: ApiBrandSocial): BrandSocialAccount => ({
 export const fetchBrandSocial = async (): Promise<BrandSocialAccount[]> =>
   (await request<ApiBrandSocial[]>('brands/me/social/')).map(mapBrandSocial);
 
-/** Save the link typed for Instagram, TikTok or Facebook. YouTube uses Google sign-in instead. */
+/** Save the link typed for Instagram, TikTok or Facebook. An admin checks it. YouTube does not verify a brand. */
 export const saveBrandSocialLink = async (platform: BrandSocialPlatform, handleUrl: string): Promise<BrandSocialAccount> =>
   mapBrandSocial(
     await request<ApiBrandSocial>(`brands/me/social/${platform}/`, { method: 'PUT', body: { handle_url: handleUrl } }),
@@ -1349,19 +1351,6 @@ export const saveBrandSocialLink = async (platform: BrandSocialPlatform, handleU
 export const removeBrandSocial = async (platform: BrandSocialPlatform): Promise<void> => {
   await request(`brands/me/social/${platform}/`, { method: 'DELETE' });
 };
-
-export const startBrandYouTubeConnect = async (): Promise<string> => {
-  const data = await request<{ authorization_url: string }>('brands/me/social/youtube/connect/');
-  return data.authorization_url;
-};
-
-export const completeBrandYouTubeConnect = async (input: { code: string; state: string }): Promise<BrandSocialAccount[]> =>
-  (
-    await request<ApiBrandSocial[]>('brands/me/social/youtube/complete/', {
-      method: 'POST',
-      body: { code: input.code, state: input.state },
-    })
-  ).map(mapBrandSocial);
 
 // ----- Campaign analytics (FR-23) ------------------------------------------
 

@@ -172,7 +172,7 @@ export default function CampaignDetail() {
           <div className="text-xs text-ink-500 mt-1">
             {eligible
               ? `Looking for: ${requirement}.`
-              : `Looking for: ${requirement}. This is a guide only, you can still apply.`}
+              : `Looking for: ${requirement}. If your numbers on this platform are under the minimum followers, you cannot apply.`}
           </div>
         </div>
         <EligibilityChip eligible={eligible} reason={`Looking for ${requirement}`} />

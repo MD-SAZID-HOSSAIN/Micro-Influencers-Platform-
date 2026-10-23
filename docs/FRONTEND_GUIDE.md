@@ -201,15 +201,13 @@ creator the email code is separate from YouTube: it confirms their address and e
 applying still needs a connected YouTube channel.
 
 An unverified **brand** cannot publish a campaign or accept a proposal: those calls return 403 with code
-`brand_email_unverified` (email not confirmed) or `brand_platform_required` (no verified platform: YouTube, or a link an
-admin approved; the email is checked first). Everything else works unverified (drafts, shortlisting, rejecting, browsing).
+`brand_email_unverified` (email not confirmed) or `brand_platform_required` (no verified platform: a link an
+admin approved, never YouTube; the email is checked first). Everything else works unverified (drafts, shortlisting, rejecting, browsing).
 
 A brand connects platforms with `GET /brands/me/social/` (list), `PUT /brands/me/social/{instagram|tiktok|facebook}/`
 with `{"handle_url"}` (a link on that platform; saved as `is_verified: false`, `review_status: "pending"` until an admin
-approves it, then `"approved"`, or `"rejected"` with a `review_note`), `DELETE /brands/me/social/{platform}/`,
-and YouTube through Google: `GET /brands/me/social/youtube/connect/`, then `POST /brands/me/social/youtube/complete/`
-with the `state` and `code` the callback redirect carries (the same `?youtube=confirm&code=...&state=...` redirect creators
-use; send brands to their own accounts page). `GET /auth/me/` returns `platform_connected` (true only when a platform is verified; null for
+approves it, then `"approved"`, or `"rejected"` with a `review_note`), `DELETE /brands/me/social/{platform}/`.
+YouTube does not verify a brand: `PUT /brands/me/social/youtube/` returns 400 `youtube_not_for_brands`. `GET /auth/me/` returns `platform_connected` (true only when a platform is verified; null for
 non-brands) and `platform_status` (`verified`, `pending` when a link waits for an admin, or `none`): show a "connect a
 platform" banner while `platform_connected` is `false`, and "an admin is checking your link" when it is `pending`.
 For everyone, verification also decides whether notification emails are sent (section 7.2). Show a
@@ -293,10 +291,10 @@ Errors (400): `invalid_reset_code`, `reset_code_expired`, `reset_code_used`, `re
 - `GET /creators/me/stats/` returns one entry per platform:
   `{ platform, handle_url, followers, engagement_rate, is_verified, review_status, review_note, is_outdated, last_synced_at }`.
 - `PUT /creators/me/stats/{platform}/` with `{ "followers": 12000, "engagement_rate": "4.20", "handle_url": "https://..." }`
-  saves numbers typed by hand. These are labelled **Unverified** (`is_verified: false`). `{platform}` must be
-  one of the four platforms (otherwise 404).
-- Typing over numbers that came from a connected YouTube account is refused: **409 `stats_verified`**. Disable
-  the form for those and show the Verified badge instead.
+  saves numbers typed by hand for `instagram`, `tiktok` or `facebook`. They wait for an admin (`review_status:
+  "pending"`) and are **Unverified** (`is_verified: false`). `{platform}` must be one of the four platforms
+  (otherwise 404).
+- `youtube` cannot be typed: **400 `youtube_from_google_only`**. YouTube numbers come only from Google sign-in.
 - **Verified** (connected account) vs **Unverified** (typed by hand) must always be visible.
 - `is_outdated: true` means the connection broke and these are the last known numbers. Show a "reconnect"
   prompt.
@@ -673,7 +671,12 @@ links live in one dictionary in `apps/notifications/emails.py`).
 | `deliverables_locked`, `deliverables_full` | 409 | deliverables | not accepted yet or already completed / 20 max |
 | `not_completed`, `already_reviewed` | 409 | review | complete first / one review only |
 | `portfolio_full` | 409 | portfolio | 10 max |
-| `stats_verified` | 409 | manual stats | numbers come from YouTube |
+| `youtube_from_google_only` | 400 | manual stats | YouTube numbers come only from Google sign-in and cannot be typed |
+| `channel_in_use` | 400 | YouTube complete | that channel is already connected to another account |
+| `creator_youtube_reconnect` | 403 | apply | the YouTube proof is out of date: reconnect or refresh |
+| `not_eligible` | 403 | apply | under the campaign's minimum followers (the message says how many are needed) |
+| `creator_unavailable` | 409 | accept | the creator's account is suspended |
+| `video_not_yours` | 400 | deliverables | a YouTube link that is not on the creator's connected channel |
 | `refresh_cooldown` | 429 | YouTube refresh | once every 15 minutes |
 | `reconnect_required` | 409 | YouTube refresh | connection expired |
 | `invalid_state`, `exchange_failed`, `no_refresh_token` | 400 | YouTube complete | see section 8 |

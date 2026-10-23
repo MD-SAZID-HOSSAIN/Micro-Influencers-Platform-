@@ -1,22 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { ArrowUpRight, CheckCircle2, Circle, ExternalLink, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, Circle, ExternalLink, Trash2 } from 'lucide-react';
 import { Button, FormField, Input, PageHeader, PlatformIcon, SectionHeader } from '../../components/ui';
 import { ConfirmDialog } from '../../components/Modal';
 import { useAuth } from '../../state/AuthContext';
 import { useToast } from '../../state/ToastContext';
 import { isApiError } from '../../api/client';
 import {
-  completeBrandYouTubeConnect, fetchBrandSocial, removeBrandSocial, saveBrandSocialLink, startBrandYouTubeConnect,
+  fetchBrandSocial, removeBrandSocial, saveBrandSocialLink,
   type BrandSocialAccount, type BrandSocialPlatform,
 } from '../../api/endpoints';
 import type { Platform } from '../../types';
 
-/** Codes already sent to the backend this session (each Google code works once). */
-const handledCodes = new Set<string>();
-
 const PLATFORMS: { key: BrandSocialPlatform; label: Platform; example?: string }[] = [
-  { key: 'youtube', label: 'YouTube' },
   { key: 'instagram', label: 'Instagram', example: 'https://instagram.com/yourbrand' },
   { key: 'tiktok', label: 'TikTok', example: 'https://www.tiktok.com/@yourbrand' },
   { key: 'facebook', label: 'Facebook', example: 'https://facebook.com/yourbrand' },
@@ -24,19 +20,9 @@ const PLATFORMS: { key: BrandSocialPlatform; label: Platform; example?: string }
 
 const STATUS_TAG = {
   pending: { label: 'Waiting for admin', tone: 'tag-amber' },
-  approved: { label: 'Verified', tone: 'tag-ember' },
+  approved: { label: 'Verified', tone: 'tag-green' },
   rejected: { label: 'Rejected', tone: 'tag-rose' },
 } as const;
-
-const GOOGLE_FAILURES: Record<string, string> = {
-  access_denied: 'You declined access on Google.',
-  invalid_state: 'That sign-in link expired or was started from another account. Try connecting again.',
-  exchange_failed: 'Google did not accept the sign-in. Try connecting again.',
-  no_channel: 'That Google account has no YouTube channel. Sign in with an account that has one, or connect another platform.',
-};
-
-const googleFailure = (code: string | null | undefined) =>
-  `YouTube was not connected. ${(code && GOOGLE_FAILURES[code]) || 'Something went wrong. Try again.'}`;
 
 function Step({ done, title, children }: { done: boolean; title: string; children?: React.ReactNode }) {
   return (
@@ -57,7 +43,6 @@ function Step({ done, title, children }: { done: boolean; title: string; childre
 export default function BrandConnectedAccounts() {
   const { user, refreshUser } = useAuth();
   const { push } = useToast();
-  const location = useLocation();
   const [accounts, setAccounts] = useState<BrandSocialAccount[] | null>(null);
   const [links, setLinks] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -75,54 +60,7 @@ export default function BrandConnectedAccounts() {
 
   useEffect(() => {
     void reload();
-
-    // After Google's consent screen the backend redirects here with
-    //   ?youtube=confirm&code=…&state=…   or   ?youtube=error&reason=…
-    // The code is single-use: it is removed from the address bar first, and `handledCodes` stops React
-    // StrictMode's second effect run from sending it twice.
-    const params = new URLSearchParams(location.search);
-    const flag = params.get('youtube');
-    if (!flag) return;
-    const code = params.get('code');
-    const state = params.get('state');
-    const reason = params.get('reason');
-    const url = new URL(window.location.href);
-    ['youtube', 'code', 'state', 'reason'].forEach((k) => url.searchParams.delete(k));
-    window.history.replaceState({}, '', url.toString());
-
-    if (flag === 'error') {
-      push(googleFailure(reason), 'error');
-      return;
-    }
-    if (flag === 'confirm' && code && state && !handledCodes.has(code)) {
-      handledCodes.add(code);
-      setWorking('youtube');
-      completeBrandYouTubeConnect({ code, state })
-        .then((list) => {
-          setAccounts(list);
-          return refreshUser();
-        })
-        .then(() => push('YouTube connected. Your brand is now verified.', 'success'))
-        .catch((err) => push(googleFailure(isApiError(err) ? err.code : null), 'error'))
-        .finally(() => setWorking(null));
-    }
-  }, [location.search]);
-
-  const connectYouTube = async () => {
-    setWorking('youtube');
-    try {
-      const url = await startBrandYouTubeConnect();
-      if (!url) {
-        push('Google sign-in is not set up on this server yet.', 'error');
-        return;
-      }
-      window.location.assign(url);
-    } catch (err) {
-      push(isApiError(err) ? err.message : 'Could not start YouTube sign-in.', 'error');
-    } finally {
-      setWorking(null);
-    }
-  };
+  }, []);
 
   const saveLink = async (platform: BrandSocialPlatform) => {
     setErrors((e) => ({ ...e, [platform]: '' }));
@@ -161,7 +99,7 @@ export default function BrandConnectedAccounts() {
         <PageHeader
           eyebrow="Account"
           title="Connected accounts"
-          description="Connect YouTube with Google, or add your official Instagram, TikTok or Facebook link. An admin checks the link before it counts."
+          description="Add your official Instagram, TikTok or Facebook link. An admin checks the link before it counts."
         />
 
         <section className="card p-5 sm:p-6">
@@ -184,7 +122,7 @@ export default function BrandConnectedAccounts() {
                 ? `${verifiedCount} verified. One is enough; add more if you like.`
                 : pendingCount > 0
                   ? 'Your link is waiting for an admin to check it.'
-                  : 'Connect YouTube with Google, or add your official Instagram, TikTok or Facebook link below. An admin approves the link.'}
+                  : 'Add your official Instagram, TikTok or Facebook link below. An admin approves the link.'}
             </Step>
           </ul>
           <p className="text-xs text-ink-500 mt-5">
@@ -206,10 +144,8 @@ export default function BrandConnectedAccounts() {
                       <PlatformIcon platform={label} className="w-5 h-5" />
                     </span>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-ink-900">{label}</h3>
-                      <p className="text-xs text-ink-500 mt-0.5">
-                        {key === 'youtube' ? 'Google sign-in · proves you own the channel' : 'Official page link · an admin checks it'}
-                      </p>
+                      <h3 className="text-base font-semibold text-ink-900">{label}</h3>
+                      <p className="text-xs text-ink-500 mt-0.5">Official page link · an admin checks it</p>
                     </div>
                   </div>
                   {account && (
@@ -242,11 +178,7 @@ export default function BrandConnectedAccounts() {
                     Admin said: “{account.reviewNote}” Remove it and add the correct link.
                   </p>
                 )}
-                {!account && (key === 'youtube' ? (
-                  <Button onClick={connectYouTube} disabled={busy} className="mt-4 w-full sm:w-auto">
-                    {busy ? 'Opening Google…' : 'Connect YouTube'} <ArrowUpRight className="w-3.5 h-3.5" />
-                  </Button>
-                ) : (
+                {!account && (
                   <form
                     className="mt-4 flex flex-col sm:flex-row sm:items-start gap-3"
                     onSubmit={(e) => {
@@ -272,7 +204,7 @@ export default function BrandConnectedAccounts() {
                       {busy ? 'Saving…' : `Connect ${label}`}
                     </Button>
                   </form>
-                ))}
+                )}
               </article>
             );
           })}

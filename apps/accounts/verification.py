@@ -1,7 +1,7 @@
 """Who may publish, accept and apply.
 
-- A brand needs a confirmed email AND one verified platform: a YouTube channel proven by Google sign-in, or an
-  Instagram, TikTok or Facebook link that an admin approved.
+- A brand needs a confirmed email AND an Instagram, TikTok or Facebook link that an admin approved. YouTube does
+  not verify a brand.
 - A creator needs a confirmed email AND a YouTube channel proven by Google sign-in with enough subscribers.
 
 Everything else (logging in, browsing, editing a profile, saving drafts, shortlisting) stays open to
@@ -24,7 +24,7 @@ class BrandPlatformRequired(DomainError):
     status_code = 403
     default_code = "brand_platform_required"
     default_detail = (
-        "Connect YouTube, or add your Instagram, TikTok or Facebook link and wait for an admin to approve it, "
+        "Add your official Instagram, TikTok or Facebook link and wait for an admin to approve it, "
         "before publishing campaigns or accepting proposals."
     )
 
@@ -56,30 +56,48 @@ class CreatorFollowersTooLow(DomainError):
         )
 
 
+class CreatorYouTubeStale(DomainError):
+    """The channel was proven once, but Google can no longer confirm it (access ended, or the audience is hidden)."""
+
+    status_code = 403
+    default_code = "creator_youtube_reconnect"
+    default_detail = (
+        "Google can no longer confirm your YouTube channel, so your stats are out of date. "
+        "Reconnect YouTube (or press Refresh) before applying to campaigns."
+    )
+
+
 def creator_is_verified(creator: User) -> bool:
-    """Verified: a confirmed email AND YouTube stats proven by Google sign-in with at least MIN_CREATOR_FOLLOWERS subscribers."""
+    """Verified: a confirmed email AND YouTube stats proven by Google sign-in with at least MIN_CREATOR_FOLLOWERS subscribers.
+
+    The proof must be current: stats marked out of date (access revoked or expired, subscribers hidden) do not count
+    until a refresh or a reconnect confirms them again.
+    """
     from apps.social.models import PlatformStats
 
     return creator.email_verified and PlatformStats.objects.filter(
         creator=creator,
         platform="youtube",
         is_verified=True,
+        is_outdated=False,
         followers__gte=settings.MIN_CREATOR_FOLLOWERS,
     ).exists()
 
 
 def brand_has_platform(brand: User) -> bool:
-    """A brand has a verified platform: YouTube proven by Google, or a typed link an admin approved."""
+    """A brand has a verified platform: an Instagram, TikTok or Facebook link an admin approved (never YouTube)."""
     from apps.social.models import BrandSocialAccount
 
-    return BrandSocialAccount.objects.filter(brand=brand, is_verified=True).exists()
+    return BrandSocialAccount.objects.filter(brand=brand, is_verified=True).exclude(platform="youtube").exists()
 
 
 def brand_platform_status(brand: User) -> str:
     """"verified", "pending" (a typed link is waiting for an admin) or "none" (nothing, or only rejected links)."""
     from apps.social.models import BrandSocialAccount
 
-    rows = list(BrandSocialAccount.objects.filter(brand=brand).values_list("is_verified", "review_status"))
+    rows = list(
+        BrandSocialAccount.objects.filter(brand=brand).exclude(platform="youtube").values_list("is_verified", "review_status")
+    )
     if any(verified for verified, _ in rows):
         return "verified"
     if any(status == "pending" for _, status in rows):
@@ -109,6 +127,8 @@ def require_verified_creator(creator: User) -> None:
 
     minimum = settings.MIN_CREATOR_FOLLOWERS
     stats = PlatformStats.objects.filter(creator=creator, platform="youtube").first()
+    if stats is not None and stats.is_verified and stats.is_outdated and stats.followers >= minimum:
+        raise CreatorYouTubeStale()
     # A channel counts as connected when Google sign-in proved it (a connection, or Verified stats).
     proven = stats is not None and (stats.is_verified or YouTubeConnection.objects.filter(creator=creator).exists())
     if proven and stats.followers < minimum:

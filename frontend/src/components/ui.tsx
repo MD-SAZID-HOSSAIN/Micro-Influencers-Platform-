@@ -212,7 +212,7 @@ export function EligibilityChip({ eligible, reason }: { eligible: boolean; reaso
 export function VerifiedBadge({ verified }: { verified: boolean }) {
   if (verified) {
     return (
-      <span className="tag tag-ember" title="Stats verified via YouTube">
+      <span className="tag tag-green" title="Confirmed email and a YouTube channel checked through Google">
         <CheckCircle2 className="w-3 h-3" /> Verified
       </span>
     );
@@ -513,16 +513,52 @@ export function PageHeader({
   );
 }
 
-// ---------- StatRow (compact, used in profile/campaign headers) ----------
-export function StatRow({ items }: { items: { label: string; value: ReactNode; hint?: ReactNode }[] }) {
+// ---------- StatRow (compact, used in profile/campaign headers; "lg" is for dashboards) ----------
+export function StatRow({
+  items, size = 'sm', cols = 4,
+}: {
+  /** `attention` marks a figure that needs the reader to act (shown with an accent dot and colour). */
+  items: { label: string; value: ReactNode; hint?: ReactNode; attention?: boolean }[];
+  size?: 'sm' | 'lg';
+  /** Columns from the `sm` breakpoint up. Use 2 in a narrow column so labels are not cut off. */
+  cols?: 2 | 4;
+}) {
+  const lg = size === 'lg';
   return (
     // The dividers are borders on the cells (not a coloured gap), so an unused slot in the last row stays blank.
-    <dl className="grid grid-cols-2 sm:grid-cols-4 border border-ink-200 bg-paper-50 rounded-md overflow-hidden">
+    <dl
+      className={clsx(
+        'grid grid-cols-2 border border-ink-200 bg-paper-50 overflow-hidden',
+        cols === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-2',
+        lg ? 'rounded-[14px]' : 'rounded-md',
+      )}
+    >
       {items.map((it) => (
-        <div key={it.label} className="bg-paper-50 p-2.5 sm:p-4 min-w-0 -mr-px -mb-px border-r border-b border-ink-200">
-          <dt className="eyebrow truncate">{it.label}</dt>
-          <dd className="num-display text-lg sm:text-xl mt-1 sm:mt-1.5 truncate">{it.value}</dd>
-          {it.hint && <div className="text-[10px] sm:text-[11px] text-ink-500 mt-0.5 truncate">{it.hint}</div>}
+        <div
+          key={it.label}
+          className={clsx(
+            'bg-paper-50 min-w-0 -mr-px -mb-px border-r border-b border-ink-200',
+            lg ? 'p-4 sm:px-6 sm:py-5' : 'p-2.5 sm:p-4',
+          )}
+        >
+          <dt className="eyebrow truncate flex items-center gap-1.5">
+            {it.attention && <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />}
+            {it.label}
+          </dt>
+          <dd
+            className={clsx(
+              'num-display truncate',
+              lg ? 'text-3xl sm:text-[2.5rem] mt-2 sm:mt-3 tabular-nums' : 'text-lg sm:text-xl mt-1 sm:mt-1.5',
+              it.attention && 'text-brand-700',
+            )}
+          >
+            {it.value}
+          </dd>
+          {it.hint && (
+            <div className={clsx('text-ink-500 truncate', lg ? 'text-xs mt-1.5' : 'text-[10px] sm:text-[11px] mt-0.5')}>
+              {it.hint}
+            </div>
+          )}
         </div>
       ))}
     </dl>

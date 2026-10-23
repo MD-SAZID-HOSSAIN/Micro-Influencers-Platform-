@@ -163,7 +163,7 @@ export default function AppShell() {
                     end={item.end}
                     className={({ isActive }) =>
                       clsx(
-                        'inline-flex items-center px-3 py-2 rounded-md font-medium transition-colors',
+                        'inline-flex items-center whitespace-nowrap px-3 py-2 rounded-md font-medium transition-colors',
                         isActive ? 'bg-ink-100 text-ink-900' : 'hover:text-ink-900 hover:bg-mist-100',
                       )
                     }
@@ -248,8 +248,8 @@ export default function AppShell() {
                 </span>
               ) : (
                 <span>
-                  <strong>Connect YouTube</strong>, or add your Instagram, TikTok or Facebook link for an admin to approve,
-                  to publish campaigns and accept proposals.
+                  <strong>Add your Instagram, TikTok or Facebook link</strong> for an admin to approve, to publish campaigns
+                  and accept proposals.
                 </span>
               )}
             </span>
