@@ -229,3 +229,10 @@ line of code, and the tests that pin them sit next to the code.
   (earlier decision above) — cost if wrong: require numbers on the campaign's platform in
   `campaigns.eligibility.minimum_followers_problem`. (5) `accept_proposal` refuses a suspended creator
   (`creator_unavailable`); rejecting still works.
+
+- **Free hosting files: Vercel + Render + Neon** — added `render.yaml` (API and a Redis-compatible store; the database is
+  Neon, the website Vercel), `frontend/vercel.json` (Vite build, SPA rewrite, basic headers) and a deployment guide
+  section. Two environment switches make a worker-less, disk-less host usable: `CELERY_TASK_ALWAYS_EAGER` (default
+  false; jobs and emails run inside the request) and `UPLOADS_ENABLED` (default true; false refuses every upload with
+  `uploads_disabled` so a file is never accepted and then lost). The scheduled daily jobs do not run without a beat process
+  — cost if wrong: the daily YouTube refresh and campaign auto-close need a paid worker or an outside scheduler.

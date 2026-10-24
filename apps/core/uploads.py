@@ -14,6 +14,12 @@ PHOTO = "photo"
 VIDEO = "video"
 
 
+class UploadsDisabled(DomainError):
+    status_code = 400
+    default_code = "uploads_disabled"
+    default_detail = "File uploads are turned off on this site. For a profile picture or logo, paste a link to an image instead."
+
+
 class UnsupportedMedia(DomainError):
     status_code = 400
     default_code = "unsupported_media"
@@ -57,6 +63,8 @@ def megabytes(n: int) -> str:
 
 def check_upload(upload) -> Detected:
     """Identify an uploaded file and make sure it is within the size limit for its type."""
+    if not settings.UPLOADS_ENABLED:
+        raise UploadsDisabled()
     head = upload.read(16)
     upload.seek(0)
     detected = detect(head)
@@ -70,6 +78,8 @@ def check_upload(upload) -> Detected:
 
 def check_photo(upload) -> Detected:
     """Like ``check_upload`` but only photos are acceptable (profile pictures and logos)."""
+    if not settings.UPLOADS_ENABLED:
+        raise UploadsDisabled()
     head = upload.read(16)
     upload.seek(0)
     detected = detect(head)

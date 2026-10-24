@@ -198,3 +198,38 @@ def test_the_logo_shows_on_campaign_cards(brand, auth_client):
 
     assert card["id"] == campaign.id
     assert card["brand"]["logo_url"] == logo
+
+
+# ---- uploads can be switched off (a host with no persistent disk) ---------------------------------------
+
+
+def test_uploads_can_be_turned_off_and_nothing_is_stored(creator, auth_client, settings, media_root):
+    settings.UPLOADS_ENABLED = False
+
+    response = put(auth_client, creator, PHOTO)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "uploads_disabled"
+    assert list(media_root.iterdir()) == []
+    assert not CreatorProfile.objects.get(user=creator).photo
+
+
+def test_a_pasted_link_still_works_when_uploads_are_off(creator, auth_client, settings):
+    settings.UPLOADS_ENABLED = False
+
+    response = auth_client(creator).patch(
+        "/api/v1/creators/me/", {"photo_url": "https://img.example.com/me.png"}, format="json"
+    )
+
+    assert response.status_code == 200
+    assert CreatorProfile.objects.get(user=creator).photo_url == "https://img.example.com/me.png"
+
+
+def test_campaign_media_is_refused_when_uploads_are_off(brand, auth_client, settings):
+    settings.UPLOADS_ENABLED = False
+    campaign = CampaignFactory(brand=brand, status=Campaign.Status.DRAFT)
+    file = SimpleUploadedFile("a.jpg", JPEG, content_type="image/jpeg")
+
+    response = auth_client(brand).post(f"/api/v1/brand/campaigns/{campaign.pk}/media/", {"file": file}, format="multipart")
+
+    assert response.status_code == 400 and response.json()["error"]["code"] == "uploads_disabled"

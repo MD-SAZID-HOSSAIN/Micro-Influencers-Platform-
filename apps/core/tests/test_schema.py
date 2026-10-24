@@ -139,3 +139,27 @@ def test_deployment_guide_exists_and_covers_the_essentials():
 
     for topic in ("NUM_PROXIES", "X-Forwarded-Proto", "beat", "migrate", "SPF", "refresh token"):
         assert topic in guide, topic
+
+
+def test_render_blueprint_matches_the_settings():
+    """render.yaml must be valid and only set variables the settings (or Render itself) actually read."""
+    blueprint = yaml.safe_load((BASE_DIR / "render.yaml").read_text(encoding="utf-8"))
+    web = next(s for s in blueprint["services"] if s["type"] == "web")
+    keys = {item["key"] for item in web["envVars"]}
+
+    assert {"DATABASE_URL", "SECRET_KEY", "ALLOWED_HOSTS", "CORS_ALLOWED_ORIGINS", "OAUTH_ENCRYPTION_KEY"} <= keys
+    assert (keys - {"PYTHON_VERSION", "DJANGO_SETTINGS_MODULE"}) <= _settings_variables()
+    env = {item["key"]: item.get("value") for item in web["envVars"]}
+    assert env["DJANGO_SETTINGS_MODULE"] == "config.settings.prod"
+    assert env["UPLOADS_ENABLED"] == "false" and env["CELERY_TASK_ALWAYS_EAGER"] == "true"
+    assert "$PORT" in web["startCommand"] and "gunicorn" in web["startCommand"]
+    assert any(s["type"] == "keyvalue" for s in blueprint["services"])
+
+
+def test_vercel_config_rewrites_every_path_to_the_app():
+    import json
+
+    config = json.loads((BASE_DIR / "frontend" / "vercel.json").read_text(encoding="utf-8"))
+
+    assert {"source": "/(.*)", "destination": "/index.html"} in config["rewrites"]
+    assert config["outputDirectory"] == "dist"

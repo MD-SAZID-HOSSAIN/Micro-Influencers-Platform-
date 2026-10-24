@@ -4,6 +4,94 @@ The backend runs as three processes from the same code: the **API** (gunicorn), 
 **Celery beat** scheduler. It needs PostgreSQL 16 and Redis 7, installed on the server (the repository ships no
 container files). Nothing in the repository chooses a host; this guide describes what any host must provide.
 
+## Free hosting: Vercel + Render + Neon
+
+The website runs on **Vercel**, the API on **Render** and the database on **Neon**, all on free plans. The files for
+this are `frontend/vercel.json` and `render.yaml`. It is good for a demo or portfolio. Read "What the free plans cost
+you" at the end of this section before real people use it.
+
+### Order of setup
+
+The three services need each other's addresses, so deploy in this order and fill the gaps afterwards.
+
+**1. Neon (database)**
+1. Create a project. Choose the region closest to your users (AWS Singapore for South Asia) and use the same region
+   on Render.
+2. Open **Connect**, turn **Connection pooling off**, and copy the connection string. It must end in
+   `?sslmode=require`. Use this *direct* string: the pooled one can interfere with the row locks that stop a brand
+   accepting more creators than it asked for.
+
+**2. Render (API)**
+1. Push the repository to GitHub. In Render choose **New, Blueprint**, pick the repository and apply `render.yaml`.
+   It creates the API (`collabnest-api`) and a Redis-compatible store (`collabnest-redis`).
+2. Render asks for the variables marked `sync: false`. Fill in what you know now and put temporary values for the
+   rest (you will fix them in step 4):
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | the Neon string from step 1 |
+   | `ALLOWED_HOSTS` | the API host, e.g. `collabnest-api.onrender.com` (no `https://`). The host is shown on the service page; if the name was taken it gets a suffix. |
+   | `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS` | temporary `https://example.vercel.app` (must start with `https://`) |
+   | `OAUTH_ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | from the Google Cloud console |
+   | `GOOGLE_REDIRECT_URI` | `https://<api host>/api/v1/social/youtube/callback/` |
+   | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | Brevo SMTP login, SMTP key and a verified sender |
+   | `YOUTUBE_API_KEY` | optional |
+
+3. Wait for the first deploy. The build installs the packages and runs the database migrations. Then open
+   `https://<api host>/api/v1/health/`. It should answer `{"status": "ok", "database": "ok"}`.
+
+**3. Vercel (website)**
+1. **Add New, Project**, pick the same repository and set **Root Directory** to `frontend`. Vercel reads
+   `frontend/vercel.json` (Vite build, `dist` folder, and the rewrite that makes page refreshes work).
+2. Add the environment variable `VITE_API_URL` = `https://<api host>/api/v1`, then deploy.
+3. Copy the website address Vercel gives you (for example `https://collabnest.vercel.app`).
+
+**4. Back to Render and Google**
+1. Set `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` to the Vercel address (no trailing slash). Saving redeploys the API.
+2. In the Google Cloud console add `https://<api host>/api/v1/social/youtube/callback/` as an authorized redirect URI
+   and add your testers as test users.
+
+**5. Create the first admin (once, from your own computer)**
+
+Render's free plan has no shell, so run the command here against the Neon database. In PowerShell, in the project
+folder with the virtual environment active:
+
+```powershell
+$env:DJANGO_SETTINGS_MODULE = "config.settings.dev"
+$env:DATABASE_URL = "<the Neon string>"
+python manage.py create_admin --email you@example.com --username you
+```
+
+The same two lines before `python manage.py seed_demo` fill the site with demo accounts, if you want them (they
+share a public password, so do not leave them on a real site). Close the window afterwards so the string is not kept.
+
+**6. Try it**: sign up, confirm the email code, log in as the admin at `/admin/login`.
+
+### What the free plans cost you
+
+- **Uploads are off** (`UPLOADS_ENABLED=false`). Render's disk is wiped on every deploy, so photos and videos cannot be
+  kept. Campaign photos and videos cannot be added at all; profile pictures and logos can be set from a pasted image
+  link. Real uploads need external storage (S3, Supabase Storage, Cloudflare R2) and a code change.
+- **No background worker.** `CELERY_TASK_ALWAYS_EAGER=true` makes emails and the first YouTube sync run inside the
+  request (an email adds about a second). The scheduled jobs do **not** run: the daily YouTube refresh (03:00 UTC),
+  the daily video statistics refresh, and the five-minute campaign auto-close. Expired campaigns still stop taking
+  applications and leave the creators' list, but their status stays "Published" until a brand closes them. To run the
+  daily YouTube refresh you need a paid Render worker plus scheduler (the commands are in section 3 below), or an
+  outside scheduler.
+- **The free API sleeps when idle.** The first request after a quiet period can take 30 to 60 seconds (logins and the
+  Google redirect feel it). An outside pinger on `/api/v1/health/` every few minutes keeps it awake.
+- **Neon sleeps too** and wakes in a few seconds. Brevo's free plan sends about 300 emails a day.
+- **The free Redis store** only holds counters and sign-in tokens; losing it is harmless.
+- **Previews:** `CORS_ALLOWED_ORIGINS` lists exact addresses, so Vercel preview deployments cannot call the API unless
+  you add their address.
+
+When real users arrive, upgrade in this order: a paid Render worker and scheduler (set `CELERY_TASK_ALWAYS_EAGER` back
+to `false` and add the two `celery` services, section 3), then external storage for uploads (`UPLOADS_ENABLED=true`),
+then paid plans so nothing sleeps.
+
+---
+
 ## 1. What must be in place
 
 | Need | Why |

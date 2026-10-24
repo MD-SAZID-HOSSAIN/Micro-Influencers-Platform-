@@ -38,6 +38,9 @@ AUTH_USER_MODEL = "accounts.User"
 # Upload size limits (photos for campaigns and profile pictures; videos for campaigns).
 MEDIA_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 MEDIA_MAX_VIDEO_BYTES = 50 * 1024 * 1024
+# false = refuse every file upload. For a host whose disk is wiped on each deploy (no persistent storage), so an
+# upload is never accepted and then lost. Profile pictures and logos can still be set from a pasted link.
+UPLOADS_ENABLED = env.bool("UPLOADS_ENABLED", default=True)
 
 # Applied when someone registers or resets a password (not when an admin is created on the server).
 # The 8-character minimum is enforced by the serializers' own `min_length`.
@@ -190,6 +193,10 @@ MEDIA_ROOT = Path(env("MEDIA_ROOT", default="") or BASE_DIR / "media")  # blank 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = "UTC"
+# true = run background jobs (emails, the first YouTube sync) inside the request instead of queueing them. For a
+# deployment with no Celery worker, such as a free Render plan. The scheduled daily jobs still need a beat process.
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = False
 CELERY_BEAT_SCHEDULE = {
     "sync-all-youtube": {
         "task": "apps.social.tasks.sync_all_youtube",

@@ -1,0 +1,87 @@
+# Render Blueprint for the API (Django). The database is Neon and the website is on Vercel, so neither is here.
+# Step by step: docs/DEPLOYMENT.md, "Free hosting: Vercel + Render + Neon".
+#
+# Every variable marked `sync: false` is asked for in the Render dashboard the first time you apply this file.
+# Choose the same region everywhere (Singapore suits South Asia) so the API and the database are close.
+services:
+  - type: web
+    name: collabnest-api
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements/base.txt && python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --access-logfile -
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Where things live. Use the real addresses once you know them (see the guide).
+      - key: ALLOWED_HOSTS          # the API's own host name, e.g. collabnest-api.onrender.com (no https://)
+        sync: false
+      - key: FRONTEND_URL           # the website, e.g. https://collabnest.vercel.app
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS   # the same website address; must start with https://
+        sync: false
+      - key: NUM_PROXIES            # Render puts exactly one proxy in front of the app
+        value: "1"
+
+      # Database (Neon): the DIRECT connection string, ending in ?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+
+      # Redis-compatible store (rate limiting and the YouTube sign-in), defined below.
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: collabnest-redis
+          property: connectionString
+
+      # No Celery worker on the free plan: send emails etc. inside the request. No disk: refuse file uploads.
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "true"
+      - key: UPLOADS_ENABLED
+        value: "false"
+
+      # Security and rules
+      - key: ADMIN_TOKEN_MINUTES    # an admin login lasts 8 hours (0 would mean it never expires)
+        value: "480"
+      - key: MIN_CREATOR_FOLLOWERS
+        value: "1000"
+      - key: OAUTH_ENCRYPTION_KEY   # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+        sync: false
+
+      # Google sign-in for YouTube
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI    # https://<your-api-host>/api/v1/social/youtube/callback/
+        sync: false
+      # YOUTUBE_API_KEY is optional (views and likes on the content report): add it later in the dashboard.
+
+      # Email (Brevo SMTP)
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp-relay.brevo.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER        # Brevo's SMTP login (looks like a1b2c3001@smtp-brevo.com), not your account email
+        sync: false
+      - key: EMAIL_HOST_PASSWORD    # the Brevo SMTP key (xsmtpsib-...)
+        sync: false
+      - key: DEFAULT_FROM_EMAIL     # a sender address you verified in Brevo
+        sync: false
+
+  - type: keyvalue
+    name: collabnest-redis
+    plan: free
+    region: singapore
+    ipAllowList: []   # only services on the same Render account can connect

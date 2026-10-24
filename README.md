@@ -678,7 +678,8 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Email delivery: console in development, SMTP for real email. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
 | `MEDIA_URL`, `MEDIA_ROOT` | URL and folder for uploaded files. `MEDIA_ROOT` empty means `<repo>/media`. |
-| `CELERY_TASK_ALWAYS_EAGER` | Development only, default `True`: run background jobs inside the request. |
+| `CELERY_TASK_ALWAYS_EAGER` | Run background jobs (emails, the first YouTube sync) inside the request instead of a worker. Default `True` in development, `false` in production. Set `true` on a host with no Celery worker. |
+| `UPLOADS_ENABLED` | Default `true`. Set `false` on a host with no persistent disk: every file upload is refused (`uploads_disabled`); profile pictures and logos can still be a pasted link. |
 
 Settings modules: `config.settings.dev` (local), `config.settings.test` (pytest) and `config.settings.prod`
 (deployment; it refuses to start with an unsafe configuration). **Production is the default**: `manage.py`, wsgi and
