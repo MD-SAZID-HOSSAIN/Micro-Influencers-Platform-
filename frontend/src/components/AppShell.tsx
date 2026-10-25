@@ -138,7 +138,7 @@ export default function AppShell() {
       <header className="sticky top-0 z-30 bg-mist-50/95 backdrop-blur-md border-b border-ink-200">
         <div className="container-page h-16 flex items-center gap-3 sm:gap-6">
           <button
-            className="lg:hidden -ml-1 inline-flex items-center justify-center w-10 h-10 text-ink-700 rounded-md hover:bg-ink-100/60"
+            className="lg:hidden -ml-1 inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 text-ink-700 rounded-md hover:bg-ink-100/60 shrink-0"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open navigation"
           >
@@ -179,11 +179,11 @@ export default function AppShell() {
             </ul>
           </nav>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="ml-auto lg:ml-0 flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setCmdkOpen(true)}
               aria-label="Search"
-              className="lg:hidden inline-flex items-center justify-center w-10 h-10 text-ink-700 rounded-md hover:bg-ink-100/60"
+              className="lg:hidden inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 text-ink-700 rounded-md hover:bg-ink-100/60 transition-colors"
             >
               <Search className="w-5 h-5" />
             </button>
@@ -521,7 +521,7 @@ function NotificationBell() {
       {mounted && (
         <div
           className={clsx(
-            'absolute right-0 mt-2 w-[min(calc(100vw-1.5rem),24rem)] sm:w-96 bg-mist-50 border border-ink-200 rounded-[14px] shadow-pop overflow-hidden z-50',
+            'absolute -right-11 sm:right-0 mt-2 w-[min(calc(100vw-2rem),24rem)] sm:w-96 bg-mist-50 border border-ink-200 rounded-[14px] shadow-pop overflow-hidden z-50',
             open ? 'anim-pop-in' : 'anim-pop-out pointer-events-none',
           )}
           style={{ transformOrigin: 'top right' }}
