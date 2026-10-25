@@ -197,6 +197,9 @@ CELERY_TIMEZONE = "UTC"
 # deployment with no Celery worker, such as a free Render plan. The scheduled daily jobs still need a beat process.
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 CELERY_TASK_EAGER_PROPAGATES = False
+# A failed email is retried later by the worker. With no worker (jobs run inside the request) a retry would only hold the
+# request open, so the failure is logged with its reason instead. Read from the environment value, not the dev default.
+EMAIL_RETRY_ON_FAILURE = not CELERY_TASK_ALWAYS_EAGER
 CELERY_BEAT_SCHEDULE = {
     "sync-all-youtube": {
         "task": "apps.social.tasks.sync_all_youtube",
@@ -226,6 +229,8 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+# Seconds to wait for the mail server. Without a limit a wrong host or login can hold a request open for minutes.
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 
 OAUTH_ENCRYPTION_KEY = env("OAUTH_ENCRYPTION_KEY", default="")

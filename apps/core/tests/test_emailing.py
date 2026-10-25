@@ -111,3 +111,17 @@ def test_deliver_email_task_is_registered_with_celery():
     app.loader.import_default_modules()
 
     assert "apps.core.tasks.deliver_email" in app.tasks
+
+
+def test_without_a_worker_a_failed_send_is_logged_with_its_reason_and_not_retried(settings, caplog):
+    """Jobs that run inside the request (no worker, e.g. a free host) must not hold the request open with retries."""
+    from apps.core.tasks import deliver_email
+
+    settings.EMAIL_RETRY_ON_FAILURE = False
+    with mock.patch("apps.core.tasks.send_mail", side_effect=SMTPException("535 authentication failed")) as send:
+        with mock.patch.object(deliver_email, "retry") as retry:
+            deliver_email.run("a@example.com", "Hi", "SECRET CODE 123456")
+
+    assert send.call_count == 1 and retry.call_count == 0
+    assert "SMTPException" in caplog.text and "535 authentication failed" in caplog.text
+    assert "SECRET CODE" not in caplog.text  # the body can hold a one-time code

@@ -676,6 +676,7 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `ADMIN_TOKEN_MINUTES` | Minutes an admin login lasts. Default `0` = the admin stays logged in until Log out or a password change (everyone else: 24 hours). |
 | `YOUTUBE_API_KEY` | Optional server key for public video statistics. Without it, content performance shows `not_available`. |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Email delivery: console in development, SMTP for real email. |
+| `EMAIL_TIMEOUT` | Seconds to wait for the mail server before giving up. Default `10`. |
 | `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
 | `MEDIA_URL`, `MEDIA_ROOT` | URL and folder for uploaded files. `MEDIA_ROOT` empty means `<repo>/media`. |
 | `CELERY_TASK_ALWAYS_EAGER` | Run background jobs (emails, the first YouTube sync) inside the request instead of a worker. Default `True` in development, `false` in production. Set `true` on a host with no Celery worker. |

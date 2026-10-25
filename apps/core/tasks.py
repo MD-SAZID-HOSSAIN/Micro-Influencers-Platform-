@@ -34,6 +34,11 @@ def deliver_email(self, to: str, subject: str, body: str) -> None:
     try:
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [to], fail_silently=False)
     except Exception as exc:
+        if not settings.EMAIL_RETRY_ON_FAILURE:
+            # No worker is waiting to retry later (the job runs inside the request), and retrying at once would only
+            # hold the request open. Say why it failed so the host's log shows a wrong login or sender.
+            logger.error("Failed to send email (subject=%r): %s: %s", subject, type(exc).__name__, exc)
+            return
         if self.request.retries >= self.max_retries:
             # Deliberately omit the body: it can contain one-time codes.
             logger.exception("Failed to send email (subject=%r) after %d retries", subject, self.max_retries)
