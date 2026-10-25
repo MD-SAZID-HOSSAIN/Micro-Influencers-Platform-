@@ -79,6 +79,9 @@ share a public password, so do not leave them on a real site). Close the window 
   applications and leave the creators' list, but their status stays "Published" until a brand closes them. To run the
   daily YouTube refresh you need a paid Render worker plus scheduler (the commands are in section 3 below), or an
   outside scheduler.
+- **Outgoing email only works on port 2525.** Render's free plan blocks outbound SMTP on ports 25, 465 and 587, so the
+  usual Brevo port 587 times out and no email is sent. `render.yaml` sets `EMAIL_PORT=2525` (Brevo accepts it). A paid
+  Render instance has no such block.
 - **The free API sleeps when idle.** The first request after a quiet period can take 30 to 60 seconds (logins and the
   Google redirect feel it). An outside pinger on `/api/v1/health/` every few minutes keeps it awake.
 - **Neon sleeps too** and wakes in a few seconds. Brevo's free plan sends about 300 emails a day.

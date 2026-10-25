@@ -69,8 +69,8 @@ services:
         value: django.core.mail.backends.smtp.EmailBackend
       - key: EMAIL_HOST
         value: smtp-relay.brevo.com
-      - key: EMAIL_PORT
-        value: "587"
+      - key: EMAIL_PORT             # 2525, not 587: Render's free plan blocks outgoing mail on ports 25, 465 and 587
+        value: "2525"
       - key: EMAIL_USE_TLS
         value: "True"
       - key: EMAIL_HOST_USER        # Brevo's SMTP login (looks like a1b2c3001@smtp-brevo.com), not your account email
