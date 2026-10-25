@@ -27,7 +27,10 @@ export function Modal({
 
   // Esc-to-close + scroll lock + initial focus (only when the dialog opens or closes)
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      document.body.style.overflow = '';
+      return;
+    }
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();

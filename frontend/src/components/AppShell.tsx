@@ -78,10 +78,14 @@ export default function AppShell() {
   useEffect(() => {
     setSidebarOpen(false);
     setCmdkOpen(false);
+    document.body.style.overflow = '';
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!sidebarOpen && !cmdkOpen) return;
+    if (!sidebarOpen && !cmdkOpen) {
+      document.body.style.overflow = '';
+      return;
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSidebarOpen(false);
@@ -92,7 +96,7 @@ export default function AppShell() {
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      if (!sidebarOpen && !cmdkOpen) document.body.style.overflow = '';
+      document.body.style.overflow = '';
     };
   }, [sidebarOpen, cmdkOpen]);
 

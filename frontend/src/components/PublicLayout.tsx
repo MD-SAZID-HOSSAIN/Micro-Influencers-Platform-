@@ -43,20 +43,25 @@ export default function PublicLayout() {
   }, []);
 
   useEffect(() => {
+    if (!menuOpen) {
+      document.body.style.overflow = '';
+      return;
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpen(false);
     };
-    if (menuOpen) {
-      window.addEventListener('keydown', onKey);
-      document.body.style.overflow = 'hidden';
-    }
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      if (menuOpen) document.body.style.overflow = '';
+      document.body.style.overflow = '';
     };
   }, [menuOpen]);
 
-  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    setMenuOpen(false);
+    document.body.style.overflow = '';
+  }, [pathname]);
 
   const closeMenu = () => setMenuOpen(false);
 
