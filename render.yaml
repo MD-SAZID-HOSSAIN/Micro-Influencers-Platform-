@@ -77,7 +77,7 @@ services:
         sync: false
       - key: EMAIL_HOST_PASSWORD    # the Brevo SMTP key (xsmtpsib-...)
         sync: false
-      - key: DEFAULT_FROM_EMAIL     # a sender address you verified in Brevo
+      - key: DEFAULT_FROM_EMAIL     # CollabNest <your-verified-sender@example.com>: the name shows in the inbox
         sync: false
 
   - type: keyvalue

@@ -4,10 +4,9 @@
 |---|---|
 | **Project** | 4 - Micro-Influencers' Platform: two-sided creator / brand marketplace |
 | **Team** | 8 members (Backend team no 1, Frontend team no 4) |
-| **Timeline** | Sep 28 – Oct 23, 2026 (about 3.5 weeks) |
+| **Timeline** | Sep 24 – Oct 23, 2026   |
 | **Type** | Internship project |
-| **Current phase** | PRD |
-| **Document** | Product Requirements Document, v1.0 (scope trimmed to fit the 23 Oct 2026 deadline) |
+| **Document** | Product Requirements Document |
 
 ---
 

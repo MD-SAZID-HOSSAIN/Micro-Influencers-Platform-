@@ -677,7 +677,7 @@ All configuration comes from environment variables; nothing secret is stored in 
 | `YOUTUBE_API_KEY` | Optional server key for public video statistics. Without it, content performance shows `not_available`. |
 | `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | Email delivery: console in development, SMTP for real email. |
 | `EMAIL_TIMEOUT` | Seconds to wait for the mail server before giving up. Default `10`. |
-| `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). |
+| `DEFAULT_FROM_EMAIL` | The sender address (set up SPF/DKIM for its domain). Add a display name so inboxes show it instead of the part before the `@`: `CollabNest <hello@example.com>`. |
 | `MEDIA_URL`, `MEDIA_ROOT` | URL and folder for uploaded files. `MEDIA_ROOT` empty means `<repo>/media`. |
 | `CELERY_TASK_ALWAYS_EAGER` | Run background jobs (emails, the first YouTube sync) inside the request instead of a worker. Default `True` in development, `false` in production. Set `true` on a host with no Celery worker. |
 | `UPLOADS_ENABLED` | Default `true`. Set `false` on a host with no persistent disk: every file upload is refused (`uploads_disabled`); profile pictures and logos can still be a pasted link. |

@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   User, Search, Bell, Compass, ListChecks, Link2, LogOut, Plus,
   Megaphone, Building2, Menu, X, ChevronDown, CheckCircle2, ArrowRight,
-  Command, Sparkles, Home, ArrowUpRight, Mail,
+  Command, Sparkles, Home, Mail,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
@@ -263,7 +263,7 @@ export default function AppShell() {
         </div>
       )}
 
-      <main key={location.pathname} id="main" className="flex-1 min-w-0 anim-page-in pb-24 md:pb-0 bg-mist-50">
+      <main key={location.pathname} id="main" className="flex-1 min-w-0 anim-page-in pb-8 md:pb-0 bg-mist-50">
         <Outlet />
       </main>
 
@@ -275,8 +275,6 @@ export default function AppShell() {
         role={user.role}
         onLogout={() => { logout(); navigate('/'); }}
       />
-
-      <MobileBottomBar primaryAction={primaryAction} onMenu={() => setSidebarOpen(true)} />
 
       <CommandPalette
         open={cmdkOpen}
@@ -362,35 +360,6 @@ function MobileDrawer({
         </div>
       </aside>
     </>
-  );
-}
-
-function MobileBottomBar({
-  primaryAction, onMenu,
-}: {
-  primaryAction: { to: string; label: string; icon: any };
-  onMenu: () => void;
-}) {
-  return (
-    <div className="md:hidden fixed bottom-0 inset-x-0 z-30 pointer-events-none">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-3 sm:pb-4 safe-bottom">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <button
-            onClick={onMenu}
-            className="inline-flex items-center justify-center gap-1.5 h-12 px-3 bg-mist-50 border border-ink-200 rounded-md text-ink-900 font-semibold text-sm shadow-card"
-            aria-label="Open navigation"
-          >
-            <Menu className="w-4 h-4" />
-            Menu
-          </button>
-          <Link to={primaryAction.to} className="btn btn-primary btn-lg flex-1 shadow-pop">
-            <primaryAction.icon className="w-4 h-4" />
-            {primaryAction.label}
-            <ArrowUpRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    </div>
   );
 }
 

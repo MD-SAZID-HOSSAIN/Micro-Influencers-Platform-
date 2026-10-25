@@ -4,6 +4,82 @@ This report explains, in simple words, what was built for the Micro-Influencers'
 was built, what went wrong along the way, and what is still open. It is written for people who were not
 watching the work happen.
 
+**Last updated: 25 October 2026.** Section 0 says where the project stands today. Sections 1 to 11 are the
+history of the first build; where something there has since changed, a line starting **Update:** says so.
+
+---
+
+## 0. Where things stand now (25 October 2026)
+
+**The app is live.** The website runs on **Vercel**, the API on **Render** and the database on **Neon**, all on free
+plans (see `docs/DEPLOYMENT.md`, "Free hosting"). The project runs on a locally installed PostgreSQL for
+development. **Docker was removed** (the Dockerfile and compose file are deleted). There are **1,125 automated tests**, all
+passing. The website (React and Vite) was also built, so the project is no longer backend only.
+
+**The four rules the product follows** (each has tests, and all four were checked again against the live API):
+
+1. **Creator verification:** a confirmed email **and** a YouTube channel connected with Google sign-in with at least
+   1,000 subscribers. Until then a creator cannot apply to any campaign.
+2. **Brand verification:** a confirmed email **and** an Instagram, TikTok or Facebook link **approved by an admin**.
+   YouTube does not verify a brand. Until then a brand cannot publish a campaign or accept a proposal.
+3. **Typed numbers:** a creator's Instagram, TikTok and Facebook numbers stay hidden until an admin approves them. They
+   never make the creator Verified. YouTube numbers cannot be typed at all.
+4. **No negotiation:** the brand sets the budget per creator. A creator sends no price, and trying to is refused.
+
+**What changed after the first build**
+
+- **Verification and admin review.** Typed Instagram, TikTok and Facebook numbers, and brand links, wait in an admin
+  queue (approve or reject with a reason). The "Verified" badge means the same thing everywhere: email plus YouTube
+  with 1,000+ subscribers.
+- **Fixes from a second review** (10 findings; 6 fixed, 4 left open, listed below):
+  - One YouTube channel can now be connected to **one account only** (the channel id is stored and unique).
+  - A creator is Verified only while Google can still confirm the channel. If access is revoked or the audience
+    is hidden, the stats are marked out of date and the creator must reconnect before applying.
+  - A YouTube **deliverable must be a video on the creator's own channel**, and the daily statistics sync only stores
+    numbers for such videos.
+  - The brand's **minimum followers is enforced** when the creator has numbers on the campaign's platform. A verified
+    YouTube creator may still apply to a campaign on another platform.
+  - A **suspended creator's proposal can't be accepted**.
+  - Typed YouTube numbers are refused by the API. A brand can't add YouTube as its verified platform.
+- **Docker removed**, and the README and deployment guide now describe a local PostgreSQL.
+- **Deployment files:** `render.yaml` (API and a Redis-compatible store), `frontend/vercel.json`, and three settings for
+  hosts with no worker and no disk: `CELERY_TASK_ALWAYS_EAGER` (run emails inside the request), `UPLOADS_ENABLED`
+  (refuse uploads), and `EMAIL_TIMEOUT` (never wait more than 10 seconds for the mail server).
+- **Email:** sending works through Brevo's SMTP. On Render's free plan the usual SMTP ports 25, 465 and 587 are
+  **blocked**, so the live site uses port **2525**. A failed send now logs its reason. Locally, email is printed
+  in the API window unless you switch `EMAIL_BACKEND` to SMTP.
+- **Website polish:** clearer "not verified" notices, larger dashboard figures, a consistent green Verified tag, better
+  colour contrast, and the header shows "My dashboard" when you are logged in.
+
+**Still open (known gaps)**
+
+- **Admin login lifetime:** the code default is "never expires". `render.yaml` sets 480 minutes (8 hours),
+  but a server without that setting keeps admins logged in until they log out. Check the value in Render's Environment tab.
+- **Password-reset codes:** requests are limited per IP only, not per account.
+- **Uploaded files:** Django itself serves `/media/`, and deleted uploads stay on disk. With uploads switched off on
+  the free plan this does not matter yet.
+- **Free-plan limits:** uploads are off; no background worker, so the daily YouTube refresh, the daily video statistics
+  refresh and the five-minute campaign auto-close do not run; the API and the database sleep when idle, so the first
+  request after a pause is slow.
+- **Not yet confirmed on the live site:** a real sign-up email arriving, and a real Google "Connect YouTube" login.
+  They were tested on a local computer and with fakes, but not end to end on Render.
+- A person (not me) should still review the code before launch (item 15 below).
+
+**Addresses**
+
+| Item | Address |
+|---|---|
+| Website (Vercel) | https://micro-influencers-platform.vercel.app |
+| API (Render) | https://collabnest-api.onrender.com |
+| Health check | https://collabnest-api.onrender.com/api/v1/health/ |
+| API docs (Swagger) | https://collabnest-api.onrender.com/api/docs/ |
+| Admin login | https://micro-influencers-platform.vercel.app/admin/login |
+| Google sign-in callback | https://collabnest-api.onrender.com/api/v1/social/youtube/callback/ |
+| Source code (GitHub) | https://github.com/MD-SAZID-HOSSAIN/Micro-Influencers-Platform- (branch `main`) |
+
+Secrets (database string, Brevo key, Google secret, passwords) are **not** written here. They live in the Render
+dashboard and in your local `.env`.
+
 ---
 
 ## 1. The project in one minute
@@ -61,7 +137,7 @@ decision I made that was not spelled out in the PRD. Those decisions are now in 
 **Each phase lives on its own git branch** (`feature/phase-0-foundation` … `feature/phase-9-extensions`).
 Each branch was cut from the one before it, so the last branch contains everything. Later, the last branch
 (`feature/phase-9-extensions`) was pushed to GitHub and merged into `main` through pull requests #1 and #2.
-The earlier phase branches exist only on this computer.
+The earlier phase branches exist only on this computer. **Update:** later changes were committed straight to `main`.
 
 ## 3. The tools I chose (and why)
 
@@ -78,6 +154,7 @@ The earlier phase branches exist only on this computer.
 Local note: your machine had no Docker and no PostgreSQL, so I installed a small PostgreSQL inside the
 project's private Python folder (`.venv`) just to run the tests. The project files still say PostgreSQL 16
 and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 18.
+**Update:** you now run PostgreSQL 16 installed on your computer, and the live database is on Neon (PostgreSQL 18).
 
 ## 4. What I built, phase by phase
 
@@ -117,6 +194,8 @@ and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 1
 - **Brand profile:** company name, industry, website, logo, about.
 - **Audience numbers per platform** (followers, engagement rate). Numbers typed by hand are labelled
   **Unverified**. Typing over a number that came from YouTube is refused.
+  **Update:** typed Instagram, TikTok and Facebook numbers now wait for an admin and stay hidden from brands until
+  approved. Typing YouTube numbers at all is refused (400 `youtube_from_google_only`).
 - **Portfolio:** up to 10 links to past work. Ten requests at the same instant still cannot create an
   11th item.
 
@@ -133,6 +212,8 @@ and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 1
 - The Google tokens are **encrypted** in our database and are **never** sent to the frontend.
 - The follower count and engagement rate (likes + comments ÷ views over the last 10 videos) are pulled
   automatically, and a connected account gets the **Verified** badge.
+  **Update:** Verified now also needs a confirmed email and at least 1,000 subscribers, and it lasts only while
+  Google can still confirm the channel. One channel can verify only one account.
 - A background job refreshes everyone **every day at 03:00 UTC**. A creator can also refresh by hand, but
   only once every 15 minutes.
 - If Google says the permission is gone, we keep the **last known numbers**, mark them *outdated*, and
@@ -153,18 +234,23 @@ and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 1
   the brand once. Also, the server refuses applications after the deadline *even before* that job runs.
 - **Creator side:** list and filter open campaigns, with an **"eligible"** hint (do you have numbers for
   this platform, and enough followers?). The hint is only advice; it never blocks applying.
+  **Update:** the brand's minimum followers is now a requirement. If you have numbers on the campaign's platform and
+  they are under the minimum, applying is refused (403 `not_eligible`). A verified YouTube creator may still apply
+  to a campaign on a platform where they have no numbers.
 
 ### Phase 6: Applications (Tasks 17–20): the heart of the product
 
-- A creator applies with a cover message, a price, up to 3 links and a note. **Only one live application
+- A creator applies with a cover message, up to 3 links and a note. **Only one live application
   per campaign.** Two clicks at the same moment still give exactly one application.
+  **Update:** there is no price to type. Every proposal gets the budget per creator the brand set, and sending a
+  rate is refused. There is no negotiation.
 - A rejected creator cannot apply again. After withdrawing, a creator can re-apply, but only while the
   campaign is still published.
 - **Withdraw:** an *accepted* creator must give a reason (up to 300 characters) and the brand is told "a
   slot has opened".
 - **The brand's list:** newest first, withdrawn hidden by default, with a counter like "2 of 3 accepted".
 - **Shortlist / Accept / Reject:** allowed moves are strictly defined. Accept and Reject can't be undone.
-  Accepting twice is harmless.
+  Accepting twice is harmless. **Update:** a suspended creator's proposal can't be accepted (it can still be rejected).
 - **The big guarantee:** *accepted creators can never be more than "creators needed"*, even if many brand
   clicks arrive at the same instant. I did this with a **database lock** on the campaign. To prove the
   tests are real, I temporarily **removed the lock** and 12 of 32 test runs failed; I put it back, and it
@@ -198,6 +284,8 @@ and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 1
   `docs/openapi.yml` file for Postman. Tests fail if this file or the environment-variable list gets out
   of date.
 - **Docker files** (Dockerfile + compose). *Not built here: no Docker on this computer.*
+  **Update:** removed. The project now runs on a locally installed PostgreSQL, and deployment is described for
+  Vercel, Render and Neon.
 - **Clean-clone check:** I copied the repo to an empty folder, installed everything fresh, followed the
   README and ran all tests: all passed.
 
@@ -219,10 +307,13 @@ and Python 3.12 for real deployment; I developed on Python 3.13 and PostgreSQL 1
   reason and is saved in an **audit log** that survives even if the admin or the target is deleted.
   Admins can't suspend or delete themselves. There is also a platform overview (users, sign-ups over 30
   days, campaigns by status, total proposals).
+  **Update:** the panel also has the review queues for typed creator numbers and brand links (approve, or reject with a
+  reason), and the admin login lasts as long as `ADMIN_TOKEN_MINUTES` says (`render.yaml` sets 480, which is 8 hours).
 - **Campaign analytics (FR-23):** views, the proposal funnel, accepted vs needed, average proposed price
   vs budget, acceptance rate. I also built the "content performance" part (views, likes, comments per
   delivered YouTube video). It reads a **daily saved snapshot**, so opening the page never waits for
-  Google; unknown numbers say `not_available`.
+  Google; unknown numbers say `not_available`. **Update:** numbers are only stored for videos on the creator's own
+  YouTube channel.
 
 ## 5. Mistakes and problems along the way (and how they were fixed)
 
@@ -246,17 +337,24 @@ I want to be open about these:
 
 - 30 tasks, 10 phases, 10 stacked git branches
 - About 220 files and 20,000+ lines added (code, tests and docs)
-- **872 automated tests, all passing** (810 before the code-review fixes)
-- 59 written decisions in `docs/DECISIONS.md`
+- **872 automated tests, all passing** (810 before the code-review fixes). **Update:** 1,125 now.
+- Every decision that was not in the PRD is written in `docs/DECISIONS.md`
 - Every one of the 5 "Review Focus" risks has tests
 
 ## 7. What I could NOT check
 
+This is the list from the first build. **Update:** the status of each item today is in the last line.
+
 - **Docker:** the image and compose stack were never built or started (Docker isn't installed here).
+  *Now: Docker was removed.*
 - **Real Google:** all Google behaviour was tested with fakes and mocked web calls, never with a real
-  Google account or your Google keys.
+  Google account or your Google keys. *Now: the app builds a real Google sign-in link with your client id and
+  redirect address. A full login on the live site is still untested.*
 - **A live server with Redis:** login/limits were tested in the test suite, not against a running Redis.
+  *Now: a Redis-compatible store is part of the Render setup. The rate limits have not been tested under load.*
 - **Real email delivery** (Gmail/Outlook): not tested; it needs your email provider set up (SPF/DKIM).
+  *Now: Brevo accepts the login and a test message, and the app's own send works locally. Delivery to other Gmail
+  addresses (not spam) and sending from Render are not confirmed yet.*
 
 ## 8. The independent code review (what it found)
 
@@ -285,6 +383,7 @@ The most important:
    helper, `config/bootstrap.py`). Local development opts in with `DJANGO_SETTINGS_MODULE=config.settings.dev`
    in `.env` (the example file has it). Docker containers are forced onto production settings.
 2. The Docker image no longer has a web health check; only the `web` service has one.
+   *(Update: items 1 and 2 mention Docker, which has since been removed. The production-by-default rule still holds.)*
 3. Network errors from Google no longer contain the request address (and so the API key), and the HTTP
    library is kept from logging addresses.
 4. YouTube connect now finishes in a separate step by the **logged-in** creator, and a link started by
@@ -317,13 +416,15 @@ button links assume frontend page names I chose.
 python -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -r requirements/dev.txt
-copy .env.example .env
-docker compose up -d db redis
+copy .env.example .env             # then create the database: see the README, Step 1
 python manage.py migrate
 python manage.py seed_demo        # optional demo data
 python manage.py runserver
 pytest                             # run all tests
 ```
+
+**Update:** Docker is no longer used. Install PostgreSQL 16, create a database called `microinfluencers`, and make
+`DATABASE_URL` in `.env` match your password. Redis is optional for development (see the README, Step 1).
 
 Open `http://localhost:8000/api/docs/` to see every endpoint. Full details: `README.md`,
 `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`.
@@ -334,8 +435,9 @@ The code is finished, but a few things can only be done by a person: they need y
 passwords, your decisions, or your team. They are listed in the order I suggest doing them. Tick them off
 as you go.
 
-**Time check:** the project deadline is **23 October**. The PRD says the **last 2 days (21–23 Oct) are for
-bug fixes only**, so try to finish items 1 to 8 before then.
+**Time check (original plan):** the project deadline was **23 October**, with the last 2 days for bug fixes only.
+**Update:** that date has passed, and the app is deployed. Items below that mention Docker, or a schedule, are the
+original plan; the **Update** lines say what is true now.
 
 ### A. Do first (today or tomorrow)
 
@@ -353,15 +455,16 @@ bug fixes only**, so try to finish items 1 to 8 before then.
 
 ### B. Set up your computer properly (about 1 hour)
 
-- [ ] **4. Install Docker Desktop** (docker.com). I could not test Docker, so you are the first to try it.
-  Then, in the project folder:
+- [x] **4. ~~Install Docker Desktop~~.** *Update: not needed. Docker was removed, and PostgreSQL is installed on your
+  computer.* The original text was:
 
   ```bash
   docker compose up -d db redis        # starts PostgreSQL and Redis
   ```
 
   Open your `.env` file (copy `.env.example` to `.env` first) and make sure `DATABASE_URL` and `REDIS_URL`
-  point to these two (the example file already does).
+  point to these two (the example file already does). *Now: `DATABASE_URL` points to your local PostgreSQL, and
+  Redis is optional for development.*
 
 - [ ] **5. Run the whole thing once, like a new person would.**
 
@@ -383,7 +486,7 @@ bug fixes only**, so try to finish items 1 to 8 before then.
   celery -A config beat -l info                   # start only ONE of these
   ```
 
-- [ ] **6. Test the full Docker stack once** (this is the part I could not run):
+- [x] **6. ~~Test the full Docker stack once~~.** *Update: no longer applicable, Docker was removed.* The original text was:
 
   ```bash
   docker compose build
@@ -394,12 +497,10 @@ bug fixes only**, so try to finish items 1 to 8 before then.
   If something fails, send me the error text and I will fix the files. (Known issue: the worker and
   beat no longer show "unhealthy": finding 2 was fixed by moving the health check to the web service only.)
 
-- [ ] **7. Know about the temporary database on this computer.** To run tests and the app here without
-  Docker, a small PostgreSQL runs from the project's private Python folder (data in `.superpowers/pgdata`,
-  port 51314). It stops when the session ends or the computer sleeps, and your local `.env` points at it.
-  Once Docker or a normal PostgreSQL works for you, change `DATABASE_URL` in `.env` and stop it
-  (Task Manager → end the `postgres.exe` processes). The `.superpowers` folder is not part of the product
-  and is ignored by git.
+- [x] **7. The temporary database on this computer.** *Update: done. Your local `.env` now points at the normal
+  PostgreSQL 16 installed on your computer, and the temporary one is no longer used.* The original note was: a small
+  PostgreSQL ran from the project's private Python folder (data in `.superpowers/pgdata`, port 51314). The
+  `.superpowers` folder is not part of the product and is ignored by git.
 
 ### C. Create the real accounts and keys (needs your logins)
 
@@ -433,7 +534,9 @@ I cannot do these for you; they need your Google and email accounts.
   are for the frontend team to make.
 
 - [ ] **10. Choose an email provider and set it up.** Password reset **only works by email**, so this is
-  required, not optional. Pick any provider that supports SMTP, then:
+  required, not optional. *Update: Brevo was chosen. Its login, key and a sender address work from your computer.
+  Set `EMAIL_PORT=2525` on Render (its free plan blocks 25, 465 and 587), put the key and login in Render's
+  Environment tab, and confirm a real code reaches another Gmail address.* Pick any provider that supports SMTP, then:
   1. Fill `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
      `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL` in `.env`
      (use `django.core.mail.backends.smtp.EmailBackend` for `EMAIL_BACKEND`).
@@ -442,17 +545,20 @@ I cannot do these for you; they need your Google and email accounts.
   3. **Test with real inboxes:** request a password reset to a real Gmail address and a real Outlook
      address and check that the code arrives.
 
-- [x] **11. Create the first admin** (done on this computer for local use; repeat it on the real server). Admins cannot sign up on the website.
+- [x] **11. Create the first admin** (done on this computer for local use, **and on the live Neon database**). Admins cannot sign up on the website.
 
   ```bash
   python manage.py create_admin --email you@example.com --username yourname
   ```
 
   It asks for a password (twice). Then log in at `POST /api/v1/admin/auth/login/`.
+  **Update:** on Windows the command waits for the keyboard, so type the password yourself. The password in use was
+  shared in a chat; **change it** with `python manage.py changepassword admin`.
 
 ### D. Before the app goes on the internet
 
-- [ ] **12. Decide where it will run** (a server, a cloud service…). It needs: PostgreSQL 16 with backups,
+- [x] **12. Decide where it will run.** *Update: decided. Vercel (website), Render (API) and Neon (database), on free
+  plans. See `docs/DEPLOYMENT.md`.* The original requirements were: PostgreSQL 16 with backups,
   Redis 7, and a **reverse proxy** (like nginx or a cloud load balancer) that handles HTTPS. Full details
   are in `docs/DEPLOYMENT.md`. Three rules matter a lot:
   - The proxy must **set and overwrite** `X-Forwarded-Proto` and `X-Forwarded-For` (never trust the
@@ -472,7 +578,7 @@ I cannot do these for you; they need your Google and email accounts.
 ### E. Decisions I need you to confirm
 
 The PRD did not say what to do in these cases, so I picked a sensible answer. Please read them, and tell
-me if you want any changed (each one is a small change). The full list of all 59 is in `docs/DECISIONS.md`.
+me if you want any changed (each one is a small change). The full list is in `docs/DECISIONS.md`.
 
 | What I chose | Why | If you disagree |
 |---|---|---|
@@ -484,6 +590,9 @@ me if you want any changed (each one is a small change). The full list of all 59
 | Acceptance rate is a number from 0 to 1, or empty when nothing was sent | Avoids showing a fake 0% | Tell me if you want a percentage |
 | The campaign does **not** close when it is full | PRD says so | (already the PRD rule) |
 | Marking a collaboration "Completed" needs no deliverable first | PRD silent | Say if at least one link should be required |
+| A brand is verified by an admin-approved Instagram, TikTok or Facebook link, never by YouTube | Asked for by you after the first build | (rule 2) |
+| A verified YouTube creator may apply to a campaign on another platform; only the brand's minimum followers is enforced, and only where the creator has numbers on that platform | An earlier decision (see DECISIONS.md), kept | Say if numbers on the campaign's platform should be required |
+| One YouTube channel can verify one account only | Stops one person holding several verified accounts | Say if sharing a channel should be allowed |
 | A completed collaboration **cannot be withdrawn** | "Completion is final" | Say if creators may still withdraw |
 | Admin login is **separate**; normal login refuses admins | Safer, and the PRD says "separate panel" | Tell me if admins should use the normal login |
 | A suspended brand's campaigns are **hidden** from creators and take no new proposals; a suspended creator is hidden from the brand search. Existing proposals are kept | Decided after the PRD: suspension should take someone off the marketplace | Say if existing proposals should be hidden too |
@@ -532,6 +641,8 @@ The complete guide is `docs/FRONTEND_GUIDE.md`; send that file to the frontend t
 
 ### H. Suggested order against the deadline
 
+*(The original plan, kept for history. The dates have passed.)*
+
 | When | Do |
 |---|---|
 | **13–14 Oct** | Items 1, 2, 3 (decide on fixes, push, send docs to frontend). Items 4–7 (Docker, run it once). |
@@ -546,7 +657,8 @@ Do this once everything is connected. If every step works, the main product work
 1. Register a brand and a creator. Check the verification and reset emails arrive.
 2. Creator: fill the profile, connect YouTube (or type numbers by hand), add a portfolio link.
 3. Brand: create a campaign, publish it.
-4. Creator: find it (check the "eligible" hint), open it, apply.
+4. Creator: find it (check the "eligible" hint), open it, apply. *(Update: a creator needs a confirmed email and a
+   YouTube channel with 1,000+ subscribers first, and a brand needs an admin-approved link before it can publish.)*
 5. Brand: open the proposals, shortlist, then accept. Click Accept twice quickly: the count must go up once.
 6. Creator: see the status change and the notification (and email, if verified).
 7. Creator: add deliverable links. Brand: mark Completed, then leave a review.
